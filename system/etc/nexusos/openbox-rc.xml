@@ -1,22 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- NexusOS: Openbox only manages other apps' windows. The NexusOS desktop draws the taskbar,
-     so maximised windows stop 84px above the bottom and never cover it. -->
+     so maximised windows stop 52px above the bottom and never cover it. -->
 <openbox_config xmlns="http://openbox.org/3.4/rc">
   <resistance><strength>10</strength><screen_edge_strength>20</screen_edge_strength></resistance>
   <focus><focusNew>yes</focusNew><followMouse>no</followMouse><focusLast>yes</focusLast><underMouse>no</underMouse><focusDelay>200</focusDelay><raiseOnFocus>no</raiseOnFocus></focus>
   <placement><policy>Smart</policy><center>yes</center><monitor>Primary</monitor><primaryMonitor>1</primaryMonitor></placement>
   <theme>
-    <name>Onyx</name><titleLayout>NLIMC</titleLayout><keepBorder>yes</keepBorder><animateIconify>no</animateIconify>
+    <name>NexusOS</name><titleLayout>NLIMC</titleLayout><keepBorder>yes</keepBorder><animateIconify>no</animateIconify>
     <font place="ActiveWindow"><name>Inter</name><size>10</size><weight>Bold</weight><slant>Normal</slant></font>
     <font place="InactiveWindow"><name>Inter</name><size>10</size><weight>Normal</weight><slant>Normal</slant></font>
   </theme>
   <desktops><number>1</number><firstdesk>1</firstdesk><names><name>NexusOS</name></names><popupTime>0</popupTime></desktops>
   <resize><drawContents>yes</drawContents><popupShow>Never</popupShow></resize>
-  <margins><top>0</top><bottom>84</bottom><left>0</left><right>0</right></margins>
+  <margins><top>0</top><bottom>52</bottom><left>0</left><right>0</right></margins>
   <keyboard>
     <keybind key="A-Tab"><action name="NextWindow"><finalactions><action name="Focus"/><action name="Raise"/><action name="Unshade"/></finalactions></action></keybind>
     <keybind key="A-S-Tab"><action name="PreviousWindow"><finalactions><action name="Focus"/><action name="Raise"/><action name="Unshade"/></finalactions></action></keybind>
     <keybind key="A-F4"><action name="Close"/></keybind>
+    <keybind key="C-S-Escape"><action name="Execute"><command>/opt/nexusos/nexusos --open=taskmgr</command></action></keybind>
+    <keybind key="W-e"><action name="Execute"><command>/opt/nexusos/nexusos --open=files</command></action></keybind>
     <keybind key="W-d"><action name="ToggleShowDesktop"/></keybind>
     <keybind key="W-Up"><action name="Maximize"/></keybind>
     <keybind key="W-Down"><action name="Unmaximize"/></keybind>
@@ -24,7 +26,7 @@
   </keyboard>
   <mouse>
     <dragThreshold>4</dragThreshold><doubleClickTime>300</doubleClickTime><screenEdgeWarpTime>0</screenEdgeWarpTime>
-    <context name="Frame"><mousebind button="A-Left" action="Press"><action name="Focus"/><action name="Raise"/><action name="Unshade"/></mousebind><mousebind button="A-Left" action="Drag"><action name="Move"/></mousebind></context>
+    <context name="Frame"><mousebind button="A-Right" action="Drag"><action name="Resize"/></mousebind><mousebind button="A-Left" action="Press"><action name="Focus"/><action name="Raise"/><action name="Unshade"/></mousebind><mousebind button="A-Left" action="Drag"><action name="Move"/></mousebind></context>
     <context name="Titlebar"><mousebind button="Left" action="Drag"><action name="Move"/></mousebind><mousebind button="Left" action="DoubleClick"><action name="ToggleMaximize"/></mousebind></context>
     <context name="Titlebar Top Right Bottom Left TLCorner TRCorner BRCorner BLCorner"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/><action name="Unshade"/></mousebind></context>
     <context name="Top"><mousebind button="Left" action="Drag"><action name="Resize"><edge>top</edge></action></mousebind></context><context name="Left"><mousebind button="Left" action="Drag"><action name="Resize"><edge>left</edge></action></mousebind></context><context name="Right"><mousebind button="Left" action="Drag"><action name="Resize"><edge>right</edge></action></mousebind></context><context name="Bottom"><mousebind button="Left" action="Drag"><action name="Resize"><edge>bottom</edge></action></mousebind></context><context name="TLCorner"><mousebind button="Left" action="Drag"><action name="Resize"><edge>topleft</edge></action></mousebind></context><context name="TRCorner"><mousebind button="Left" action="Drag"><action name="Resize"><edge>topright</edge></action></mousebind></context><context name="BLCorner"><mousebind button="Left" action="Drag"><action name="Resize"><edge>bottomleft</edge></action></mousebind></context><context name="BRCorner"><mousebind button="Left" action="Drag"><action name="Resize"><edge>bottomright</edge></action></mousebind></context>

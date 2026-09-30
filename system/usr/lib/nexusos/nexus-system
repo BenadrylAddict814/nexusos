@@ -48,7 +48,7 @@ install_system_files() {   # copy the update's system files into place (only Nex
       /usr/share/polkit-1/actions/os.nexusos.*|/usr/share/lightdm/*nexusos*|/usr/share/xsessions/nexusos*|\
       /usr/share/applications/nexusos*|/usr/share/xdg-desktop-portal/nexusos*|/usr/share/pixmaps/nexusos*|\
       /etc/apt/apt.conf.d/20auto-upgrades|/etc/default/grub.d/nexusos*|/etc/systemd/journald.conf.d/nexusos*|\
-      /etc/xdg/mimeapps.list|/etc/skel/*) ;;
+      /etc/xdg/mimeapps.list|/etc/skel/*|/usr/share/themes/NexusOS/*) ;;
       *) say "  skipping $rel (not a NexusOS file)"; continue ;;
     esac
     case "$rel" in /usr/bin/*|/usr/lib/nexusos/nexus-*|/usr/lib/nexusos/*.py) mode=0755 ;; *) mode=0644 ;; esac

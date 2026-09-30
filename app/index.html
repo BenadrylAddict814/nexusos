@@ -100,6 +100,7 @@ textarea.note{width:100%;height:100%;border:0;resize:none;padding:16px 20px;back
 .devs{display:contents} .files nav button small{color:var(--muted);font-size:11px} .files nav button{text-align:left;border:0;background:none;color:var(--fg);padding:8px 10px;border-radius:8px;font:14px var(--body);cursor:pointer}
 .files nav button.on,.files nav button:hover{background:var(--raised)}
 .files ul{list-style:none;margin:0;padding:8px}
+.files .main>ul{flex:1 0 auto}
 .files li{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:default}
 .files li:hover{background:var(--raised)} .files li small{color:var(--muted);font-variant-numeric:tabular-nums}
 .files .fi{width:24px;height:24px}
@@ -295,6 +296,67 @@ select.txt{max-width:100%} select.txt option{background:var(--surface-solid);col
 .acc{border-radius:6px}
 .wp{border-radius:6px}
 :root.light{--accent:#0095b3}
+
+/* ===== 1.4.3: NexusOS as separate windows ===== */
+.view-panel #wall,.view-panel #desk,.view-panel .panel,.view-popup #wall,.view-popup #desk,.view-popup #bar,.view-toasts #wall,.view-toasts #desk,.view-toasts #bar,.view-toasts .panel,
+.view-app #wall,.view-app #desk,.view-app #bar,.view-app .panel,.view-desktop #bar,.view-desktop .panel{display:none!important}
+.view-panel body{background:#080b11}
+.view-panel #bar{position:fixed;inset:0;transform:none;border-radius:0;justify-content:center;padding:0 10px;gap:6px;background:linear-gradient(180deg,#0c1119,#070a10);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--accent) 55%,transparent);border:0;backdrop-filter:none}
+.view-panel #bar>.sep:first-of-type{display:none}
+.view-panel #tray{position:absolute;right:14px;top:50%;transform:translateY(-50%)}
+.view-panel #tray.on,.view-panel #startBtn.on{background:var(--raised)}
+.view-panel #apps{max-width:calc(100vw - 420px)}
+.view-panel .tb.many::before{content:"";position:absolute;right:3px;top:3px;width:6px;height:6px;border-radius:50%;background:var(--accent);opacity:.7}
+#showdesk{position:absolute;right:0;top:0;bottom:0;width:8px;border:0;border-left:1px solid var(--line);background:transparent;cursor:pointer}
+#showdesk:hover{background:var(--raised)}
+.view-popup body{background:var(--surface-solid)}
+.view-popup .panel{position:fixed;inset:0;width:auto!important;transform:none!important;opacity:1!important;pointer-events:auto!important;border-radius:0;display:none!important;backdrop-filter:none;background:linear-gradient(180deg,#0d121b,#080b11);border:1px solid color-mix(in srgb,var(--accent) 35%,transparent);box-shadow:none;overflow:auto}
+.view-popup .panel.open{display:flex!important}
+.view-popup #grid{flex:1;align-content:start;overflow:auto}
+.view-toasts body{background:#080b11;overflow:hidden}
+#toastbox{display:flex;flex-direction:column;gap:8px;padding:0}
+.view-toasts .toast{position:static!important;max-width:none;box-shadow:none;margin:0;background:#0c1119;transition:opacity .25s}
+.view-toasts #dls{position:static;width:auto}
+.view-toasts .dlcard{background:#0c1119;box-shadow:none}
+.view-app body{background:var(--surface-solid)}
+.view-app .appbody{position:fixed;inset:0;display:flex;flex-direction:column}
+.view-app .appbody>*{flex:1;min-height:0}
+/* desktop icons you can move */
+#desk.free{display:block;padding:0}
+#desk.free .dicon{position:absolute;width:88px;padding:8px 4px}
+.dicon.sel{background:color-mix(in srgb,var(--accent) 22%,transparent);border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+.dicon.dragging{opacity:.75;z-index:5;pointer-events:none}
+.dicon.drop{background:color-mix(in srgb,var(--accent) 35%,transparent);outline:2px solid var(--accent)}
+.dicon .dname{max-width:84px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;text-align:center;word-break:break-word}
+.band{position:absolute;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent);pointer-events:none;z-index:4}
+#wallimg{position:fixed;inset:0;background:#000 center/cover no-repeat}
+.picwall #wall{display:none}
+.files li.drop{background:color-mix(in srgb,var(--accent) 25%,transparent)}
+dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 10px;font-size:13px} dl.props dt{color:var(--muted)} dl.props dd{margin:0;overflow-wrap:anywhere;user-select:text}
+/* Bin */
+.binapp{display:flex;flex-direction:column;height:100%}
+.binlist{list-style:none;margin:0;padding:6px;overflow:auto;flex:1}
+.binlist li{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:default}
+.binlist li:hover{background:var(--raised)} .binlist li.sel{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.binlist .bn{display:flex;flex-direction:column;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .binlist small{color:var(--muted)}
+.binlist li.empty{display:block;color:var(--muted);text-align:center;padding:40px 10px}
+/* Task Manager */
+.tm{display:flex;flex-direction:column;height:100%;min-height:0}
+.tmcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:14px 14px 8px}
+.tmcard{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--raised);display:flex;flex-direction:column;gap:2px;min-width:0}
+.tmcard b{font:700 22px var(--display);letter-spacing:.03em} .tmcard small{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tmcard .spark{margin-top:4px;height:28px} .tmcard .spark svg{width:100%;height:28px}
+.tmtable{flex:1;overflow:auto;margin:0 14px;border:1px solid var(--line);border-radius:8px}
+.tmrow{display:grid;grid-template-columns:1fr 90px 110px 90px;gap:8px;padding:7px 12px;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line);cursor:default}
+.tmrow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .tmrow span:not(:first-child){text-align:right}
+.tmrow:hover{background:var(--raised)} .tmrow.sel{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.tmhead{position:sticky;top:0;background:var(--surface-solid);z-index:1;padding:0 12px}
+.tmhead button{border:0;background:none;color:var(--muted);font:600 12px var(--body);text-transform:uppercase;letter-spacing:.06em;padding:9px 0;text-align:right;cursor:pointer}
+.tmhead button:first-child{text-align:left} .tmhead button.on{color:var(--accent)}
+.tm>.fileacts{padding:10px 14px}
+/* pictures in Appearance */
+.picrow{display:flex;gap:8px;flex-wrap:wrap} .pic{width:110px;height:68px;border-radius:6px;border:2px solid transparent;background:#000 center/cover no-repeat;cursor:pointer}
+.pic.on{border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -346,6 +408,8 @@ const $=(s,r=document)=>r.querySelector(s), h=(t,a={},...c)=>{const e=document.c
 const store={get(k,d){try{const v=localStorage.getItem('hx.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('hx.'+k,JSON.stringify(v))}catch(e){}}};
 /* real-PC bridge: present only when running as the desktop app */
 const HX=window.halcyon||null;let SYS=null;
+// NexusOS draws itself as several real windows (desktop, taskbar, Start, notifications, one per app); elsewhere it is one page
+const VIEW=new URLSearchParams(location.search).get('view')||'main';const MW=!!HX&&VIEW!=='main';document.documentElement.classList.add('view-'+VIEW);
 const TEXT_RE=/\.(txt|md|markdown|json|csv|log|ini|cfg|conf|yaml|yml|xml|html?|css|js|ts|py|bat|ps1|sh)$/i;
 const fmtSize=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':n<1073741824?(n/1048576).toFixed(1)+' MB':(n/1073741824).toFixed(2)+' GB';
 const fmtUp=s=>{const d=Math.floor(s/86400),hh=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'d ':'')+hh+'h '+m+'m'};
@@ -362,6 +426,9 @@ const I={
  settings:['#3a4556','<circle cx="12" cy="12" r="8.5" fill="#eef2f3"/><circle cx="12" cy="12" r="3" fill="none" stroke="#6b7b80" stroke-width="1.8"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6 6l2.1 2.1M15.9 15.9 18 18M6 18l2.1-2.1M15.9 8.1 18 6" stroke="#6b7b80" stroke-width="1.8" stroke-linecap="round"/>'],
  about:['#0c1017','<path d="M12 2.5 20.3 7.2v9.6L12 21.5 3.7 16.8V7.2z" fill="none" stroke="#00e5ff" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.6 15.4V8.6l6.8 6.8V8.6" fill="none" stroke="#ff2e88" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>'],
  store:['#ff4f2e','<path d="M5 8h14l-1.2 11.2A2 2 0 0 1 15.8 21H8.2a2 2 0 0 1-2-1.8z" fill="#fff3ea"/><path d="M9 10V7a3 3 0 0 1 6 0v3" fill="none" stroke="#fff3ea" stroke-width="1.8" stroke-linecap="round"/><path d="m10 14.5 1.6 1.6 3-3.2" fill="none" stroke="#e0703a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'],
+ bin:['#2a3444','<path d="M6 7h12l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z" fill="#dfe8f2"/><path d="M4.5 7h15M9.5 4h5" stroke="#dfe8f2" stroke-width="1.8" stroke-linecap="round"/><path d="M10 11v7M14 11v7" stroke="#8796ab" stroke-width="1.5" stroke-linecap="round"/>'],
+ binfull:['#2a3444','<path d="M6 7h12l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z" fill="#dfe8f2"/><path d="M4.5 7h15M9.5 4h5" stroke="#dfe8f2" stroke-width="1.8" stroke-linecap="round"/><path d="M8 9.5l3 2.5 4-3 1.5 2" stroke="#00b8d4" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="9" y="13" width="6" height="5" rx="1" fill="#ff2e88" opacity=".85"/>'],
+ taskmgr:['#141b28','<rect x="3" y="4" width="18" height="16" rx="3" fill="#0b1018" stroke="#2c3a50"/><path d="M5.5 15.5l3.5-4 3 2.5 3.5-6 3 4" fill="none" stroke="#00e5ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'],
  txt:['','<path d="M6 2h8l4 4v16H6z" fill="#e8eef0"/><path d="M8.5 10h7M8.5 13h7M8.5 16h5" stroke="#6b7b80" stroke-width="1.3" stroke-linecap="round"/>'],
  img:['','<rect x="3" y="4" width="18" height="16" rx="2" fill="#e3f6ff"/><path d="m3 17 5-5 4 4 3-3 6 6" fill="none" stroke="#2fa6d6" stroke-width="1.5"/><circle cx="16" cy="8.5" r="1.6" fill="#f0b451"/>'],
  dir:['','<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#9fd8ee"/>']
@@ -374,6 +441,7 @@ let z=10, wins={}, nextPos=0;
 function focus(id){for(const k in wins){wins[k].el.classList.toggle('blur',k!==id)}if(wins[id]){wins[id].el.style.zIndex=++z;wins[id].el.classList.remove('min')}active=id;renderBar()}
 let active=null;
 function openApp(key,arg){
+  if(MW){closePanels();HX.openWindow(key,arg===undefined?null:arg).catch(e=>toast('Couldn’t open that',errMsg(e)));return}
   closePanels();
   const A=APPS[key];
   if(wins[key]&&!A.multi){focus(key);if(A.onArg&&arg)A.onArg(wins[key],arg);return}
@@ -438,7 +506,7 @@ function onPermission(d){permChain=permChain.then(async()=>{let host=d.origin;tr
   const ok=await ask('Allow this site?',`${host} wants to ${permText(d)}. Allow it only if you trust the site. NexusOS remembers your answer until you restart.`,'Allow');HX.answerPermission(d.id,ok)})}
 const jobListeners=new Map();
 function onJob(d){const fn=jobListeners.get(d.id);if(fn)fn(d)}
-async function openPathSafe(p,name){try{const r=await HX.open(p,false);if(r&&r.needsConfirm){const ok=await ask('Run this program?',`“${r.name}” is a program${r.fromInternet?' you downloaded from the internet':''}. Programs can change your computer. Only run it if you trust where it came from.`,'Run it',true);if(ok)await HX.open(p,true)}}catch(e){toast('Couldn’t open that',errMsg(e))}}
+async function openPathSafe(p,name){try{const r=await HX.open(p,false);if(r&&r.needsConfirm){const t1='Run this program?',t2=`“${r.name}” is a program${r.fromInternet?' you downloaded from the internet':''}. Programs can change your computer. Only run it if you trust where it came from.`;const ok=MW?await HX.confirm(t1,t2,'Run it'):await ask(t1,t2,'Run it',true);if(ok)await HX.open(p,true)}}catch(e){toast('Couldn’t open that',errMsg(e))}}
 
 /* ---------- a safe calculator (no eval) ---------- */
 function calcEval(src){const s=src.replace(/\s+/g,'');let i=0;
@@ -558,11 +626,14 @@ const PAGES={
    if(b.present){s.append(srow(`${Math.round(b.percent)}%`,[b.state,b.timeToEmpty&&b.state==='discharging'?b.timeToEmpty+' left':'',b.timeToFull&&b.state==='charging'?b.timeToFull+' until full':''].filter(Boolean).join(' · ')),h('div',{class:'meter'},h('div',{style:`width:${b.percent}%`})));if(b.health)s.append(h('p',{class:'hint'},'Battery health: '+b.health))}else s.append(h('p',{class:'hint'},'No battery. This computer runs on mains power.'));
    const p=sec(c,'Power','The screen turns off after 10 minutes of no activity.');p.append(h('div',{class:'row2 wrap'},...[['sleep','Sleep'],['restart','Restart'],['shutdown','Shut down'],['logout','Log out']].map(([k,l])=>h('button',{class:'pbtn',on:{click:()=>powerAction(k)}},l))))},
  async time(c){const s=sec(c,'Date & time');s.append(busyEl());let t;try{t=await HX.lx('time')}catch(e){s.lastChild.replaceWith(errEl(e));return}s.lastChild.remove();
-   s.append(srow('Set time automatically',t.ntp?'On. The clock syncs over the internet.':'Off'));
+   s.append(srow('Set time automatically',t.ntp?'On. The clock syncs over the internet.':'Off. Set the date and time yourself below.',sswitch(t.ntp,async v=>{await HX.lx('setNtp',v);setTimeout(()=>openSettings('time'),400);return v},'Set time automatically')));
+   if(!t.ntp){const now=new Date(),pad=n=>String(n).padStart(2,'0');const di=h('input',{class:'txt',type:'date','aria-label':'Date',value:`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`}),ti=h('input',{class:'txt',type:'time','aria-label':'Time',value:`${pad(now.getHours())}:${pad(now.getMinutes())}`});
+     const go=h('button',{class:'pbtn pri'},'Set');go.onclick=async()=>{go.disabled=true;try{await HX.lx('setDateTime',di.value+' '+ti.value);toast('Date and time set',di.value+' '+ti.value)}catch(e){toast('Not changed',errMsg(e))}go.disabled=false};
+     s.append(srow('Date and time','Asks for your password.',di,ti,go))}
    const sel=h('select',{class:'txt','aria-label':'Time zone'},h('option',{},t.timezone));s.append(srow('Time zone','Changing it asks for your password.',sel));
    HX.lx('timezones').then(list=>{sel.innerHTML='';for(const z of list)sel.append(h('option',{value:z,selected:z===t.timezone},z.replace(/_/g,' ')))}).catch(()=>{});
    sel.onchange=async()=>{try{await HX.lx('setTimezone',sel.value);toast('Time zone changed',sel.value.replace(/_/g,' '))}catch(e){toast('Time zone not changed',errMsg(e));openSettings('time')}};
-   s.append(srow('24-hour clock','',sswitch(clock24,async v=>{clock24=await HX.clock24(v);tick();return clock24},'24-hour clock')))},
+   s.append(srow('24-hour clock','',sswitch(clock24,async v=>{clock24=await HX.clock24(v);tick();if(HX.changed)HX.changed('clock');return clock24},'24-hour clock')))},
  async keyboard(c){const s=sec(c,'Keyboard layout','Pick the layout printed on your keys.');let cur='gb';try{cur=(await HX.lx('keyboard')).layout}catch(e){}
    const sel=h('select',{class:'txt','aria-label':'Keyboard layout'},KB_LAYOUTS.map(([k,n])=>h('option',{value:k,selected:k===cur},n)));if(!KB_LAYOUTS.some(k=>k[0]===cur))sel.prepend(h('option',{value:cur,selected:true},cur));
    sel.onchange=()=>HX.lx('setKeyboard',sel.value).then(()=>toast('Keyboard layout changed',sel.selectedOptions[0].textContent)).catch(e=>toast('Layout not changed',errMsg(e)));
@@ -571,8 +642,12 @@ const PAGES={
    const seg=h('div',{class:'seg'}),acc=h('div',{class:'row'}),wp=h('div',{class:'row'});
    const draw=()=>{seg.innerHTML='';['light','dark'].forEach(m=>seg.append(h('button',{class:S.mode===m?'on':'',on:{click:()=>{S.mode=m;apply(S);draw()}}},m[0].toUpperCase()+m.slice(1))));
      acc.innerHTML='';accents.forEach(a=>acc.append(h('button',{class:'acc'+(a===S.accent?' on':''),style:'background:'+a,'aria-label':'Accent '+a,on:{click:()=>{S.accent=a;apply(S);draw()}}})));
-     wp.innerHTML='';WALLS.forEach((w,i)=>wp.append(h('button',{class:'wp'+(i===S.wall?' on':''),style:`background:linear-gradient(135deg,${w.c.join(',')})`,'aria-label':w.n,title:w.n,on:{click:()=>{S.wall=i;apply(S);draw()}}})))};
-   sec(c,'Mode').append(seg);sec(c,'Accent colour').append(acc);sec(c,'Wallpaper').append(wp);draw();
+     wp.innerHTML='';WALLS.forEach((w,i)=>wp.append(h('button',{class:'wp'+(i===S.wall?' on':''),style:`background:linear-gradient(135deg,${w.c.join(',')})`,'aria-label':w.n,title:w.n,on:{click:()=>{S.wall=i;apply(S);if(HX&&HX.clearWallpaper)HX.clearWallpaper().catch(()=>{});draw()}}})))};
+   sec(c,'Mode').append(seg);sec(c,'Accent colour').append(acc);sec(c,'Animated background','These move gently, and stop while you’re in a game.').append(wp);draw();
+   if(HX&&HX.getWallpaper&&SYS){const ps=sec(c,'Picture background','Pick one of your pictures, or right-click any picture in Files and choose “Set as desktop background”.');const cur=h('div',{class:'row2'}),row=h('div',{class:'picrow'});ps.append(cur,row);
+     HX.getWallpaper().then(u=>{if(u)cur.append(h('div',{class:'pic on',style:`background-image:url("${u}")`,title:'Current background'}),h('button',{class:'pbtn',on:{click:async()=>{await HX.clearWallpaper();openSettings('appearance')}}},'Use the animated background'))});
+     HX.list(SYS.drive+SYS.sep+'Pictures').then(async res=>{const imgs=res.entries.filter(f=>!f.dir&&IMG_RE.test(f.name)&&f.size<8e6).slice(0,12);if(!imgs.length){row.append(h('p',{class:'hint'},'No pictures in your Pictures folder yet.'));return}
+       for(const f of imgs){const t=h('button',{class:'pic',title:f.name,'aria-label':f.name,on:{click:async()=>{await setAsBackground(f.path);openSettings('appearance')}}});row.append(t);HX.readDataUrl(f.path).then(u=>{t.style.backgroundImage=`url("${u}")`}).catch(()=>{})}}).catch(()=>{})}
    if(HX&&!OSM())sec(c,'Clock').append(srow('24-hour clock','',sswitch(clock24,async v=>{clock24=await HX.clock24(v);tick();return clock24},'24-hour clock')))},
  async apps(c){const s=sec(c,'Apps',OSM()?'Apps come from Flathub and run in their own sandbox.':'Apps install through winget, Windows’ own installer.');s.append(h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:()=>openApp('store')}},'Open the App Store')));
    const l=sec(c,'Installed');l.append(busyEl());const list=await installedApps(true);l.lastChild.remove();if(!list.length)l.append(h('p',{class:'hint'},'Nothing installed from the App Store yet.'));
@@ -619,13 +694,13 @@ const PAGES={
    s.append(h('p',{class:'hint'},'The installer lets you choose your disk, set a password and encrypt your system. Back up anything important first. Replacing a disk erases it.'),h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:()=>HX.lx('installOS').catch(e=>toast('Couldn’t start the installer',errMsg(e)))}},'Start the installer')))},
  about(c){const s=sec(c,OSM()?'NexusOS '+(SYS.version||''):'NexusOS '+(SYS?SYS.version:'')); s.append(h('p',{class:'hint'},OSM()?'NexusOS is built on Debian 13. NexusOS is its desktop.':'NexusOS runs on top of '+(SYS&&SYS.isWin?'Windows':'your computer')+'.'),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>openApp('about')}},'More about this computer')))}
 };
-function openSettings(page){if(wins.settings&&wins.settings.api.show){focus('settings');wins.settings.api.show(page)}else openApp('settings',page)}
+function openSettings(page){if(MW){HX.openWindow('settings',page||null).catch(()=>{});return}if(wins.settings&&wins.settings.api.show){focus('settings');wins.settings.api.show(page)}else openApp('settings',page)}
 async function powerAction(k){closePanels();
   if(!OSM()){if(k==='logout'||k==='shutdown')shutDown();return}
   const labels={sleep:['Sleep now?','Your apps stay open.','Sleep'],restart:['Restart now?','Save your work first. Open apps will close.','Restart'],shutdown:['Shut down now?','Save your work first. Open apps will close.','Shut down'],logout:['Log out?','Open apps will close.','Log out']}[k];
-  if(k!=='sleep'&&!(await ask(labels[0],labels[1],labels[2],true)))return;
-  if(k==='shutdown'||k==='restart'||k==='logout'){const bt=$('#boot');$('#boot h2').textContent=k==='restart'?'Restarting':k==='logout'?'Logging out':'Shutting down';bt.classList.remove('done')}
-  try{await HX.lx('power',k)}catch(e){$('#boot').classList.add('done');toast('That didn’t work',errMsg(e))}}
+  if(k!=='sleep'&&!(await (MW?HX.confirm(labels[0],labels[1],labels[2]):ask(labels[0],labels[1],labels[2],true))))return;
+  if(k==='shutdown'||k==='restart'||k==='logout'){const bt=$('#boot');if(bt){bt.querySelector('h2').textContent=k==='restart'?'Restarting':k==='logout'?'Logging out':'Shutting down';bt.classList.remove('done')}}
+  try{await HX.lx('power',k)}catch(e){const b=$('#boot');if(b)b.classList.add('done');toast('That didn’t work',errMsg(e))}}
 /* ---------- quick settings (real on NexusOS) ---------- */
 let quickState={bright:false},qbT=0,qvT=0;
 function syncVol(v){const e=$('#vol');if(e)e.value=v}
@@ -661,24 +736,24 @@ function renderBar(){
 }
 
 /* ---------- panels ---------- */
-function closePanels(){$('#start').classList.remove('open');$('#quick').classList.remove('open');if(typeof pm!=='undefined'&&pm){pm.remove();pm=null}}
-$('#startBtn').onclick=e=>{e.stopPropagation();$('#quick').classList.remove('open');const s=$('#start');s.classList.toggle('open');if(s.classList.contains('open')){$('#search').value='';renderGrid('');setTimeout(()=>$('#search').focus(),50)}};
-$('#tray').onclick=e=>{e.stopPropagation();$('#start').classList.remove('open');$('#quick').classList.toggle('open');renderCal();if($('#quick').classList.contains('open'))refreshQuick()};
+function closePanels(){if(VIEW==='popup'&&HX)HX.popupHide();$('#start').classList.remove('open');$('#quick').classList.remove('open');if(typeof pm!=='undefined'&&pm){pm.remove();pm=null}}
+$('#startBtn').onclick=e=>{e.stopPropagation();if(MW){HX.popup('start');return}$('#quick').classList.remove('open');const s=$('#start');s.classList.toggle('open');if(s.classList.contains('open')){$('#search').value='';renderGrid('');setTimeout(()=>$('#search').focus(),50)}};
+$('#tray').onclick=e=>{e.stopPropagation();if(MW){HX.popup('quick');return}$('#start').classList.remove('open');$('#quick').classList.toggle('open');renderCal();if($('#quick').classList.contains('open'))refreshQuick()};
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('.panel,#bar'))closePanels()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanels();if(e.key==='Meta'||(e.ctrlKey&&e.key==='Escape')){e.preventDefault();$('#startBtn').click()}});
 function renderGrid(q){const g=$('#grid');g.innerHTML='';const ql=q.toLowerCase();
- Object.keys(APPS).filter(k=>APPS[k].name.toLowerCase().includes(ql)).forEach(k=>g.append(h('button',{class:'icon',on:{click:()=>openApp(k)}},glyph(k),APPS[k].name)));
+ Object.keys(APPS).filter(k=>APPS[k].name.toLowerCase().includes(ql)&&(OSM()||!['bin','taskmgr'].includes(k))).forEach(k=>g.append(h('button',{class:'icon',on:{click:()=>openApp(k),contextmenu:e=>{e.preventDefault();pinMenu({type:'app',key:k})}}},glyph(k),APPS[k].name)));
  if(OSM()){const extra=[['System terminal',()=>HX.lx('openTerminal')]];if(SYS.live)extra.push(['Install NexusOS',()=>openSettings('install')]);
   extra.filter(([n])=>n.toLowerCase().includes(ql)).forEach(([n,fn])=>g.append(h('button',{class:'icon ext',on:{click:()=>{closePanels();Promise.resolve(fn()).catch(e=>toast('Couldn’t open that',errMsg(e)))}}},letterIcon(n),n)))}
  if(!g.children.length)g.append(h('div',{class:'nomatch',style:'color:var(--muted);padding:8px'},'No apps match “'+q+'”'));
  if(HX)installedApps().then(list=>{if($('#search').value!==q||!$('#start').classList.contains('open'))return;
   const add=list.filter(a=>a.name&&a.name.toLowerCase().includes(ql)&&(OSM()||(CAT&&CAT.some(c=>c.key===a.key&&c.canLaunch))));if(!add.length)return;const nm=$('.nomatch',g);if(nm)nm.remove();
   add.forEach(a=>{let gl=letterIcon(a.name);appIcon(a.id).then(u=>{if(u){const n2=letterIcon(a.name,u);gl.replaceWith(n2);gl=n2}});
-   g.append(h('button',{class:'icon ext',title:a.name,on:{click:()=>{closePanels();HX.store('launch',a.key||a.id).then(()=>toast('Opening '+a.name,'')).catch(e=>toast('Couldn’t open '+a.name,errMsg(e)))}}},gl,h('span',{class:'dname'},a.name)))})})}
+   g.append(h('button',{class:'icon ext',title:a.name,on:{contextmenu:e=>{e.preventDefault();if(OSM())pinMenu({type:'flatpak',id:a.id,name:a.name})},click:()=>{closePanels();HX.store('launch',a.key||a.id).then(()=>toast('Opening '+a.name,'')).catch(e=>toast('Couldn’t open '+a.name,errMsg(e)))}}},gl,h('span',{class:'dname'},a.name)))})})}
 $('#search').addEventListener('input',e=>renderGrid(e.target.value));
 $('#search').addEventListener('keydown',e=>{if(e.key==='Enter'){const f=$('#grid .icon');f&&f.click()}});
 let pm=null;
-$('#power').onclick=e=>{e.stopPropagation();if(pm){pm.remove();pm=null;return}
+$('#power').onclick=async e=>{e.stopPropagation();if(MW&&OSM()){const k=await menu([{id:'sleep',label:'Sleep'},{id:'restart',label:'Restart'},{id:'shutdown',label:'Shut down'},{type:'separator'},{id:'logout',label:'Log out'}]);if(k)powerAction(k);return}if(pm){pm.remove();pm=null;return}
  const B=(l,fn)=>h('button',{on:{click:fn}},l);
  pm=OSM()?h('div',{class:'pmenu'},B('Sleep',()=>powerAction('sleep')),B('Restart',()=>powerAction('restart')),B('Shut down',()=>powerAction('shutdown')),B('Log out',()=>powerAction('logout')))
   :h('div',{class:'pmenu'},B('Restart NexusOS',()=>{closePanels();Object.keys(wins).forEach(close);boot()}),HX?B('Toggle full screen',()=>{closePanels();HX.toggleFullscreen()}):null,B(HX?'Quit NexusOS':'Shut down (restart)',shutDown));
@@ -698,7 +773,7 @@ function renderCal(){const d=new Date(),y=d.getFullYear(),m=d.getMonth(),first=(
   $('#cal').innerHTML=`<div class="ch"><b>${d.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</b><span style="color:var(--muted)">${d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric'})}</span></div><table><tr>${['Mo','Tu','We','Th','Fr','Sa','Su'].map(x=>`<th>${x}</th>`).join('')}</tr>${rows}</table>`}
 function tick(){const d=new Date();$('#clock b').textContent=d.toLocaleTimeString('en-GB',{hour:clock24?'2-digit':'numeric',minute:'2-digit',hour12:!clock24});$('#clock span').textContent=d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})}
 setInterval(tick,1000);tick();
-function toast(t,s){const e=h('div',{class:'toast'},h('b',{},t),s?h('span',{},s):null);const prev=[...document.querySelectorAll('.toast:not(.out)')];let top=16;prev.forEach(x=>top=Math.max(top,x.offsetTop+x.offsetHeight+8));e.style.top=top+'px';document.body.append(e);setTimeout(()=>e.classList.add('out'),2600);setTimeout(()=>e.remove(),3000)}
+function toast(t,s){if(MW&&VIEW!=='toasts'){HX.toast(t,s||'').catch(()=>{});return}if(VIEW==='toasts')return toastView(t,s);const e=h('div',{class:'toast'},h('b',{},t),s?h('span',{},s):null);const prev=[...document.querySelectorAll('.toast:not(.out)')];let top=16;prev.forEach(x=>top=Math.max(top,x.offsetTop+x.offsetHeight+8));e.style.top=top+'px';document.body.append(e);setTimeout(()=>e.classList.add('out'),2600);setTimeout(()=>e.remove(),3000)}
 
 /* ---------- file system ---------- */
 const FS=store.get('fs',null)||{
@@ -718,8 +793,186 @@ const shortPath=p=>inDrive(p)?(OSM()?'Home':'NexusOS')+(p===SYS.drive?'':' › '
 const BIN=()=>SYS&&SYS.isWin?'Recycle Bin':'Bin';
 const baseOf=p=>p.split(SYS?SYS.sep:'/').pop();
 function openPath(path,name){name=name||baseOf(path);if(TEXT_RE.test(name))openApp('notes',{real:path,n:name});else if(IMG_RE.test(name))openApp('paint',{real:path,n:name,t:'img'});else openPathSafe(path,name)}
-function refreshFiles(){Object.values(wins).forEach(w=>{if(w.key==='files'&&w.api.refresh)w.api.refresh()});refreshDesktop()}
+function refreshFiles(){Object.values(wins).forEach(w=>{if(w.key==='files'&&w.api.refresh)w.api.refresh()});refreshDesktop();if(MW&&!refreshFiles.busy){refreshFiles.busy=1;HX.changed('files').finally(()=>setTimeout(()=>refreshFiles.busy=0,300))}}
 
+/* ---------- 1.4.3: shared file clipboard, right-click menus, properties ---------- */
+// drags between NexusOS windows carry only a token; the paths stay in NexusOS's own storage, so a website can't fake a drop
+const DRAG={start(e,paths){const id=(crypto.randomUUID?crypto.randomUUID():String(Math.random()).slice(2));store.set('nxdrag',{id,paths:paths.slice(0,200),t:Date.now()});e.dataTransfer.setData('application/x-nexus-drag',id);e.dataTransfer.effectAllowed='copyMove'},
+  is(e){return [...e.dataTransfer.types].includes('application/x-nexus-drag')},
+  paths(e){const id=e.dataTransfer.getData('application/x-nexus-drag');const d=store.get('nxdrag',null);if(!id||!d||d.id!==id||Date.now()-d.t>600000)return [];store.set('nxdrag',null);return (d.paths||[]).filter(p=>typeof p==='string'&&p.startsWith('/')&&!/(^|\/)\.\.?(\/|$)/.test(p))}};
+const CLIP={get(){return store.get('nxclip',null)},set(mode,paths){store.set('nxclip',{mode,paths:paths.slice(0,200),t:Date.now()})},clear(){store.set('nxclip',null)}};
+async function menu(items){if(!HX||!HX.menu)return null;try{return await HX.menu(items.filter(Boolean))}catch(e){return null}}
+async function pasteInto(dir){const c=CLIP.get();if(!c||!c.paths||!c.paths.length)return;let n=0,err=null;
+  for(const p of c.paths){try{if(c.mode==='cut')await HX.moveTo(p,dir);else await HX.copyTo(p,dir);n++}catch(e){err=e}}
+  if(c.mode==='cut')CLIP.clear();
+  if(err)toast(n?'Some items couldn’t be pasted':'Couldn’t paste',errMsg(err));else toast(c.mode==='cut'?'Moved':'Copied',n+' item'+(n>1?'s':'')+' into '+shortPath(dir));
+  refreshFiles()}
+async function trashPaths(paths){let n=0,err=null;for(const p of paths){try{await HX.trash(p);n++}catch(e){err=e}}
+  if(err&&!n)toast('Couldn’t delete',errMsg(err));else toast('Moved to the '+BIN(),n+' item'+(n>1?'s':'')+(err?' (some couldn’t be moved)':''));refreshFiles()}
+async function showProps(p){let st;try{st=await HX.stat(p)}catch(e){toast('Couldn’t read that',errMsg(e));return}
+  const d=v=>v?new Date(v).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}):'—';
+  const rows=[['Location',shortPath(p.slice(0,p.length-st.name.length-1))||'/'],['Size',fmtSize(st.size)+(st.dir?` · ${st.files} file${st.files===1?'':'s'}, ${st.folders} folder${st.folders===1?'':'s'}`:'')],['Modified',d(st.modified)],['Created',d(st.created)]];
+  await new Promise(res=>{const wrap=h('div',{class:'ask'});const done=()=>{wrap.remove();document.removeEventListener('keydown',key,true);res()};const key=e=>{if(e.key==='Escape'||e.key==='Enter'){e.stopPropagation();done()}};document.addEventListener('keydown',key,true);
+   wrap.append(h('div',{class:'askbox',role:'dialog','aria-label':'Properties'},h('b',{},st.name),h('dl',{class:'props'},...rows.flatMap(([k,v])=>[h('dt',{},k),h('dd',{},v)])),h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:done}},'OK'))));document.body.append(wrap)})}
+async function setAsBackground(p){try{await HX.setWallpaper(p);toast('Desktop background changed','Settings › Appearance switches back to the animated backgrounds.')}catch(e){toast('Couldn’t use that picture',errMsg(e))}}
+async function renamePrompt(p,name){const v=await askText('Rename','New name for “'+name+'”:',name,'Rename');if(!v||v.trim()===name)return null;try{const np=await HX.rename(p,v.trim());refreshFiles();return np}catch(e){toast('Couldn’t rename',errMsg(e));return null}}
+// the menu for one or more files/folders (used by Files and the desktop)
+async function fileMenu(sel,where){const one=sel.length===1?sel[0]:null,allIn=sel.every(f=>SYS&&inDrive(f.path));
+  const k=await menu([
+   {id:'open',label:one&&one.dir?'Open':'Open',enabled:!!one},
+   one&&!one.dir&&IMG_RE.test(one.name)?{id:'bg',label:'Set as desktop background'}:null,
+   {type:'separator'},
+   {id:'cut',label:'Cut',enabled:allIn},{id:'copy',label:'Copy'},
+   one&&one.dir&&CLIP.get()&&allIn?{id:'pastein',label:'Paste into folder'}:null,
+   {type:'separator'},
+   !allIn&&OSM()?{id:'copyin',label:'Copy to my files'}:null,
+   {id:'rename',label:'Rename',enabled:!!one&&allIn},{id:'delete',label:'Delete',enabled:allIn},
+   {type:'separator'},{id:'props',label:'Properties',enabled:!!one}]);
+  if(!k)return;
+  if(k==='open'){if(one.dir)openApp('files',{dir:one.path});else openPath(one.path,one.name)}
+  else if(k==='bg')setAsBackground(one.path);
+  else if(k==='cut'||k==='copy'){CLIP.set(k,sel.map(f=>f.path));toast(k==='cut'?'Cut':'Copied',sel.length+' item'+(sel.length>1?'s':'')+'. Right-click a folder or the desktop and choose Paste.')}
+  else if(k==='pastein')pasteInto(one.path);
+  else if(k==='copyin'){for(const f of sel){try{const p=await HX.copyIn(f.path);toast('Copied to your files',shortPath(p))}catch(e){toast('Couldn’t copy',errMsg(e))}}}
+  else if(k==='rename'){if(where&&where.rename)where.rename(one);else renamePrompt(one.path,one.name)}
+  else if(k==='delete'){if(sel.length>1&&!await ask('Delete '+sel.length+' items?','They go to the '+BIN()+', so you can get them back.','Delete',true))return;trashPaths(sel.map(f=>f.path))}
+  else if(k==='props')showProps(one.path)}
+async function folderMenu(dir,refresh){const inD=SYS&&inDrive(dir);
+  const k=await menu([{id:'newdir',label:'New folder',enabled:inD},{id:'newtxt',label:'New text document',enabled:inD},{type:'separator'},{id:'paste',label:'Paste',enabled:inD&&!!CLIP.get()},{id:'refresh',label:'Refresh'},
+   OSM()?{id:'term',label:'Open System terminal here'}:null,{type:'separator'},{id:'props',label:'Properties'}]);
+  if(!k)return null;
+  try{if(k==='newdir')return {created:await HX.mkdir(dir,'New folder')};if(k==='newtxt')return {created:await HX.newText(dir)};
+   if(k==='paste')await pasteInto(dir);if(k==='refresh'&&refresh)refresh();if(k==='term')HX.lx('openTerminal',dir);if(k==='props')showProps(dir)}catch(e){toast('That didn’t work',errMsg(e))}
+  return null}
+
+/* ---------- 1.4.3: the desktop (icons you can move, the Bin, pictures as background) ---------- */
+const CELL_W=96,CELL_H=104,DESK_PAD=12;
+const DESK_APPS=['files','web','store','settings','term','taskmgr'];
+let deskItems=[],deskSel=new Set(),deskBinFull=false;
+function deskGrid(){const rows=Math.max(1,Math.floor((innerHeight-(MW?60:84)-DESK_PAD)/CELL_H)),cols=Math.max(1,Math.floor((innerWidth-DESK_PAD)/CELL_W));return{rows,cols}}
+function deskPositions(){return store.get('nxpos',{})}
+function placeDesk(){const pos=deskPositions(),{rows,cols}=deskGrid(),taken=new Set();const cell=(c,r)=>c+','+r;
+  const fixed=deskItems.filter(it=>pos[it.id]&&pos[it.id][0]<cols&&pos[it.id][1]<rows&&!taken.has(cell(...pos[it.id]))&&(taken.add(cell(...pos[it.id])),true));
+  let c=0,r=0;const next=()=>{while(taken.has(cell(c,r))){r++;if(r>=rows){r=0;c++}}taken.add(cell(c,r));return[c,r]};
+  for(const it of deskItems){const p=fixed.includes(it)?pos[it.id]:next();it.c=p[0];it.r=p[1];it.el.style.left=(DESK_PAD+p[0]*CELL_W)+'px';it.el.style.top=(DESK_PAD+p[1]*CELL_H)+'px'}}
+function savePos(){const pos=deskPositions();for(const it of deskItems)pos[it.id]=[it.c,it.r];store.set('nxpos',pos)}
+function deskSelect(ids,add){if(!add)deskSel.clear();for(const i of ids)deskSel.add(i);for(const it of deskItems)it.el.classList.toggle('sel',deskSel.has(it.id))}
+async function buildDesktop(){const desk=$('#desk');const files=[];
+  if(HX&&SYS){try{const res=await HX.list(SYS.drive+SYS.sep+'Desktop');files.push(...res.entries.slice(0,120))}catch(e){}}
+  const hidden=store.get('nxdeskhide',[]);
+  const items=[];
+  if(OSM())items.push({id:'bin',kind:'bin',name:BIN()});
+  DESK_APPS.filter(k=>APPS[k]&&!hidden.includes(k)&&(k!=='taskmgr'||OSM())).forEach(k=>items.push({id:'app:'+k,kind:'app',key:k,name:APPS[k].name}));
+  files.forEach(f=>items.push({id:'file:'+f.name,kind:'file',f,name:f.name}));
+  const sig=JSON.stringify(items.map(i=>i.id+(i.f?i.f.dir:'')))+deskBinFull;
+  if(sig===buildDesktop.sig)return;buildDesktop.sig=sig;
+  desk.innerHTML='';deskItems=items;
+  for(const it of items){const g=it.kind==='bin'?glyph(deskBinFull?'binfull':'bin'):it.kind==='app'?glyph(it.key):h('div',{class:'glyph fglyph'},fileIcon(it.f.dir?'dir':IMG_RE.test(it.f.name)?'img':'txt'));
+    it.el=h('div',{class:'icon dicon',tabIndex:0,title:it.name,'data-id':it.id},g,h('span',{class:'dname'},it.name));desk.append(it.el)}
+  deskSelect([...deskSel].filter(id=>items.some(i=>i.id===id)));placeDesk()}
+function deskOpen(it){if(it.kind==='bin')openApp('bin');else if(it.kind==='app')openApp(it.key);else if(it.f.dir)openApp('files',{dir:it.f.path});else openPath(it.f.path,it.f.name)}
+function deskItemAt(x,y){return deskItems.find(it=>{const r=it.el.getBoundingClientRect();return x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom})}
+function setupDesktop(){const desk=$('#desk');desk.classList.add('free');
+  let drag=null,band=null;
+  desk.addEventListener('pointerdown',e=>{if(e.button!==0)return;const el=e.target.closest('.dicon');
+    if(!el){deskSelect([]);band={x:e.clientX,y:e.clientY,el:h('div',{class:'band'})};desk.append(band.el);desk.setPointerCapture(e.pointerId);return}
+    const id=el.dataset.id;if(e.ctrlKey){deskSelect([id],true);return}if(!deskSel.has(id))deskSelect([id]);
+    drag={id,x:e.clientX,y:e.clientY,moved:false,items:deskItems.filter(i=>deskSel.has(i.id)).map(i=>({it:i,l:parseFloat(i.el.style.left),t:parseFloat(i.el.style.top)}))}});
+  desk.addEventListener('pointermove',e=>{
+    if(band){const x=Math.min(e.clientX,band.x),y=Math.min(e.clientY,band.y),w=Math.abs(e.clientX-band.x),hh=Math.abs(e.clientY-band.y);Object.assign(band.el.style,{left:x+'px',top:y+'px',width:w+'px',height:hh+'px'});
+      deskSelect(deskItems.filter(it=>{const r=it.el.getBoundingClientRect();return r.right>x&&r.left<x+w&&r.bottom>y&&r.top<y+hh}).map(i=>i.id));return}
+    if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(!drag.moved&&Math.hypot(dx,dy)<5)return;if(!drag.moved){try{desk.setPointerCapture(e.pointerId)}catch(_){}}drag.moved=true;
+    for(const d of drag.items){d.it.el.style.left=(d.l+dx)+'px';d.it.el.style.top=(d.t+dy)+'px';d.it.el.classList.add('dragging')}
+    const over=deskItemAt(e.clientX,e.clientY);deskItems.forEach(i=>i.el.classList.toggle('drop',!!over&&i===over&&!deskSel.has(i.id)&&(i.kind==='bin'||(i.kind==='file'&&i.f.dir))))});
+  desk.addEventListener('pointerup',async e=>{
+    if(band){band.el.remove();band=null;return}
+    if(!drag)return;const d=drag;drag=null;deskItems.forEach(i=>{i.el.classList.remove('dragging');i.el.classList.remove('drop')});if(!d.moved)return;
+    const over=deskItems.find(i=>!deskSel.has(i.id)&&(i.kind==='bin'||(i.kind==='file'&&i.f.dir))&&(()=>{const r=i.el.getBoundingClientRect();return e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom})());
+    const files=d.items.map(x=>x.it).filter(i=>i.kind==='file');
+    if(over&&over.kind==='bin'){placeDesk();if(files.length)await trashPaths(files.map(i=>i.f.path));const apps=d.items.map(x=>x.it).filter(i=>i.kind==='app');if(apps.length){store.set('nxdeskhide',[...new Set([...store.get('nxdeskhide',[]),...apps.map(a=>a.key)])]);buildDesktop.sig=null;buildDesktop()}return}
+    if(over&&over.kind==='file'){placeDesk();for(const f of files){try{await HX.moveTo(f.f.path,over.f.path)}catch(err){toast('Couldn’t move '+f.name,errMsg(err))}}refreshFiles();return}
+    // snap to the nearest free spots
+    const {rows,cols}=deskGrid();const moving=new Set(d.items.map(x=>x.it));const taken=new Set(deskItems.filter(i=>!moving.has(i)).map(i=>i.c+','+i.r));
+    for(const x of d.items){let c=Math.round((parseFloat(x.it.el.style.left)-DESK_PAD)/CELL_W),r=Math.round((parseFloat(x.it.el.style.top)-DESK_PAD)/CELL_H);c=Math.max(0,Math.min(cols-1,c));r=Math.max(0,Math.min(rows-1,r));
+      let best=null;for(let rad=0;rad<Math.max(rows,cols)&&!best;rad++)for(let cc=c-rad;cc<=c+rad&&!best;cc++)for(let rr=r-rad;rr<=r+rad&&!best;rr++){if(cc<0||rr<0||cc>=cols||rr>=rows||taken.has(cc+','+rr))continue;best=[cc,rr]}
+      if(best){x.it.c=best[0];x.it.r=best[1];taken.add(best.join(','))}}
+    savePos();placeDesk()});
+  const reset=()=>{if(band){band.el.remove();band=null}if(drag){drag=null;deskItems.forEach(i=>{i.el.classList.remove('dragging','drop')});placeDesk()}};desk.addEventListener('pointercancel',reset);desk.addEventListener('lostpointercapture',e=>{if(drag&&drag.moved)return;reset()});
+  desk.addEventListener('dblclick',e=>{const el=e.target.closest('.dicon');if(!el)return;const it=deskItems.find(i=>i.id===el.dataset.id);if(it)deskOpen(it)});
+  desk.addEventListener('keydown',e=>{const sel=deskItems.filter(i=>deskSel.has(i.id));if(!sel.length)return;
+    if(e.key==='Enter')sel.forEach(deskOpen);
+    if(e.key==='Delete'){const f=sel.filter(i=>i.kind==='file');if(f.length)trashPaths(f.map(i=>i.f.path))}
+    if(e.key==='F2'&&sel.length===1&&sel[0].kind==='file')renamePrompt(sel[0].f.path,sel[0].f.name).then(()=>{buildDesktop.sig=null;buildDesktop()});
+    if(e.ctrlKey&&(e.key==='c'||e.key==='x')){const f=sel.filter(i=>i.kind==='file');if(f.length)CLIP.set(e.key==='x'?'cut':'copy',f.map(i=>i.f.path))}});
+  document.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='v'&&(e.target===document.body||e.target.closest('#desk'))&&SYS)pasteInto(SYS.drive+SYS.sep+'Desktop')});
+  desk.addEventListener('contextmenu',async e=>{e.preventDefault();const el=e.target.closest('.dicon');
+    if(!el){const hidden=store.get('nxdeskhide',[]);const dir=SYS.drive+SYS.sep+'Desktop';
+      const k=await menu([{id:'sort',label:'Sort icons by name'},{id:'refresh',label:'Refresh'},{type:'separator'},{id:'newdir',label:'New folder'},{id:'newtxt',label:'New text document'},{id:'paste',label:'Paste',enabled:!!CLIP.get()},{type:'separator'},
+        OSM()?{id:'term',label:'Open System terminal'}:null,OSM()?{id:'taskmgr',label:'Task Manager'}:null,{type:'separator'},OSM()?{id:'display',label:'Display settings'}:null,{id:'personal',label:'Personalise'},hidden.length?{id:'restore',label:'Show all desktop icons'}:null]);
+      if(k==='sort'){store.set('nxpos',{});deskItems.sort((a,b)=>(a.kind==='file')-(b.kind==='file')||a.name.localeCompare(b.name,undefined,{numeric:true}));placeDesk();savePos()}
+      if(k==='refresh'){buildDesktop.sig=null;buildDesktop()}
+      if(k==='newdir'||k==='newtxt'){try{const p=k==='newdir'?await HX.mkdir(dir,'New folder'):await HX.newText(dir);buildDesktop.sig=null;await buildDesktop();const it=deskItems.find(i=>i.f&&i.f.path===p);if(it)renamePrompt(p,it.name).then(()=>{buildDesktop.sig=null;buildDesktop()})}catch(err){toast('That didn’t work',errMsg(err))}}
+      if(k==='paste')pasteInto(dir);if(k==='term')HX.lx('openTerminal');if(k==='taskmgr')openApp('taskmgr');if(k==='display')openSettings('display');if(k==='personal')openSettings('appearance');
+      if(k==='restore'){store.set('nxdeskhide',[]);buildDesktop.sig=null;buildDesktop()}
+      return}
+    const it=deskItems.find(i=>i.id===el.dataset.id);if(!it)return;if(!deskSel.has(it.id))deskSelect([it.id]);
+    if(it.kind==='bin'){const k=await menu([{id:'open',label:'Open'},{id:'empty',label:'Empty '+BIN(),enabled:deskBinFull}]);if(k==='open')openApp('bin');if(k==='empty'&&await ask('Empty the '+BIN()+'?','Everything in it is deleted for good.','Empty',true)){await HX.binEmpty().catch(e=>toast('Couldn’t empty it',errMsg(e)))}return}
+    if(it.kind==='app'){const pins=await HX.pins();const pinned=pins.some(p=>p.type==='app'&&p.key===it.key);
+      const k=await menu([{id:'open',label:'Open'},{id:'pin',label:pinned?'Unpin from taskbar':'Pin to taskbar'},{type:'separator'},{id:'hide',label:'Remove from desktop'}]);
+      if(k==='open')openApp(it.key);if(k==='pin')HX.setPins(pinned?pins.filter(p=>!(p.type==='app'&&p.key===it.key)):[...pins,{type:'app',key:it.key}]);
+      if(k==='hide'){store.set('nxdeskhide',[...store.get('nxdeskhide',[]),it.key]);buildDesktop.sig=null;buildDesktop()}return}
+    const sel=deskItems.filter(i=>deskSel.has(i.id)&&i.kind==='file').map(i=>i.f);
+    await fileMenu(sel.length?sel:[it.f]);buildDesktop.sig=null;buildDesktop()});
+  // files dragged in from Files
+  desk.addEventListener('dragover',e=>{if(DRAG.is(e)){e.preventDefault();e.dataTransfer.dropEffect='move'}});
+  desk.addEventListener('drop',async e=>{if(!DRAG.is(e))return;e.preventDefault();const paths=DRAG.paths(e);if(!paths.length)return;
+    const dir=SYS.drive+SYS.sep+'Desktop';const over=deskItemAt(e.clientX,e.clientY);
+    if(over&&over.kind==='bin'){trashPaths(paths.filter(p=>inDrive(p)));return}
+    const target=over&&over.kind==='file'&&over.f.dir?over.f.path:dir;
+    for(const p of paths){try{if(inDrive(p))await HX.moveTo(p,target);else await HX.copyTo(p,target)}catch(err){toast('Couldn’t move that',errMsg(err))}}refreshFiles()});
+  addEventListener('resize',()=>placeDesk())}
+async function refreshBinIcon(){if(!OSM())return;try{const r=await HX.binList();const full=r.items.length>0;if(full!==deskBinFull){deskBinFull=full;buildDesktop.sig=null;buildDesktop()}}catch(e){}}
+// picture backgrounds
+let wallImg=null;
+async function loadWallpaper(){if(!HX||!HX.getWallpaper)return;const u=await HX.getWallpaper().catch(()=>null);
+  if(u){if(!wallImg){wallImg=h('div',{id:'wallimg'});document.body.prepend(wallImg)}wallImg.style.backgroundImage=`url("${u}")`;document.documentElement.classList.add('picwall')}
+  else{document.documentElement.classList.remove('picwall');if(wallImg){wallImg.remove();wallImg=null}}}
+
+/* ---------- 1.4.3: the taskbar as its own always-on-top bar ---------- */
+let PINS=[],WINLIST=[],popupOpen=null;
+const pinKey=p=>p.type==='app'?'app:'+p.key:'fp:'+p.id;
+function groupsFor(list){const g=new Map();
+  for(const p of PINS)g.set(pinKey(p),{key:pinKey(p),pin:p,wins:[]});
+  for(const w of list){const k=w.own?'app:'+w.key:w.app?'fp:'+w.app:'x:'+w.group;
+    if(!g.has(k))g.set(k,{key:k,pin:null,wins:[],app:w.own?{type:'app',key:w.key}:w.app?{type:'flatpak',id:w.app,name:w.appName}:null,title:w.appName||w.title||w.cls});
+    g.get(k).wins.push(w)}
+  return [...g.values()]}
+function groupIcon(gr){const p=gr.pin||gr.app;if(p&&p.type==='app')return glyph(p.key);
+  const name=p?(p.name||p.id):(gr.title||'?');let g=letterIcon(name);if(p&&p.type==='flatpak')appIcon(p.id).then(u=>{if(u){const n2=letterIcon(name,u);g.replaceWith(n2);g=n2}});return g}
+function groupName(gr){const p=gr.pin||gr.app;return p?(p.type==='app'?APPS[p.key].name:(p.name||p.id)):(gr.wins[0]&&gr.wins[0].title)||'App'}
+function launchPin(p){if(p.type==='app')openApp(p.key);else HX.store('launch',p.id).then(()=>toast('Opening '+(p.name||p.id),'')).catch(e=>toast('Couldn’t open '+(p.name||p.id),errMsg(e)))}
+function renderPanel(){const box=$('#apps');box.innerHTML='';
+  for(const gr of groupsFor(WINLIST)){const act=gr.wins.find(w=>w.active);
+    const b=h('button',{class:'tb'+(gr.wins.length?' run':'')+(act?' on':'')+(gr.wins.length>1?' many':''),title:groupName(gr)+(gr.wins.length>1?' ('+gr.wins.length+' windows)':''),'aria-label':groupName(gr)},groupIcon(gr));
+    b.onclick=()=>{if(!gr.wins.length)return launchPin(gr.pin);if(act)return HX.winAct(act.id,'minimize');HX.winAct(gr.wins[0].id,'activate')};
+    b.addEventListener('auxclick',e=>{if(e.button===1&&gr.wins.length)HX.winAct(gr.wins[gr.wins.length-1].id,'close')});
+    b.addEventListener('contextmenu',async e=>{e.preventDefault();const p=gr.pin||gr.app;
+      const k=await menu([...gr.wins.map((w,i)=>({id:'w'+i,label:(w.title||groupName(gr)).slice(0,60)})),gr.wins.length?{type:'separator'}:null,
+        p?{id:'new',label:gr.wins.length?'Open another':'Open'}:null,p?{id:'pin',label:gr.pin?'Unpin from taskbar':'Pin to taskbar'}:null,
+        gr.wins.length?{id:'close',label:gr.wins.length>1?'Close all windows':'Close window'}:null]);
+      if(!k)return;if(k[0]==='w')HX.winAct(gr.wins[+k.slice(1)].id,'activate');
+      if(k==='new')launchPin(p);
+      if(k==='pin'){const pins=await HX.pins();HX.setPins(gr.pin?pins.filter(x=>pinKey(x)!==gr.key):[...pins,p])}
+      if(k==='close')gr.wins.forEach(w=>HX.winAct(w.id,'close'))});
+    box.append(b)}}
+async function loadPins(){PINS=await HX.pins().catch(()=>[]);renderPanel()}
+
+/* ---------- 1.4.3: notifications window ---------- */
+function toastView(t,s){const box=$('#toastbox');const e=h('div',{class:'toast'},h('b',{},t),s?h('span',{},s):null);box.append(e);sizeToasts();
+  setTimeout(()=>{e.classList.add('out');setTimeout(()=>{e.remove();sizeToasts()},300)},5200)}
+function sizeToasts(){setTimeout(()=>{const hgt=Math.ceil($('#toastbox').scrollHeight);HX.toastSize(hgt>2?hgt+2:0)},0)}
+async function pinMenu(p){if(!HX||!HX.pins)return;const pins=await HX.pins();const has=pins.some(x=>pinKey(x)===pinKey(p));const k=await menu([{id:'open',label:'Open'},{id:'pin',label:has?'Unpin from taskbar':'Pin to taskbar'}]);
+  if(k==='open')launchPin(p);if(k==='pin'){await HX.setPins(has?pins.filter(x=>pinKey(x)!==pinKey(p)):[...pins,p]);toast(has?'Unpinned':'Pinned to the taskbar',p.name||(APPS[p.key]||{}).name||'')}}
 /* ---------- apps ---------- */
 const LEGACY={
  files:{name:'Files',w:760,h:480,mount(b,api,start){
@@ -819,7 +1072,11 @@ const APPS={
   let DRV=[];const devBox=h('div',{class:'devs'});
   const driveOf=p=>DRV.find(d=>d.mountpoint&&(p===d.mountpoint||p.startsWith(d.mountpoint+'/')));
   function fillDevs(){devBox.innerHTML='';for(const d of DRV){const on=!!(d.mountpoint&&driveOf(cur)===d);
-    devBox.append(h('button',{class:on?'on':'',title:d.label+' · '+fmtSize(d.size)+(d.locked?' · locked (BitLocker)':d.readOnly?' · read-only':''),on:{click:()=>openDrive(d)}},(d.locked?'🔒 ':'')+d.label+' ',h('small',{},fmtSize(d.size))))}}
+    devBox.append(h('button',{class:on?'on':'',title:d.label+' · '+fmtSize(d.size)+(d.locked?' · locked (BitLocker)':d.readOnly?' · read-only':''),on:{click:()=>openDrive(d),contextmenu:async e=>{e.preventDefault();
+      const k=await menu([{id:'open',label:d.locked?'Unlock…':'Open'},{id:'rename',label:'Rename…',enabled:d.removable&&!d.locked},{id:'eject',label:'Eject',enabled:d.removable&&!!d.mountpoint}]);
+      if(k==='open')openDrive(d);
+      if(k==='eject'){try{await HX.lx('unmountDrive',d.path);toast('Safe to remove',d.label);if(driveOf(cur)===d)go(D);loadDrives()}catch(err){toast('Couldn’t eject',errMsg(err))}}
+      if(k==='rename'){const v=await askText('Rename drive','New name for “'+d.label+'”:',d.label,'Rename');if(!v)return;try{const nl=await HX.lx('renameDrive',d.path,v);toast('Drive renamed',nl);loadDrives()}catch(err){toast('Couldn’t rename the drive',errMsg(err))}}}}},(d.locked?'🔒 ':'')+d.label+' ',h('small',{},fmtSize(d.size))))}}
   async function loadDrives(){if(!OSM())return;try{DRV=await HX.lx('drives')}catch(e){DRV=[]}fillDevs()}
   async function openDrive(d){try{
     if(d.locked){const key=await askText('Unlock '+d.label,'This drive is locked with BitLocker. Type its recovery key (the 48 digits from account.microsoft.com/devices/recoverykey). It stays unlocked until you restart, and NexusOS only ever reads it.','Recovery key','Unlock');
@@ -835,6 +1092,12 @@ const APPS={
       if(res.inDrive)acts.append(h('button',{class:'pbtn danger',on:{click:()=>{mode={kind:'delete'};renderActs()}}},'Delete'))}
     const dv=OSM()&&res&&driveOf(res.dir);if(dv){acts.append(h('span',{style:'flex:1'}),h('span',{class:'nstat'},dv.readOnly?'Read-only: NexusOS never changes this drive':''));if(dv.removable)acts.append(h('button',{class:'pbtn',on:{click:async()=>{try{await HX.lx('unmountDrive',dv.path);toast('Safe to remove',dv.label);go(D);loadDrives()}catch(e){toast('Couldn’t eject',errMsg(e))}}}},'Eject'))}
     if(!OSM())acts.append(h('span',{style:'flex:1'}),h('button',{class:'pbtn',title:SYS.isWin?'Open this folder in Windows File Explorer':'Open this folder in your file manager',on:{click:()=>HX.open(res?res.dir:cur,true).catch(e=>toast('Couldn’t open',errMsg(e)))}},SYS.isWin?'Show in Windows':'Show in file manager'))}
+  async function dropPaths(e,dir){const paths=DRAG.paths(e);
+    for(const p of paths){if(p===dir||baseOf(p)===''||p.slice(0,p.length-baseOf(p).length-1)===dir)continue;try{if(inDrive(p))await HX.moveTo(p,dir);else await HX.copyTo(p,dir)}catch(err){toast('Couldn’t move that',errMsg(err))}}draw();refreshFiles()}
+  list.addEventListener('contextmenu',async e=>{if(e.target.closest('li[data-n]'))return;e.preventDefault();if(!res)return;const r=await folderMenu(res.dir,draw);if(r&&r.created){selName=baseOf(r.created);await draw();const s2=sel();if(s2)startRename(s2)}else draw()});
+  list.addEventListener('dragover',e=>{if(res&&res.inDrive&&DRAG.is(e))e.preventDefault()});
+  list.addEventListener('drop',async e=>{if(!res||!res.inDrive)return;e.preventDefault();await dropPaths(e,res.dir)});
+  list.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='v'&&res&&res.inDrive&&e.target.tagName!=='INPUT'){e.stopPropagation();pasteInto(res.dir).then(draw)}});
   function setSel(name){selName=name;mode=null;list.querySelectorAll('li[data-n]').forEach(li=>li.classList.toggle('sel',li.dataset.n===name));renderActs()}
   async function newFolder(){try{const p=await HX.mkdir(res.dir,'New folder');selName=baseOf(p);await draw();const s=sel();if(s)startRename(s);refreshDesktop()}catch(e){toast('Couldn’t make a folder',errMsg(e))}}
   async function addFromPC(){try{const n=await HX.addFromPC(res.dir);if(n){toast('Added to NexusOS',n+' file'+(n>1?'s':'')+' copied into '+shortPath(res.dir));draw();refreshDesktop()}}catch(e){toast('Couldn’t copy',errMsg(e))}}
@@ -852,8 +1115,14 @@ const APPS={
     list.innerHTML='';if(selName&&!sel())selName=null;
     if(!res.entries.length)list.append(h('li',{class:'empty'},'',res.inDrive?'This folder is empty. Downloads, notes and drawings you save show up in NexusOS’s folders.':'This folder is empty.'));
     res.entries.slice(0,500).forEach(f=>{const kind=f.dir?'dir':IMG_RE.test(f.name)?'img':'txt';
-      const li=h('li',{tabIndex:0,class:f.name===selName?'sel':'','data-n':f.name,on:{click:e=>{setSel(f.name);if(e.pointerType==='touch')open(f)},dblclick:()=>open(f),
-        keydown:e=>{if(e.target.tagName==='INPUT')return;if(e.key==='Enter')open(f);else if(e.key==='Delete'){setSel(f.name);mode={kind:'delete'};renderActs()}else if(e.key==='F2')startRename(f)}}},
+      const li=h('li',{tabIndex:0,draggable:true,class:f.name===selName?'sel':'','data-n':f.name,on:{click:e=>{setSel(f.name);if(e.pointerType==='touch')open(f)},dblclick:()=>open(f),
+        keydown:e=>{if(e.target.tagName==='INPUT')return;if(e.key==='Enter')open(f);else if(e.key==='Delete'&&res.inDrive){setSel(f.name);mode={kind:'delete'};renderActs()}else if(e.key==='F2'&&res.inDrive)startRename(f)
+          else if(e.ctrlKey&&(e.key==='c'||(e.key==='x'&&res.inDrive))){CLIP.set(e.key==='x'?'cut':'copy',[f.path]);toast(e.key==='x'?'Cut':'Copied',f.name)}},
+        contextmenu:async e=>{e.preventDefault();e.stopPropagation();setSel(f.name);await fileMenu([f],{rename:startRename});draw()},
+        dragstart:e=>DRAG.start(e,[f.path]),
+        dragover:e=>{if(f.dir&&DRAG.is(e)&&inDrive(f.path)){e.preventDefault();li.classList.add('drop')}},
+        dragleave:()=>li.classList.remove('drop'),
+        drop:async e=>{li.classList.remove('drop');if(!f.dir)return;e.preventDefault();e.stopPropagation();await dropPaths(e,f.path)}}},
         fileIcon(kind),h('span',{style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},f.name),h('small',{},f.dir?'folder':fmtSize(f.size)));list.append(li)});
     if(res.entries.length>500)list.append(h('li',{class:'empty'},'','Showing the first 500 items.'));
     renderActs();const s=list.querySelector('li.sel');if(s)s.scrollIntoView({block:'nearest'})}
@@ -1016,6 +1285,45 @@ const APPS={
     else acts.append(h('button',{class:'pbtn pri',on:{click:()=>run(c,'install')}},'Install'));
     body.append(acts);grid.append(h('div',{class:'ascard','data-k':c.key},ic,body))}}
   load()}},
+ bin:{name:'Bin',w:760,h:500,mount(b,api){
+  const wrap=h('div',{class:'binapp'}),head=h('div',{class:'fileacts'}),list=h('ul',{class:'binlist'});wrap.append(head,list);b.append(wrap);
+  if(!HX||!OSM()){list.append(h('li',{class:'empty'},'','The Bin works on NexusOS. On Windows, deleted files go to the Windows Recycle Bin.'));return}
+  let items=[],sel=null;
+  async function draw(){let r;try{r=await HX.binList()}catch(e){list.innerHTML='';list.append(h('li',{class:'empty'},'',errMsg(e)));return}items=r.items;
+    head.innerHTML='';head.append(h('span',{class:'nstat'},items.length?items.length+' item'+(items.length>1?'s':''):'The Bin is empty'),h('span',{style:'flex:1'}),
+      h('button',{class:'pbtn',disabled:!sel,on:{click:()=>restore(sel)}},'Restore'),h('button',{class:'pbtn danger',disabled:!sel,on:{click:()=>del(sel)}},'Delete for good'),
+      h('button',{class:'pbtn danger',disabled:!items.length,on:{click:empty}},'Empty Bin'));
+    list.innerHTML='';if(!items.length)list.append(h('li',{class:'empty'},'','Things you delete wait here until you empty the Bin.'));
+    for(const it of items){const li=h('li',{tabIndex:0,class:sel===it.name?'sel':'',on:{click:()=>{sel=it.name;draw()},dblclick:()=>restore(it.name),
+      contextmenu:async e=>{e.preventDefault();sel=it.name;draw();const k=await menu([{id:'restore',label:'Restore'},{id:'delete',label:'Delete for good'}]);if(k==='restore')restore(it.name);if(k==='delete')del(it.name)},
+      keydown:e=>{if(e.key==='Delete')del(it.name);if(e.key==='Enter')restore(it.name)}}},
+      fileIcon(it.dir?'dir':IMG_RE.test(it.display)?'img':'txt'),h('span',{class:'bn'},it.display,h('small',{},it.from?'from '+shortPath(it.from):'')),h('small',{},(it.dir?'folder':fmtSize(it.size))+(it.date?' · '+new Date(it.date).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}):'')));list.append(li)}}
+  async function restore(n){try{const p=await HX.binRestore(n);toast('Restored',shortPath(p));sel=null;draw();refreshFiles()}catch(e){toast('Couldn’t restore it',errMsg(e))}}
+  async function del(n){const it=items.find(i=>i.name===n);if(!await ask('Delete “'+(it?it.display:n)+'” for good?','You can’t get it back afterwards.','Delete',true))return;try{await HX.binDelete(n);sel=null;draw()}catch(e){toast('Couldn’t delete it',errMsg(e))}}
+  async function empty(){if(!await ask('Empty the '+BIN()+'?','Everything in it is deleted for good.','Empty',true))return;try{await HX.binEmpty();sel=null;draw()}catch(e){toast('Couldn’t empty it',errMsg(e))}}
+  draw();api.refresh=draw;if(HX.onChanged)HX.onChanged(w=>{if(w==='bin')draw()})}},
+ taskmgr:{name:'Task Manager',w:900,h:620,mount(b,api){
+  const wrap=h('div',{class:'tm'});b.append(wrap);
+  if(!HX||!OSM()){wrap.append(h('p',{class:'hint',style:'padding:20px'},'Task Manager works on NexusOS. On Windows, press Ctrl + Shift + Esc for Windows’ own.'));return}
+  const cards=h('div',{class:'tmcards'}),tbl=h('div',{class:'tmtable'}),foot=h('div',{class:'fileacts'});wrap.append(cards,tbl,foot);
+  const hist={cpu:[],mem:[],gpu:[],net:[]};let sort='cpu',sel=null,last=null,timer=0;
+  const spark=(arr,max)=>{const w=120,hh=28;const pts=arr.map((v,i)=>`${(i/(Math.max(1,arr.length-1)))*w},${hh-Math.min(1,v/(max||1))*hh}`).join(' ');return `<svg viewBox="0 0 ${w} ${hh}" width="${w}" height="${hh}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="1.6"/></svg>`};
+  const prot=g=>g.id==='nexusos'||g.id.startsWith('sys:');
+  const rate=n=>n<1024?Math.round(n)+' B/s':n<1048576?(n/1024).toFixed(0)+' KB/s':(n/1048576).toFixed(1)+' MB/s';
+  function card(title,big,sub,svg){return h('div',{class:'tmcard'},h('small',{},title),h('b',{},big),h('small',{},sub),svg?h('div',{class:'spark',html:svg}):null)}
+  async function tickTm(reuse){let s;if(reuse&&last)s=last;else{try{s=await HX.lx('procs')}catch(e){cards.innerHTML='';cards.append(errEl(e));return}last=s}if(!reuse){
+    const push=(k,v)=>{hist[k].push(v);if(hist[k].length>40)hist[k].shift()};push('cpu',s.cpu);push('mem',s.memUsed/s.memTotal*100);if(s.gpu)push('gpu',s.gpu.util);push('net',s.netRx+s.netTx)}
+    cards.innerHTML='';cards.append(card('CPU',Math.round(s.cpu)+'%',s.cores+' threads',spark(hist.cpu,100)),card('Memory',fmtSize(s.memUsed),'of '+fmtSize(s.memTotal),spark(hist.mem,100)),
+      s.gpu?card('GPU · NVIDIA',s.gpu.util+'%',fmtSize(s.gpu.memUsed)+' of '+fmtSize(s.gpu.memTotal)+' · '+s.gpu.temp+'°C',spark(hist.gpu,100)):card('GPU','—','NVIDIA driver not running'),
+      card('Disk',rate(s.diskR+s.diskW),'read '+rate(s.diskR)+' · write '+rate(s.diskW)),card('Network',rate(s.netRx+s.netTx),'↓ '+rate(s.netRx)+' · ↑ '+rate(s.netTx),spark(hist.net,Math.max(...hist.net,1))));
+    const rows=s.groups.slice().sort((a,b)=>sort==='name'?a.name.localeCompare(b.name):sort==='mem'?b.mem-a.mem:(b.cpu-a.cpu)||(b.mem-a.mem));
+    tbl.innerHTML='';const hd=h('div',{class:'tmrow tmhead'},...[['name','Name'],['cpu','CPU'],['mem','Memory'],['n','Processes']].map(([k,l])=>h('button',{class:sort===k?'on':'',on:{click:()=>{if(k!=='n'){sort=k;tickTm(true)}}}},l)));tbl.append(hd);
+    for(const g of rows.slice(0,200)){const r=h('div',{class:'tmrow'+(sel===g.id?' sel':''),tabIndex:0,on:{click:()=>{sel=g.id;tickTm(true)},contextmenu:async e=>{e.preventDefault();sel=g.id;const k=await menu([{id:'end',label:'End task',enabled:!prot(g)},{id:'kill',label:'Force end',enabled:!prot(g)}]);if(k)end(g,k==='kill')},keydown:e=>{if(e.key==='Delete')end(g,false)}}},
+      h('span',{},g.name),h('span',{},g.cpu.toFixed(1)+'%'),h('span',{},fmtSize(g.mem)),h('span',{},String(g.pids.length)));tbl.append(r)}
+    const cur=rows.find(g=>g.id===sel);foot.innerHTML='';foot.append(h('span',{class:'nstat'},'Up for '+fmtUp(s.uptime)),h('span',{style:'flex:1'}),h('button',{class:'pbtn danger',disabled:!cur||prot(cur),on:{click:()=>end(cur,false)}},'End task'))}
+  async function end(g,force){if(!g)return;if(!await ask((force?'Force end ':'End ')+g.name+'?',force?'It closes straight away. Anything unsaved in it is lost.':'It’s asked to close. Anything unsaved in it may be lost.',force?'Force end':'End task',true))return;
+    try{await HX.lx('endTask',g.pids,force);toast('Ended',g.name);setTimeout(tickTm,600)}catch(e){toast('Couldn’t end it',errMsg(e))}}
+  tickTm();timer=setInterval(()=>{if(!document.hidden)tickTm()},1500);api.onClose=()=>clearInterval(timer)}},
  about:{name:'About NexusOS',w:520,h:520,mount(b){
   const dl=h('dl',{});const add=(k,v)=>dl.append(h('dt',{},k),h('dd',{style:'margin:0'},v));
   const mem=h('div',{style:'display:flex;flex-direction:column;gap:4px'});
@@ -1047,44 +1355,72 @@ function paintWall(t){const W=Math.round(innerWidth*devicePixelRatio/2),H=Math.r
   wx.globalAlpha=.9;wx.fillStyle=c[2];wx.fillRect(0,hz-1,W,Math.max(1.5,H/450));wx.globalAlpha=1;wx.fillStyle=gl;wx.fillRect(0,hz,W,H-hz)}
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 // the wallpaper stops moving while other apps (games) are open, so it never costs them frame rate
-(function loop(t){if(!(typeof extWins!=='undefined'&&extWins.length))paintWall(t);if(!reduce)setTimeout(()=>requestAnimationFrame(loop),66)})();
-addEventListener('resize',()=>paintWall(performance.now()));
+if(VIEW==='main'||VIEW==='desktop')(function loop(t){if(!(typeof extWins!=='undefined'&&extWins.length)&&!document.documentElement.classList.contains('picwall'))paintWall(t);if(!reduce)setTimeout(()=>requestAnimationFrame(loop),66)})();
+addEventListener('resize',()=>{if(VIEW==='main'||VIEW==='desktop')paintWall(performance.now())});
 
-function apply(S){document.documentElement.classList.toggle('light',S.mode==='light');document.documentElement.style.setProperty('--accent',S.accent);wallIdx=S.wall;paintWall(performance.now());store.set('nxset',S)}
+function apply(S){document.documentElement.classList.toggle('light',S.mode==='light');document.documentElement.style.setProperty('--accent',S.accent);wallIdx=S.wall;if(VIEW==='main'||VIEW==='desktop')paintWall(performance.now());store.set('nxset',S)}
 apply(store.get('nxset',NX_DEFAULT));
 
 /* ---------- desktop ---------- */
 const DESK=['web','files','store','notes','calc','term','paint','mines','settings','about'];
-DESK.forEach(k=>{const b=h('button',{class:'icon'},glyph(k),APPS[k].name);b.addEventListener('dblclick',()=>openApp(k));b.addEventListener('keydown',e=>{if(e.key==='Enter')openApp(k)});b.addEventListener('click',e=>{if(e.pointerType==='touch'||matchMedia('(hover:none)').matches)openApp(k)});$('#desk').append(b)});
-renderBar();
-let deskSig='';
-function refreshDesktop(){if(!HX||!SYS)return;HX.list(SYS.drive+SYS.sep+'Desktop').then(res=>{const sig=res.entries.map(e=>e.name+(e.dir?'/':'')).join('|');if(sig===deskSig)return;deskSig=sig;
-  document.querySelectorAll('#desk .dfile').forEach(e=>e.remove());
-  for(const f of res.entries.slice(0,40)){const kind=f.dir?'dir':IMG_RE.test(f.name)?'img':'txt';const g=h('div',{class:'glyph fglyph'},fileIcon(kind));
-    const b=h('button',{class:'icon dfile',title:f.name},g,h('span',{class:'dname'},f.name));const open=()=>{if(f.dir)openApp('files',{dir:f.path});else openPath(f.path,f.name)};
-    b.addEventListener('dblclick',open);b.addEventListener('keydown',e=>{if(e.key==='Enter')open()});b.addEventListener('click',e=>{if(e.pointerType==='touch'||matchMedia('(hover:none)').matches)open()});$('#desk').append(b)}}).catch(()=>{})}
+function legacyDesktop(){DESK.forEach(k=>{const b=h('button',{class:'icon'},glyph(k),APPS[k].name);b.addEventListener('dblclick',()=>openApp(k));b.addEventListener('keydown',e=>{if(e.key==='Enter')openApp(k)});b.addEventListener('click',e=>{if(e.pointerType==='touch'||matchMedia('(hover:none)').matches)openApp(k)});$('#desk').append(b)})}
+function refreshDesktop(){if(!HX||!SYS||!(VIEW==='desktop'||VIEW==='main'))return;buildDesktop().catch(()=>{});refreshBinIcon()}
 const dlBox=h('div',{id:'dls'});document.body.append(dlBox);const dls={};
-function onDownload(d){let c=dls[d.id];
+function onDownload(d){let c=dls[d.id];if(VIEW==='toasts')setTimeout(sizeToasts,30);
   if(!c){c=dls[d.id]={el:h('div',{class:'dlcard',role:'status'})};dlBox.append(c.el)}
   const pct=d.total>0?Math.min(100,d.received/d.total*100):0;c.el.innerHTML='';
   const title=h('b',{},d.name);
   if(d.state==='start'||d.state==='progress'){c.el.append(title,h('div',{class:'bar2'},h('div',{style:'width:'+(d.total>0?pct:30)+'%'})),h('small',{},d.total>0?`${fmtSize(d.received)} of ${fmtSize(d.total)}`:`${fmtSize(d.received)} downloaded`))}
   else if(d.state==='completed'){c.el.append(title,h('small',{},`Saved to ${OSM()?'Home':'NexusOS'} › Downloads · ${fmtSize(d.received)}`),...(d.risky?[h('small',{class:'dlwarn'},'This is a program. Only open it if you trust where it came from.')]:[]),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>{openPath(d.path,d.name);dismiss()}}},'Open'),h('button',{class:'pbtn',on:{click:()=>{openApp('files',{dir:SYS.drive+SYS.sep+'Downloads',select:d.name});dismiss()}}},'Show in Files')));refreshFiles();c.t=setTimeout(dismiss,12000)}
   else{c.el.append(title,h('small',{},d.state==='cancelled'?'Download cancelled.':'Download failed. Check your connection and try again.'),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:dismiss}},'Dismiss')));c.t=setTimeout(dismiss,8000)}
-  function dismiss(){clearTimeout(c.t);c.el.classList.add('out');setTimeout(()=>{c.el.remove();delete dls[d.id]},300)}}
+  function dismiss(){clearTimeout(c.t);c.el.classList.add('out');setTimeout(()=>{c.el.remove();delete dls[d.id];if(VIEW==='toasts')sizeToasts()},300)}}
 async function migrateOldFiles(){if(!HX||!SYS||store.get('migrated12',false))return;const old=store.get('fs',null);store.set('migrated12',true);if(!old)return;let n=0;
   for(const folder of ['Documents','Downloads'])for(const f of (old[folder]||[])){if(f.t!=='txt'||!f.c)continue;if(f.n==='Welcome.txt'||f.n==='halcyon-release-notes.txt')continue;try{const p=await HX.unique(SYS.drive+SYS.sep+folder,f.n);await HX.writeText(p,f.c);n++}catch(e){}}
   if(n)toast('Your notes moved to the NexusOS drive',n+' file'+(n>1?'s are':' is')+' now in Documents and Downloads.')}
 
-function boot(){const bt=$('#boot');$('#boot h2').textContent='NexusOS';bt.classList.remove('done');setTimeout(()=>{bt.classList.add('done');setTimeout(()=>{if(!Object.keys(wins).length){toast('Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+(SYS?SYS.user:'Xiaoming'),'Click the flower in the taskbar to open Start.')}},400)},1400)}
+function boot(){const bt=$('#boot');$('#boot h2').textContent='NexusOS';bt.classList.remove('done');setTimeout(()=>{bt.classList.add('done');setTimeout(()=>{if(!Object.keys(wins).length){toast('Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+(SYS?SYS.user:'Xiaoming'),'Click the NexusOS logo in the taskbar to open Start.')}},400)},1400)}
 /* ---------- real PC hooks ---------- */
 function loadSys(){if(!HX)return Promise.resolve();return HX.sysInfo().then(x=>{SYS=x;const n=x.user||'User';$('.me').lastChild.textContent=n;$('.avatar').textContent=n.slice(0,2).toUpperCase()}).catch(()=>{})}
-if(HX){setInterval(loadSys,15000);HX.onOpenUrl(u=>openApp('web',u));HX.onDownload(onDownload);HX.onJob(onJob);HX.onPermission(onPermission);setInterval(refreshDesktop,4000);HX.catalog().then(c=>{CAT=c}).catch(()=>{})}
 const wifi=$('[data-t="wifi"]');
-function net(){$('#tray svg').style.opacity=navigator.onLine?1:.35;if(OSM()){refreshQuick();return}if(HX&&SYS&&SYS.isWin){wifi.classList.toggle('on',navigator.onLine);wifi.lastChild.textContent=navigator.onLine?'Online':'Offline';return}wifi.classList.toggle('on',navigator.onLine);wifi.lastChild.textContent=navigator.onLine?'Online':'Offline'}
-addEventListener('online',()=>{net();toast('Back online','Your internet connection is working again.')});addEventListener('offline',()=>{net();toast('You’re offline','NexusOS lost its internet connection.')});net();
-if(navigator.getBattery)navigator.getBattery().then(bat=>{const svg=$('#tray svg:nth-of-type(2)');const rect=svg.querySelector('rect[fill]');const draw=()=>{rect.setAttribute('width',Math.max(1,11*bat.level));svg.parentNode.title='Battery '+Math.round(bat.level*100)+'%'+(bat.charging?', charging':'')};draw();bat.onlevelchange=draw;bat.onchargingchange=draw}).catch(()=>{});
-loadSys().then(()=>{if(SYS){clock24=SYS.clock24!==false;tick();net();if(!OSM()&&HX)$('#vol').closest('.slider').hidden=true;if(SYS.isWin)$('[data-t="bt"]').classList.remove('on');if(OSM()){$('#boot h2').textContent='NexusOS';setInterval(pollWindows,1500);pollWindows();installedApps();setTimeout(autoCheckUpdates,60000);setInterval(autoCheckUpdates,6*3600000)}}refreshDesktop();migrateOldFiles();boot()});
+function net(){$('#tray svg').style.opacity=navigator.onLine?1:.35;if(OSM()){if(VIEW!=='panel')refreshQuick();return}if(HX&&SYS&&SYS.isWin){wifi.classList.toggle('on',navigator.onLine);wifi.lastChild.textContent=navigator.onLine?'Online':'Offline';return}wifi.classList.toggle('on',navigator.onLine);wifi.lastChild.textContent=navigator.onLine?'Online':'Offline'}
+function battery(){if(navigator.getBattery)navigator.getBattery().then(bat=>{const svg=$('#tray svg:nth-of-type(2)');const rect=svg.querySelector('rect[fill]');const draw=()=>{rect.setAttribute('width',Math.max(1,11*bat.level));svg.parentNode.title='Battery '+Math.round(bat.level*100)+'%'+(bat.charging?', charging':'')};draw();bat.onlevelchange=draw;bat.onchargingchange=draw}).catch(()=>{})}
+addEventListener('storage',e=>{if(e.key==='hx.nxset')apply(store.get('nxset',NX_DEFAULT))});
+function mountAppView(){const q=new URLSearchParams(location.search),key=q.get('app'),A=APPS[key];if(!A)return;let arg;try{const r=q.get('arg');arg=r?JSON.parse(r):undefined}catch(e){}
+  if(arg===null)arg=undefined;const body=h('div',{class:'body appbody'});document.body.append(body);document.title=A.name;
+  const api={el:document.body,body,setTitle:t=>{document.title=t},close:()=>window.close()};
+  wins[key]={el:document.body,key,title:null,body,api};
+  A.mount(body,api,arg);
+  const q2=mountAppView.queued||[];mountAppView.ready=a=>{if(A.onArg)A.onArg(wins[key],a)};q2.forEach(mountAppView.ready);
+  addEventListener('resize',()=>document.body.dispatchEvent(new Event('winresize')));
+  addEventListener('beforeunload',()=>{api.onClose&&api.onClose()})}
+if(HX){
+  if(VIEW==='app')HX.onAppArg(a=>{if(mountAppView.ready)mountAppView.ready(a);else(mountAppView.queued=mountAppView.queued||[]).push(a)});
+  HX.onJob(onJob);HX.onPermission(onPermission);HX.catalog().then(c=>{CAT=c}).catch(()=>{});
+  if(VIEW==='main'){setInterval(loadSys,15000);HX.onOpenUrl(u=>openApp('web',u));HX.onDownload(onDownload);setInterval(refreshDesktop,4000)}
+  if(VIEW==='toasts'){const tb=h('div',{id:'toastbox'});document.body.append(tb);tb.append(dlBox);HX.onToast(d=>toastView(d.t,d.s));HX.onDownload(onDownload)}
+  if(HX.onChanged)HX.onChanged(w=>{
+    if(w==='files'){Object.values(wins).forEach(x=>{if(x.key==='files'&&x.api.refresh)x.api.refresh()});if(VIEW==='desktop'){buildDesktop.sig=null;buildDesktop()}}
+    if(w==='bin'){refreshBinIcon();Object.values(wins).forEach(x=>{if(x.key==='bin'&&x.api.refresh)x.api.refresh()})}
+    if(w==='wallpaper'&&(VIEW==='desktop'||VIEW==='main'))loadWallpaper();
+    if(w==='pins'&&VIEW==='panel')loadPins();
+    if(w==='clock')HX.clock24().then(v=>{clock24=v;tick()})});
+}else{legacyDesktop();renderBar()}
+if(!MW){addEventListener('online',()=>{net();toast('Back online','Your internet connection is working again.')});addEventListener('offline',()=>{net();toast('You’re offline','NexusOS lost its internet connection.')});net();battery()}
+if(VIEW==='panel'){battery();addEventListener('online',net);addEventListener('offline',net)}
+if(VIEW!=='main'&&VIEW!=='desktop')$('#boot').remove();
+loadSys().then(()=>{
+  if(SYS){clock24=SYS.clock24!==false;tick();if(!OSM()&&HX&&!MW)$('#vol').closest('.slider').hidden=true;if(SYS.isWin)$('[data-t="bt"]').classList.remove('on')}
+  if(VIEW==='main'){if(HX){setupDesktop();refreshDesktop();loadWallpaper()}renderBar();net();migrateOldFiles();boot();if(OSM()){setInterval(pollWindows,1500);pollWindows();installedApps();setTimeout(autoCheckUpdates,60000);setInterval(autoCheckUpdates,6*3600000)}}
+  else if(VIEW==='desktop'){setupDesktop();refreshDesktop();loadWallpaper();setInterval(refreshDesktop,4000);HX.onWindows(l=>{extWins=l.filter(w=>w.active)});boot();migrateOldFiles();installedApps();setTimeout(autoCheckUpdates,60000);setInterval(autoCheckUpdates,6*3600000)}
+  else if(VIEW==='panel'){setInterval(loadSys,60000);loadPins();HX.onWindows(l=>{WINLIST=l;renderPanel()});HX.windows().then(l=>{WINLIST=l;renderPanel()}).catch(()=>{});
+    HX.onPopupState(w=>{$('#startBtn').classList.toggle('on',w==='start');$('#tray').classList.toggle('on',w==='quick')});net();setInterval(net,20000);
+    const sd=h('button',{id:'showdesk',title:'Show desktop','aria-label':'Show desktop',on:{click:()=>HX.lx('showDesktop').catch(()=>{})}});$('#bar').append(sd);
+    $('#bar').addEventListener('contextmenu',async e=>{if(e.target.closest('.tb'))return;e.preventDefault();const k=await menu([{id:'tm',label:'Task Manager'},{id:'set',label:'Taskbar settings'}]);if(k==='tm')openApp('taskmgr');if(k==='set')openSettings('appearance')})}
+  else if(VIEW==='popup'){HX.onPopup(which=>{$('#start').classList.toggle('open',which==='start');$('#quick').classList.toggle('open',which==='quick');
+      if(which==='start'){$('#search').value='';renderGrid('');setTimeout(()=>$('#search').focus(),30)}else{renderCal();refreshQuick()}});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')HX.popupHide()})}
+  else if(VIEW==='app')mountAppView();
+});
 })();
 </script>
 </body>

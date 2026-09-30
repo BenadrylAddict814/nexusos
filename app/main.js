@@ -14,7 +14,7 @@
  *   - System commands are run directly (no shell), with fixed argument lists and timeouts.
  *   - Programs are never started without the person confirming it first.
  */
-const { app, BrowserWindow, ipcMain, shell, dialog, session, Menu, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, session, Menu, screen, globalShortcut, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -269,7 +269,7 @@ const LX = {
     if (!/^[\w.-]+$/.test(String(output)) || !/^\d+x\d+$/.test(String(mode))) throw new Error('Unknown display mode.');
     await run('xrandr', ['--output', output, '--mode', mode]); return true;
   },
-  setZoom: async (z) => { config.zoom = Math.max(0.75, Math.min(2, Number(z) || 1)); saveConfig(); if (win) win.webContents.setZoomFactor(config.zoom); return config.zoom; },
+  setZoom: async (z) => { config.zoom = Math.max(0.75, Math.min(2, Number(z) || 1)); saveConfig(); for (const wc of TRUSTED) if (!wc.isDestroyed()) wc.setZoomFactor(config.zoom); return config.zoom; },
 
   /* Power */
   async battery() {
@@ -293,6 +293,14 @@ const LX = {
   },
   timezones: async () => (await run('timedatectl', ['list-timezones'])).trim().split('\n'),
   setTimezone: async (tz) => { if (!/^[A-Za-z0-9_+\-/]+$/.test(String(tz))) throw new Error('Unknown time zone'); await run('timedatectl', ['set-timezone', tz], { timeout: 120000 }); return true; },
+  setNtp: async (on) => { await run('timedatectl', ['set-ntp', on ? 'true' : 'false'], { timeout: 120000 }); return !!on; },
+  async setDateTime(when) {
+    when = String(when || '').trim().replace('T', ' ');
+    if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(when)) throw new Error('Pick a date and a time.');
+    await run('timedatectl', ['set-time', when.length === 16 ? when + ':00' : when], { timeout: 120000 })
+      .catch((e) => { throw new Error(/NTP|automatic/i.test(e.message) ? 'Turn off “Set time automatically” first.' : e.message); });
+    return true;
+  },
   setClock24: async (v) => { config.clock24 = !!v; saveConfig(); return config.clock24; },
 
   /* Keyboard layout */
@@ -370,6 +378,21 @@ const LX = {
     if (d.removable) await run('udisksctl', ['power-off', '-b', d.path]).catch(() => {});
     return true;
   },
+  async renameDrive(dev, label) {
+    const d = (await LX.drives()).find((x) => x.path === dev); if (!d) throw new Error('That drive isn’t connected any more.');
+    if (!d.removable) throw new Error('Drives inside the laptop are read-only here. Rename them from Windows.');
+    if (d.locked) throw new Error('Unlock the drive first.');
+    label = String(label || '').trim();
+    const max = { vfat: 11, exfat: 15, ntfs: 32, ext4: 16, ext3: 16, ext2: 16, btrfs: 255, xfs: 12 }[d.fs] || 11;
+    if (!label || /['"\\\/\x00-\x1f]/.test(label)) throw new Error('That name can’t be used.');
+    if (Buffer.byteLength(label) > max) throw new Error(`Names on this drive can be ${max} characters at most.`);
+    if (d.fs === 'vfat') label = label.toUpperCase();
+    let dev0 = d.path; try { dev0 = fs.realpathSync(d.path); } catch (_) {}
+    const obj = '/org/freedesktop/UDisks2/block_devices/' + path.basename(dev0).replace(/[^A-Za-z0-9]/g, (c) => '_' + c.charCodeAt(0).toString(16).padStart(2, '0'));
+    await run('gdbus', ['call', '--system', '--dest', 'org.freedesktop.UDisks2', '--object-path', obj, '--method', 'org.freedesktop.UDisks2.Filesystem.SetLabel', `'${label}'`, '@a{sv} {}'], { timeout: 120000 })
+      .catch((e) => { throw new Error(/busy|mounted/i.test(e.message) ? 'Eject the drive in Files, plug it back in without opening it, then rename it.' : /not authori[sz]ed|dismissed/i.test(e.message) ? 'Cancelled.' : e.message); });
+    return label;
+  },
   async unlockDrive(dev, key) {
     const d = (await LX.drives()).find((x) => x.path === dev); if (!d || !d.locked) throw new Error('That drive isn’t locked.');
     key = String(key || '').trim(); if (!key) throw new Error('Type the recovery key.');
@@ -390,6 +413,23 @@ const LX = {
   closeWindow: async (id) => { if (!/^0x[0-9a-f]+$/i.test(String(id))) throw new Error('Bad window'); await run('wmctrl', ['-ic', id]); return true; },
   minimizeWindow: async (id) => { if (!/^0x[0-9a-f]+$/i.test(String(id))) throw new Error('Bad window'); await run('xdotool', ['windowminimize', String(parseInt(id, 16))]); return true; },
   secureBootSetup: async () => { if (!fs.existsSync('/usr/lib/nexusos/nexus-secureboot')) throw new Error('This isn’t available on this system.'); cp.spawn('lxterminal', ['--title=Secure Boot setup', '-e', 'sudo /usr/lib/nexusos/nexus-secureboot'], { detached: true, stdio: 'ignore' }).unref(); return true; },
+  /* Task Manager */
+  procs: () => taskSnapshot(),
+  async endTask(pids, force) {
+    const me = os.userInfo().uid; let n = 0;
+    for (const raw of (Array.isArray(pids) ? pids : []).slice(0, 500)) {
+      const pid = Number(raw); if (!Number.isInteger(pid) || pid <= 1) continue;
+      if (pid === process.pid) throw new Error('That’s the NexusOS desktop itself. Use Log out instead.');
+      let uid = -1; try { uid = +(/^Uid:\s+(\d+)/m.exec(fs.readFileSync(`/proc/${pid}/status`, 'utf8')) || [])[1]; } catch (_) { continue; }
+      if (uid !== me) continue;   // only your own programs
+      let comm = '', cmd = ''; try { comm = fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim(); cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')[0]; } catch (_) { continue; }
+      if (cmd === process.execPath || cmd.startsWith(process.execPath + ' ') || KEEP_ALIVE.test(comm)) continue;   // the desktop, window manager and sound/session services
+      try { process.kill(pid, force ? 'SIGKILL' : 'SIGTERM'); n++; } catch (_) {}
+    }
+    if (!n) throw new Error('Nothing was ended. It may have closed already.');
+    return n;
+  },
+
   /* NexusOS's own updates (signed GitHub releases) */
   nexusUpdateState: async () => ({ version: VERSION, previous: prevVersion(), rolledBack: process.env.NEXUS_ROLLED_BACK === '1', canUpdate: fs.existsSync('/usr/lib/nexusos/nexus-system') && fs.existsSync(UPDATE_KEY) }),
   nexusUpdateCheck: async () => { const m = await fetchManifest(); return { available: newerThan(m.version, VERSION), version: m.version, notes: String(m.notes || '').slice(0, 4000), size: Number(m.size) || 0, date: m.date || '' }; },
@@ -397,7 +437,7 @@ const LX = {
     const m = await fetchManifest();
     if (!newerThan(m.version, VERSION)) throw new Error('You already have the newest NexusOS.');
     const dir = path.join(app.getPath('userData'), 'updates', m.version); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(dir, { recursive: true });
-    const send = (line, pct) => { if (win && !win.isDestroyed()) win.webContents.send('job', { id: 'nexus-update', line, pct }); };
+    const send = (line, pct) => broadcast('job', { id: 'nexus-update', line, pct });
     fs.writeFileSync(path.join(dir, 'manifest.json'), m.raw); fs.writeFileSync(path.join(dir, 'manifest.json.sig'), m.sig);
     send(`Downloading NexusOS ${m.version}...`, 5);
     const tar = await download(releaseUrl('nexusos-update.tar.gz'), 200 * 1024 * 1024, (got) => send(`Downloading NexusOS ${m.version}... ${fmtMB(got)} of ${fmtMB(m.size)}`, m.size ? Math.min(60, 5 + Math.round(got / m.size * 55)) : null));
@@ -414,8 +454,63 @@ const LX = {
   wifiPowersave: async () => !fs.existsSync('/etc/NetworkManager/conf.d/nexusos-wifi-performance.conf'),
   setWifiPowersave: async (on) => { await run('pkexec', ['/usr/lib/nexusos/nexus-system', 'wifi-powersave', on ? 'on' : 'off'], { timeout: 120000 }); return !!on; },
 
-  openTerminal: async () => { cp.spawn('lxterminal', ['--working-directory=' + os.homedir()], { detached: true, stdio: 'ignore' }).unref(); return true; },
+  openTerminal: async (dir) => { const d = typeof dir === 'string' && dir && fs.existsSync(dir) && fs.statSync(dir).isDirectory() ? path.resolve(dir) : os.homedir(); cp.spawn('lxterminal', ['--working-directory=' + d], { detached: true, stdio: 'ignore' }).unref(); return true; },
+  showDesktop: async () => { const on = (await run('wmctrl', ['-m']).catch(() => '')).includes('"showing the desktop" mode: ON'); await run('wmctrl', ['-k', on ? 'off' : 'on']); return !on; },
 };
+
+/* ---------------------------------------------------------------- Task Manager: what's running and what it uses */
+const TICK = 100; const PAGE = 4096;
+const KEEP_ALIVE = /^(nexusos.*|openbox|Xorg|X|systemd|\(sd-pam\)|dbus-daemon|dbus-broker.*|pipewire.*|wireplumber|lightdm.*|lxpolkit|polkit-.*|xss-lock|xdg-desktop-por.*|xdg-document-po.*|xdg-permission-.*|gvfsd.*|at-spi.*)$/;
+let tmPrev = null;   // { t, cpuTotal, cpuIdle, procs: Map(pid -> ticks), net: {rx,tx}, disk: {r,w} }
+let gpuCache = { t: 0, v: null };
+function readCpu() { const l = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0].trim().split(/\s+/).slice(1).map(Number); const idle = l[3] + (l[4] || 0); return { total: l.reduce((a, b) => a + b, 0), idle }; }
+function readNet() { let rx = 0, tx = 0; try { for (const l of fs.readFileSync('/proc/net/dev', 'utf8').split('\n').slice(2)) { const m = /^\s*([^:]+):\s*(.*)$/.exec(l); if (!m || m[1] === 'lo') continue; const f = m[2].trim().split(/\s+/).map(Number); rx += f[0]; tx += f[8]; } } catch (_) {} return { rx, tx }; }
+function readDisk() { let r = 0, w = 0; try { for (const l of fs.readFileSync('/proc/diskstats', 'utf8').split('\n')) { const f = l.trim().split(/\s+/); if (f.length < 10 || !/^(nvme\d+n\d+|sd[a-z]+|mmcblk\d+|vd[a-z]+)$/.test(f[2])) continue; r += +f[5] * 512; w += +f[9] * 512; } } catch (_) {} return { r, w }; }
+async function readGpu() {
+  if (!nvidiaPresent()) return null;
+  if (Date.now() - gpuCache.t < 1800) return gpuCache.v;
+  const out = await run('nvidia-smi', ['--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw', '--format=csv,noheader,nounits'], { timeout: 4000 }).catch(() => '');
+  const f = out.trim().split('\n')[0]; let v = null;
+  if (f) { const [name, util, mu, mt, temp, pw] = f.split(',').map((x) => x.trim()); v = { name, util: +util || 0, memUsed: (+mu || 0) * 1048576, memTotal: (+mt || 0) * 1048576, temp: +temp || 0, power: parseFloat(pw) || 0 }; }
+  gpuCache = { t: Date.now(), v }; return v;
+}
+function groupOf(pid, comm, cmd) {
+  let cg = ''; try { cg = fs.readFileSync(`/proc/${pid}/cgroup`, 'utf8'); } catch (_) {}
+  const fp = /app-flatpak-([A-Za-z0-9_.-]+?)-\d+\.scope/.exec(cg);
+  if (fp) return { id: 'flatpak:' + fp[1], name: (wmClassMap().get(fp[1].toLowerCase()) || {}).name || fp[1].split('.').pop() };
+  if (cmd.startsWith(process.execPath) || comm === 'nexusos') return { id: 'nexusos', name: 'NexusOS desktop' };
+  if (KEEP_ALIVE.test(comm)) return { id: 'sys:' + comm, name: comm + ' (system)' };
+  return { id: 'proc:' + comm, name: comm };
+}
+async function taskSnapshot() {
+  const now = Date.now(), cpu = readCpu(), net = readNet(), disk = readDisk(), me = os.userInfo().uid;
+  const cores = os.cpus().length || 1; const ticks = new Map(); const groups = new Map();
+  const dt = tmPrev ? (now - tmPrev.t) / 1000 : 0;
+  for (const d of fs.readdirSync('/proc')) {
+    if (!/^\d+$/.test(d)) continue; const pid = +d;
+    let stat, status; try { stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8'); status = fs.readFileSync(`/proc/${pid}/status`, 'utf8'); } catch (_) { continue; }
+    const r = stat.lastIndexOf(')'); const comm = stat.slice(stat.indexOf('(') + 1, r); const f = stat.slice(r + 2).split(' ');
+    const t = (+f[11]) + (+f[12]); ticks.set(pid, t);
+    const uid = +(/^Uid:\s+(\d+)/m.exec(status) || [])[1]; if (uid !== me) continue;
+    const rss = (+(/^VmRSS:\s+(\d+)/m.exec(status) || [0, 0])[1]) * 1024; if (!rss) continue;   // kernel threads have no memory
+    let cmd = ''; try { cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').replace(/\0/g, ' ').trim(); } catch (_) {}
+    const prevT = tmPrev && tmPrev.procs.get(pid); const cpuPct = dt > 0 && prevT != null ? Math.max(0, (t - prevT) / TICK / dt / cores * 100) : 0;
+    const g = groupOf(pid, comm, cmd); const e = groups.get(g.id) || { id: g.id, name: g.name, cpu: 0, mem: 0, pids: [] };
+    e.cpu += cpuPct; e.mem += rss; e.pids.push(pid); groups.set(g.id, e);
+  }
+  const mem = fs.readFileSync('/proc/meminfo', 'utf8'); const kb = (k) => (+(new RegExp('^' + k + ':\\s+(\\d+)', 'm').exec(mem) || [0, 0])[1]) * 1024;
+  const memTotal = kb('MemTotal'), memAvail = kb('MemAvailable');
+  const res = {
+    cpu: tmPrev ? Math.max(0, Math.min(100, 100 * (1 - (cpu.idle - tmPrev.cpuIdle) / Math.max(1, cpu.total - tmPrev.cpuTotal)))) : 0,
+    cores, cpuName: (os.cpus()[0] || {}).model || '', memUsed: memTotal - memAvail, memTotal,
+    netRx: dt ? Math.max(0, (net.rx - tmPrev.net.rx) / dt) : 0, netTx: dt ? Math.max(0, (net.tx - tmPrev.net.tx) / dt) : 0,
+    diskR: dt ? Math.max(0, (disk.r - tmPrev.disk.r) / dt) : 0, diskW: dt ? Math.max(0, (disk.w - tmPrev.disk.w) / dt) : 0,
+    gpu: await readGpu(), uptime: os.uptime(),
+    groups: [...groups.values()].map((g) => ({ ...g, cpu: Math.round(g.cpu * 10) / 10 })).sort((a, b) => (b.cpu - a.cpu) || (b.mem - a.mem)),
+  };
+  tmPrev = { t: now, cpuTotal: cpu.total, cpuIdle: cpu.idle, procs: ticks, net, disk };
+  return res;
+}
 
 /* ---------------------------------------------------------------- App Store */
 const CATALOG = [
@@ -511,7 +606,7 @@ function streamJob(jobId, cmd, args) {
     let child;
     try { child = cp.spawn(cmd, args, { windowsHide: true, env: { ...process.env, LC_ALL: 'C', DEBIAN_FRONTEND: 'noninteractive' } }); } catch (e) { return reject(e); }
     jobs.set(jobId, child);
-    const send = (m) => { if (win && !win.isDestroyed()) win.webContents.send('job', { id: jobId, ...m }); };
+    const send = (m) => broadcast('job', { id: jobId, ...m });
     let tail = '';
     const onData = (d) => { const s = String(d); tail = (tail + s).slice(-4000); s.split(/[\r\n]+/).map((x) => x.trim()).filter(Boolean).slice(-3).forEach((line) => { const pct = /(\d{1,3})%/.exec(line); send({ line: line.slice(0, 200), pct: pct ? Math.min(100, +pct[1]) : null }); }); };
     child.stdout.on('data', onData); child.stderr.on('data', onData);
@@ -529,11 +624,13 @@ const PERM_ALWAYS = new Set(['fullscreen', 'clipboard-sanitized-write']);
 const PERM_ASK = new Set(['media', 'geolocation', 'notifications']);
 const permMemo = new Map();
 let permSeq = 0; const permWaiting = new Map();
-function askPermission(info) {
+function askPermission(info, wc) {
   return new Promise((resolve) => {
-    if (!win || win.isDestroyed()) return resolve(false);
+    // ask in the window that shows the site (the Browser), falling back to the desktop
+    const host = wc && wc.hostWebContents && !wc.hostWebContents.isDestroyed() && TRUSTED.has(wc.hostWebContents) ? wc.hostWebContents : (anyWin() && anyWin().webContents);
+    if (!host) return resolve(false);
     const id = ++permSeq; permWaiting.set(id, resolve);
-    win.webContents.send('perm-ask', { id, ...info });
+    host.send('perm-ask', { id, ...info });
     setTimeout(() => { if (permWaiting.has(id)) { permWaiting.delete(id); resolve(false); } }, 60000);
   });
 }
@@ -546,7 +643,7 @@ function lockDownSession(ses, isWeb) {
     const media = (details.mediaTypes || []).slice().sort().join('+');
     const key = `${origin}|${perm}|${media}`;
     if (permMemo.has(key)) return cb(permMemo.get(key));
-    askPermission({ origin, perm, media }).then((ok) => { permMemo.set(key, ok); cb(ok); });
+    askPermission({ origin, perm, media }, wc).then((ok) => { permMemo.set(key, ok); cb(ok); });
   });
   ses.setPermissionCheckHandler((wc, perm, origin) => {
     if (PERM_ALWAYS.has(perm)) return true;
@@ -560,25 +657,33 @@ function lockDownSession(ses, isWeb) {
   ses.on('select-usb-device', (e, _d, cb) => { e.preventDefault(); cb(); });
 }
 
-/* ---------------------------------------------------------------- windows */
-function createWindow() {
-  const common = {
-    backgroundColor: '#070d0f', title: 'NexusOS', icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, show: false,
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true, webSecurity: true, spellcheck: false, navigateOnDragDrop: false, safeDialogs: true },
-  };
-  if (OS_MODE) {
-    const b = screen.getPrimaryDisplay().bounds;
-    win = new BrowserWindow({ ...common, type: 'desktop', frame: false, x: b.x, y: b.y, width: b.width, height: b.height, resizable: false, movable: false, skipTaskbar: true });
-    const fit = () => { if (win && !win.isDestroyed()) win.setBounds(screen.getPrimaryDisplay().bounds); };
-    screen.on('display-metrics-changed', fit); screen.on('display-added', fit); screen.on('display-removed', fit);
-  } else {
-    win = new BrowserWindow({ ...common, width: 1400, height: 900, fullscreen: true });
-  }
-  Menu.setApplicationMenu(null);
-  win.loadFile(path.join(__dirname, 'index.html'));
-  win.once('ready-to-show', () => { if (config.zoom) win.webContents.setZoomFactor(config.zoom); win.show(); });
-  const wc = win.webContents;
-  wc.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//i.test(url)) wc.send('open-url', url); return { action: 'deny' }; });
+/* ---------------------------------------------------------------- windows
+ * On Windows (and in a normal Linux desktop) NexusOS is one full-screen window, as before.
+ * As the NexusOS desktop it is several real windows, so they stack properly with other apps:
+ *   desktop  – wallpaper, icons and the Bin (always at the bottom)
+ *   panel    – the taskbar (always on top, except under full-screen games)
+ *   popup    – Start and quick settings (on top of everything while open)
+ *   toasts   – notifications and download cards (top right, never takes focus)
+ *   app      – one window per NexusOS app (Files, Settings, ...), framed and stacked like any other app
+ */
+const TRUSTED = new Set();               // webContents of NexusOS's own pages
+const appWins = new Map();               // BrowserWindow.id -> { key, win }
+let desktopWin = null, panelWin = null, popupWin = null, toastWin = null, popupWhich = null, popupPrevActive = 0;
+const PANEL_H = 52;
+const INDEX = path.join(__dirname, 'index.html');
+const APP_SIZES = { files: [880, 560], notes: [640, 520], web: [1180, 760], calc: [320, 480], term: [700, 440], paint: [760, 560], mines: [340, 440], settings: [900, 620], about: [560, 600], store: [940, 640], bin: [760, 500], taskmgr: [900, 620] };
+const APP_MULTI = new Set(['notes']);
+const APP_TITLES = { files: 'Files', notes: 'Notes', web: 'Browser', calc: 'Calculator', term: 'Terminal', paint: 'Paint', mines: 'Mines', settings: 'Settings', about: 'About NexusOS', store: 'App Store', bin: 'Bin', taskmgr: 'Task Manager' };
+
+function sendTo(w, ch, data) { if (w && !w.isDestroyed()) w.webContents.send(ch, data); }
+function broadcast(ch, data) { for (const wc of TRUSTED) if (!wc.isDestroyed()) wc.send(ch, data); }
+const anyWin = () => win || desktopWin || [...appWins.values()].map((a) => a.win).find((w) => !w.isDestroyed()) || null;
+
+function guard(w) {
+  const wc = w.webContents;
+  TRUSTED.add(wc);
+  wc.once('destroyed', () => TRUSTED.delete(wc));
+  wc.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//i.test(url)) openUrl(url); return { action: 'deny' }; });
   wc.on('will-navigate', (e) => e.preventDefault());
   wc.on('will-redirect', (e) => e.preventDefault());
   // Lock down the Browser's <webview>: no bridge, sandboxed, web addresses only
@@ -589,9 +694,162 @@ function createWindow() {
   });
   wc.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown') return;
-    if (!OS_MODE && input.key === 'F11') { win.setFullScreen(!win.isFullScreen()); e.preventDefault(); }
+    if (!OS_MODE && input.key === 'F11' && win) { win.setFullScreen(!win.isFullScreen()); e.preventDefault(); }
     if (!OS_MODE && input.control && input.shift && input.key.toLowerCase() === 'q') { app.quit(); e.preventDefault(); }
   });
+  wc.on('did-finish-load', () => { if (config.zoom && config.zoom !== 1) wc.setZoomFactor(config.zoom); });
+}
+const PREFS = () => ({ preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true, webSecurity: true, spellcheck: false, navigateOnDragDrop: false, safeDialogs: true, backgroundThrottling: false });
+function makeWin(opts, query) {
+  const w = new BrowserWindow({ backgroundColor: '#05060a', title: 'NexusOS', icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, show: false, ...opts, webPreferences: PREFS() });
+  guard(w);
+  w.loadFile(INDEX, { query });
+  return w;
+}
+const xid = (w) => { try { const b = w.getNativeWindowHandle(); return b.length >= 4 ? b.readUInt32LE(0) : 0; } catch (_) { return 0; } };
+
+function createWindow() {
+  Menu.setApplicationMenu(null);
+  if (!OS_MODE) {
+    win = makeWin({ width: 1400, height: 900, fullscreen: true }, { view: 'main' });
+    win.once('ready-to-show', () => win.show());
+    return;
+  }
+  const b = screen.getPrimaryDisplay().bounds;
+  desktopWin = makeWin({ type: 'desktop', frame: false, x: b.x, y: b.y, width: b.width, height: b.height, resizable: false, movable: false, skipTaskbar: true }, { view: 'desktop' });
+  desktopWin.once('ready-to-show', () => desktopWin.show());
+  panelWin = makeWin({ type: 'dock', frame: false, x: b.x, y: b.y + b.height - PANEL_H, width: b.width, height: PANEL_H, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false }, { view: 'panel' });
+  panelWin.once('ready-to-show', () => panelWin.showInactive());
+  popupWin = makeWin({ frame: false, width: 640, height: 600, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, minimizable: false, maximizable: false, fullscreenable: false }, { view: 'popup' });
+  popupWin.on('blur', () => hidePopup());
+  toastWin = makeWin({ type: 'notification', frame: false, width: 380, height: 10, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false, x: b.x + b.width - 396, y: b.y + 16 }, { view: 'toasts' });
+  win = desktopWin;   // dialogs belong to the desktop
+  const fit = () => {
+    const d = screen.getPrimaryDisplay().bounds;
+    if (desktopWin && !desktopWin.isDestroyed()) desktopWin.setBounds(d);
+    if (panelWin && !panelWin.isDestroyed()) panelWin.setBounds({ x: d.x, y: d.y + d.height - PANEL_H, width: d.width, height: PANEL_H });
+    placeToasts();
+  };
+  screen.on('display-metrics-changed', fit); screen.on('display-added', fit); screen.on('display-removed', fit);
+  startWindowWatch();
+  run('openbox', ['--reconfigure']).catch(() => {});   // pick up new window-manager settings after an update
+  try { globalShortcut.register('Control+Shift+Escape', () => openAppWindow('taskmgr')); } catch (_) {}
+}
+
+/* NexusOS apps as their own windows */
+function openAppWindow(key, arg) {
+  key = String(key);
+  if (!Object.prototype.hasOwnProperty.call(APP_TITLES, key)) throw new Error('Unknown app');
+  hidePopup();
+  if (!APP_MULTI.has(key)) {
+    for (const a of appWins.values()) if (a.key === key && !a.win.isDestroyed()) {
+      if (a.win.isMinimized()) a.win.restore(); a.win.show(); a.win.focus();
+      if (arg !== undefined && arg !== null) sendTo(a.win, 'app-arg', arg);
+      return true;
+    }
+  }
+  const [w0, h0] = APP_SIZES[key] || [720, 520];
+  const wa = screen.getPrimaryDisplay().workArea, n = appWins.size % 6;
+  const width = Math.min(w0, wa.width - 40), height = Math.min(h0, wa.height - 40);   // the work area already leaves room for the taskbar
+  const w = makeWin({ width, height, minWidth: 300, minHeight: 200, x: Math.round(wa.x + (wa.width - width) / 2 - 60 + n * 28), y: Math.round(wa.y + Math.max(10, (wa.height - height) / 2 - 30 + n * 28)), title: APP_TITLES[key] },
+    { view: 'app', app: key, arg: arg == null ? '' : JSON.stringify(arg) });
+  appWins.set(w.id, { key, win: w });
+  const id = w.id;
+  w.on('closed', () => { appWins.delete(id); pushWindows(true); });
+  w.once('ready-to-show', () => { w.show(); w.focus(); });
+  return true;
+}
+function openUrl(url) { if (OS_MODE) openAppWindow('web', url); else sendTo(win, 'open-url', url); }
+
+/* Start and quick settings */
+function showPopup(which) {
+  if (!popupWin || popupWin.isDestroyed()) return;
+  if (popupWin.isVisible() && popupWhich === which) return hidePopup();
+  const d = screen.getPrimaryDisplay().bounds;
+  const [w, h] = which === 'quick' ? [380, 600] : [660, 620];
+  const x = which === 'quick' ? d.x + d.width - w - 12 : Math.round(d.x + (d.width - w) / 2);
+  popupWin.setBounds({ x, y: d.y + d.height - PANEL_H - h - 8, width: w, height: h });
+  popupWhich = which; popupPrevActive = activeX;
+  sendTo(popupWin, 'popup', which);
+  popupWin.show(); popupWin.focus();
+  sendTo(panelWin, 'popup-state', which);
+}
+function hidePopup() {
+  if (!popupWin || popupWin.isDestroyed() || !popupWin.isVisible()) return;
+  popupWin.hide(); popupWhich = null; sendTo(panelWin, 'popup-state', null);
+}
+
+/* notifications */
+let toastH = 0;
+function placeToasts() {
+  if (!toastWin || toastWin.isDestroyed()) return;
+  const d = screen.getPrimaryDisplay().bounds;
+  if (toastH <= 0) { toastWin.hide(); return; }
+  toastWin.setBounds({ x: d.x + d.width - 396, y: d.y + 16, width: 380, height: Math.min(toastH, d.height - PANEL_H - 40) });
+  if (!toastWin.isVisible()) toastWin.showInactive();
+}
+
+/* the taskbar's list of open windows (NexusOS's own and other apps'), pushed to the panel */
+const WMCLASS_CACHE = { t: 0, map: new Map() };
+function wmClassMap() {   // StartupWMClass / app-id -> flatpak app, from installed .desktop files
+  if (Date.now() - WMCLASS_CACHE.t < 30000) return WMCLASS_CACHE.map;
+  const map = new Map();
+  for (const dir of [path.join(os.homedir(), '.local/share/flatpak/exports/share/applications'), '/var/lib/flatpak/exports/share/applications']) {
+    let list = []; try { list = fs.readdirSync(dir).filter((f) => f.endsWith('.desktop')); } catch (_) {}
+    for (const f of list) {
+      const id = f.replace(/\.desktop$/, ''); let text = ''; try { text = fs.readFileSync(path.join(dir, f), 'utf8'); } catch (_) {}
+      const name = (/^Name=(.*)$/m.exec(text) || [])[1] || id; const wm = (/^StartupWMClass=(.*)$/m.exec(text) || [])[1];
+      const entry = { id, name: name.trim() };
+      if (wm) map.set(wm.trim().toLowerCase(), entry);
+      map.set(id.toLowerCase(), entry); map.set(id.split('.').pop().toLowerCase(), entry);
+    }
+  }
+  WMCLASS_CACHE.t = Date.now(); WMCLASS_CACHE.map = map; return map;
+}
+let lastWinSig = '', activeX = 0, watchTimer = null;
+async function listWindows() {
+  const out = await run('wmctrl', ['-lpx'], { timeout: 4000 }).catch(() => '');
+  const act = await run('xprop', ['-root', '_NET_ACTIVE_WINDOW'], { timeout: 3000 }).catch(() => '');
+  const am = /window id # (0x[0-9a-f]+)/i.exec(act); activeX = am ? parseInt(am[1], 16) : 0;
+  const own = new Map(); for (const a of appWins.values()) if (!a.win.isDestroyed()) own.set(xid(a.win), a);
+  const skip = new Set([desktopWin, panelWin, popupWin, toastWin].filter((w) => w && !w.isDestroyed()).map(xid));
+  const map = wmClassMap(); const res = [];
+  for (const l of out.trim().split('\n').filter(Boolean)) {
+    const m = /^(0x[0-9a-f]+)\s+(-?\d+)\s+(\d+)\s+(\S+)\s+\S+\s?(.*)$/i.exec(l); if (!m) continue;
+    const x = parseInt(m[1], 16), desk = +m[2]; if (skip.has(x) || desk < 0) continue;
+    const a = own.get(x); const cls = m[4];
+    if (a) { res.push({ id: m[1], key: a.key, title: a.win.getTitle(), own: true, active: x === activeX }); continue; }
+    if (/^(nexusos|halcyon)\./i.test(cls)) continue;
+    const [inst, klass] = cls.split('.'); const hit = map.get((klass || '').toLowerCase()) || map.get((inst || '').toLowerCase());
+    const steamGame = /^steam_app_\d+/i.test(inst || '');
+    res.push({ id: m[1], app: hit && !steamGame ? hit.id : null, appName: hit && !steamGame ? hit.name : null, group: hit && !steamGame ? hit.id : (inst || cls).toLowerCase(), title: m[5], cls, active: x === activeX });
+  }
+  return res;
+}
+async function pushWindows(force) {
+  if (!panelWin || panelWin.isDestroyed()) return;
+  const list = await listWindows();
+  const sig = JSON.stringify(list);
+  if (force || sig !== lastWinSig) { lastWinSig = sig; sendTo(panelWin, 'windows', list); sendTo(desktopWin, 'windows', list); }
+  // hide Start if the person clicked into another window
+  // (only when a different window than before Start opened becomes active, so a slow focus change can't close it)
+  if (popupWin && popupWin.isVisible() && activeX && activeX !== xid(popupWin) && activeX !== popupPrevActive) hidePopup();
+}
+function startWindowWatch() { clearInterval(watchTimer); watchTimer = setInterval(() => pushWindows(false).catch(() => {}), 900); }
+async function windowAction(id, action) {
+  if (!/^0x[0-9a-f]+$/i.test(String(id))) throw new Error('Bad window');
+  const x = parseInt(id, 16);
+  const own = [...appWins.values()].find((a) => !a.win.isDestroyed() && xid(a.win) === x);
+  if (action === 'toggle') action = x === activeX ? 'minimize' : 'activate';
+  if (own) {
+    if (action === 'activate') { if (own.win.isMinimized()) own.win.restore(); own.win.show(); own.win.focus(); }
+    else if (action === 'minimize') own.win.minimize();
+    else if (action === 'close') own.win.close();
+  } else if (action === 'activate') await run('wmctrl', ['-ia', id]);
+  else if (action === 'minimize') await run('xdotool', ['windowminimize', String(x)]);
+  else if (action === 'close') await run('wmctrl', ['-ic', id]);
+  setTimeout(() => pushWindows(true).catch(() => {}), 150);
+  return true;
 }
 
 app.on('web-contents-created', (_e, contents) => {
@@ -615,7 +873,7 @@ function setupDownloads() {
     const target = uniquePath(path.join(DRIVE, 'Downloads'), cleanName(item.getFilename() || 'download'));
     item.setSavePath(target);
     const id = ++dlId, name = path.basename(target);
-    const send = (m) => { if (win && !win.isDestroyed()) win.webContents.send('download', { id, name, path: target, risky: isRisky(target), ...m }); };
+    const send = (m) => sendTo(OS_MODE ? toastWin : win, 'download', { id, name, path: target, risky: isRisky(target), ...m });
     send({ state: 'start', received: 0, total: item.getTotalBytes() });
     let last = 0;
     item.on('updated', (_ev, state) => {
@@ -635,10 +893,18 @@ function setupDownloads() {
 
 /* ---------------------------------------------------------------- startup */
 function urlFromArgs(argv) { return (argv || []).find((a) => /^https?:\/\//i.test(a)) || null; }
+function handleArgs(argv) {
+  const url = urlFromArgs(argv);
+  const open = ((argv || []).find((a) => /^--open=[a-z]+$/.test(a)) || '').slice(7);
+  if (OS_MODE) {
+    if (url) openUrl(url);
+    if (open && Object.prototype.hasOwnProperty.call(APP_TITLES, open)) openAppWindow(open);
+    if ((argv || []).includes('--toggle-start')) { if (popupWin && popupWin.isVisible()) hidePopup(); else showPopup('start'); }
+  } else if (url) openUrl(url);
+}
 app.on('second-instance', (_e, argv) => {
-  if (!win) return;
-  if (win.isMinimized()) win.restore(); win.focus();
-  const url = urlFromArgs(argv); if (url) win.webContents.send('open-url', url);
+  if (!OS_MODE && win) { if (win.isMinimized()) win.restore(); win.focus(); }
+  handleArgs(argv);
 });
 app.whenReady().then(() => {
   if (!PRIMARY) return;
@@ -649,19 +915,19 @@ app.whenReady().then(() => {
   setupDownloads();
   if (OS_MODE && config.kbd) LX.setKeyboard(config.kbd).catch(() => {});
   createWindow();
-  const first = urlFromArgs(process.argv); if (first) win.webContents.once('did-finish-load', () => win.webContents.send('open-url', first));
+  const first = OS_MODE ? desktopWin : win; first.webContents.once('did-finish-load', () => setTimeout(() => handleArgs(process.argv), 400));
 });
 app.on('window-all-closed', () => app.quit());
 
 /* ---------------------------------------------------------------- the only doors into the system */
 function handle(channel, fn) {
   ipcMain.handle(channel, async (e, ...args) => {
-    if (!win || e.sender !== win.webContents || !e.senderFrame || !String(e.senderFrame.url).startsWith('file://')) throw new Error('Not allowed.');
+    if (!TRUSTED.has(e.sender) || !e.senderFrame || !String(e.senderFrame.url).startsWith('file://')) throw new Error('Not allowed.');
     return fn(...args);
   });
 }
 ipcMain.on('perm-answer', (e, id, ok) => {
-  if (!win || e.sender !== win.webContents) return;
+  if (!TRUSTED.has(e.sender)) return;
   const r = permWaiting.get(id); if (r) { permWaiting.delete(id); r(!!ok); }
 });
 
@@ -737,7 +1003,7 @@ handle('fs:rename', async (p, name) => {
 handle('fs:trash', async (p) => {
   const t = mustBeInDrive(p);
   if (t === path.resolve(DRIVE) || FOLDERS.some((f) => t === path.join(path.resolve(DRIVE), f))) throw new Error('NexusOS’s main folders can’t be deleted.');
-  await shell.trashItem(t); return true;
+  await shell.trashItem(t); broadcast('sys-changed', 'bin'); return true;
 });
 handle('fs:addFromPC', async (destDir) => {
   const dest = mustBeInDrive(destDir);
@@ -809,3 +1075,126 @@ function btAgent() {
   } catch (_) { agentProc = null; }
 }
 app.on('before-quit', () => { if (agentProc) try { agentProc.kill(); } catch (_) {} });
+
+/* ---------------------------------------------------------------- 1.4.3: windows, menus, pins, Bin, wallpaper */
+handle('win:open', (key, arg) => { if (!OS_MODE) throw new Error('Only on NexusOS'); return openAppWindow(key, arg); });
+handle('win:popup', (which) => { if (!['start', 'quick'].includes(which)) throw new Error('Unknown panel'); showPopup(which); return true; });
+handle('win:popupHide', () => { hidePopup(); return true; });
+handle('win:list', () => listWindows());
+handle('win:act', (id, action) => { if (!['activate', 'minimize', 'close', 'toggle'].includes(action)) throw new Error('Unknown action'); return windowAction(id, action); });
+handle('toast', (t, s) => { sendTo(toastWin || win, 'toast', { t: String(t || '').slice(0, 120), s: String(s || '').slice(0, 300) }); return true; });
+handle('toast:size', (h) => { toastH = Math.max(0, Math.min(2000, Number(h) || 0)); placeToasts(); return true; });
+handle('dlg:confirm', async (title, text, ok) => {
+  const r = await dialog.showMessageBox(null, { type: 'question', title: 'NexusOS', message: String(title || '').slice(0, 120), detail: String(text || '').slice(0, 400), buttons: [String(ok || 'OK').slice(0, 30), 'Cancel'], defaultId: 1, cancelId: 1, noLink: true });
+  return r.response === 0;
+});
+handle('sys:changed', (what) => { broadcast('sys-changed', String(what || '')); return true; });
+
+// native right-click menus: they draw above every window, like on Windows
+ipcMain.handle('menu', (e, items) => {
+  if (!TRUSTED.has(e.sender)) throw new Error('Not allowed.');
+  const w = BrowserWindow.fromWebContents(e.sender);
+  return new Promise((resolve) => {
+    let picked = null;
+    const build = (list, depth) => (Array.isArray(list) ? list : []).slice(0, 40).map((it) => {
+      if (!it || it.type === 'separator') return { type: 'separator' };
+      const o = { label: String(it.label || '').slice(0, 80), enabled: it.enabled !== false };
+      if (it.type === 'checkbox') { o.type = 'checkbox'; o.checked = !!it.checked; }
+      if (it.submenu && depth < 2) o.submenu = build(it.submenu, depth + 1);
+      else o.click = () => { picked = String(it.id || ''); };
+      return o;
+    });
+    const menu = Menu.buildFromTemplate(build(items, 0));
+    menu.popup({ window: w || undefined, callback: () => setTimeout(() => resolve(picked), 0) });
+  });
+});
+
+// pinned taskbar apps
+const DEFAULT_PINS = [{ type: 'app', key: 'web' }, { type: 'app', key: 'files' }, { type: 'app', key: 'store' }, { type: 'app', key: 'term' }, { type: 'app', key: 'settings' }];
+const cleanPin = (p) => p && p.type === 'app' && Object.prototype.hasOwnProperty.call(APP_TITLES, p.key) ? { type: 'app', key: p.key }
+  : p && p.type === 'flatpak' && /^[A-Za-z0-9_.-]{3,120}$/.test(p.id) ? { type: 'flatpak', id: p.id, name: String(p.name || p.id).slice(0, 60) } : null;
+handle('pins:get', () => (Array.isArray(config.pins) ? config.pins : DEFAULT_PINS));
+handle('pins:set', (list) => { config.pins = (Array.isArray(list) ? list : []).map(cleanPin).filter(Boolean).slice(0, 24); saveConfig(); broadcast('sys-changed', 'pins'); return config.pins; });
+
+// the Bin (freedesktop Trash, which is where deleted files go)
+const TRASH = () => path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local/share'), 'Trash');
+const binName = (n) => { n = String(n || ''); if (!n || n.includes('/') || n === '.' || n === '..') throw new Error('Unknown item'); return n; };
+handle('bin:list', async () => {
+  if (!OS_MODE) return { supported: false, items: [] };
+  const T = TRASH(); let names = []; try { names = await fs.promises.readdir(path.join(T, 'files')); } catch (_) {}
+  const items = [];
+  for (const n of names.slice(0, 2000)) {
+    let orig = '', date = ''; try { const info = await fs.promises.readFile(path.join(T, 'info', n + '.trashinfo'), 'utf8'); orig = decodeURIComponent((/^Path=(.*)$/m.exec(info) || [])[1] || ''); date = (/^DeletionDate=(.*)$/m.exec(info) || [])[1] || ''; } catch (_) {}
+    let st = null; try { st = await fs.promises.lstat(path.join(T, 'files', n)); } catch (_) { continue; }
+    items.push({ name: n, display: orig ? path.basename(orig) : n, from: orig ? path.dirname(orig) : '', date, dir: st.isDirectory(), size: st.isDirectory() ? 0 : st.size });
+  }
+  items.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  return { supported: true, items };
+});
+handle('bin:restore', async (n) => { if (!OS_MODE) throw new Error('The Bin is only on NexusOS.');
+  n = binName(n); const T = TRASH(); const src = path.join(T, 'files', n);
+  let orig = ''; try { orig = decodeURIComponent((/^Path=(.*)$/m.exec(await fs.promises.readFile(path.join(T, 'info', n + '.trashinfo'), 'utf8')) || [])[1] || ''); } catch (_) {}
+  let destDir = orig && insideDrive(path.dirname(orig)) ? path.dirname(orig) : path.join(DRIVE, 'Documents');
+  await fs.promises.mkdir(mustBeInDrive(destDir), { recursive: true });
+  const dest = uniquePath(destDir, orig ? path.basename(orig) : n);
+  await moveAcross(src, dest);
+  await fs.promises.rm(path.join(T, 'info', n + '.trashinfo'), { force: true });
+  broadcast('sys-changed', 'files'); return dest;
+});
+handle('bin:delete', async (n) => { if (!OS_MODE) throw new Error('The Bin is only on NexusOS.'); n = binName(n); const T = TRASH(); await fs.promises.rm(path.join(T, 'files', n), { recursive: true, force: true }); await fs.promises.rm(path.join(T, 'info', n + '.trashinfo'), { force: true }); broadcast('sys-changed', 'bin'); return true; });
+handle('bin:empty', async () => { if (!OS_MODE) throw new Error('The Bin is only on NexusOS.'); const T = TRASH(); for (const d of ['files', 'info']) { const p = path.join(T, d); let l = []; try { l = await fs.promises.readdir(p); } catch (_) {} for (const f of l) await fs.promises.rm(path.join(p, f), { recursive: true, force: true }); } broadcast('sys-changed', 'bin'); return true; });
+
+// copy / move / new text file / properties
+async function moveAcross(from, to) {   // rename, or copy + delete when the two places are on different disks
+  try { await fs.promises.rename(from, to); }
+  catch (e) { if (e.code !== 'EXDEV') throw e; await fs.promises.cp(from, to, { recursive: true, errorOnExist: true, force: false, dereference: false }); await fs.promises.rm(from, { recursive: true, force: true }); }
+}
+const MAIN_FOLDERS = () => [path.resolve(DRIVE), ...FOLDERS.map((f) => path.join(path.resolve(DRIVE), f))];
+handle('fs:copyTo', async (src, destDir) => {
+  const from = path.resolve(String(src || '')); const dir = mustBeInDrive(String(destDir || ''));
+  const st = await fs.promises.lstat(from);
+  if (!st.isFile() && !st.isDirectory()) throw new Error('Only files and folders can be copied.');
+  if (st.isDirectory() && (dir === from || dir.startsWith(from + path.sep))) throw new Error('A folder can’t be copied into itself.');
+  const to = uniquePath(dir, path.basename(from));
+  if (st.isDirectory()) await fs.promises.cp(from, to, { recursive: true, dereference: false, errorOnExist: true, force: false });
+  else await fs.promises.copyFile(from, to, fs.constants.COPYFILE_EXCL);
+  broadcast('sys-changed', 'files'); return to;
+});
+handle('fs:moveTo', async (src, destDir) => {
+  const from = mustBeInDrive(String(src || '')); const dir = mustBeInDrive(String(destDir || ''));
+  if (MAIN_FOLDERS().includes(from)) throw new Error('NexusOS’s main folders can’t be moved.');
+  if (path.dirname(from) === dir) return from;
+  if (dir === from || dir.startsWith(from + path.sep)) throw new Error('A folder can’t be moved into itself.');
+  const to = uniquePath(dir, path.basename(from));
+  await moveAcross(from, to);
+  broadcast('sys-changed', 'files'); return to;
+});
+handle('fs:newText', async (dir) => { const p = uniquePath(mustBeInDrive(dir), 'New text document.txt'); await fs.promises.writeFile(p, '', { flag: 'wx' }); broadcast('sys-changed', 'files'); return p; });
+handle('fs:stat', async (p) => {
+  const t = path.resolve(String(p || '')); const st = await fs.promises.stat(t);
+  let size = st.size, files = 0, folders = 0;
+  if (st.isDirectory()) {
+    size = 0; const walk = async (d, depth) => { let l; try { l = await fs.promises.readdir(d, { withFileTypes: true }); } catch (_) { return; }
+      for (const e of l) { if (files + folders > 20000 || depth > 20) return; const q = path.join(d, e.name);
+        if (e.isDirectory()) { folders++; await walk(q, depth + 1); } else if (e.isFile()) { files++; try { size += (await fs.promises.stat(q)).size; } catch (_) {} } } };
+    await walk(t, 0);
+  }
+  return { path: t, name: path.basename(t), dir: st.isDirectory(), size, files, folders, modified: st.mtimeMs, created: st.birthtimeMs || st.ctimeMs, inDrive: insideDrive(t) };
+});
+
+// desktop background picture (a private copy, so it stays even if the original is deleted)
+const WALL_DIR = () => app.getPath('userData');
+handle('wall:set', async (p) => {
+  const from = path.resolve(String(p || '')); const ext = path.extname(from).toLowerCase();
+  if (!/^\.(png|jpe?g|webp|gif|bmp)$/.test(ext)) throw new Error('Only pictures can be the desktop background.');
+  const st = await fs.promises.stat(from); if (!st.isFile() || st.size > 40 * 1024 * 1024) throw new Error('That picture is too big (40 MB at most).');
+  for (const f of await fs.promises.readdir(WALL_DIR())) if (/^wallpaper\./.test(f)) await fs.promises.rm(path.join(WALL_DIR(), f), { force: true });
+  const to = path.join(WALL_DIR(), 'wallpaper' + ext); await fs.promises.copyFile(from, to);
+  config.wallpaper = path.basename(to); saveConfig(); broadcast('sys-changed', 'wallpaper'); return true;
+});
+handle('wall:get', async () => {
+  if (!config.wallpaper) return null; const p = path.join(WALL_DIR(), path.basename(config.wallpaper));
+  const mime = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp' }[path.extname(p).toLowerCase()];
+  try { return `data:${mime};base64,` + (await fs.promises.readFile(p)).toString('base64'); } catch (_) { return null; }
+});
+handle('wall:clear', async () => { if (config.wallpaper) await fs.promises.rm(path.join(WALL_DIR(), path.basename(config.wallpaper)), { force: true }); config.wallpaper = null; saveConfig(); broadcast('sys-changed', 'wallpaper'); return true; });

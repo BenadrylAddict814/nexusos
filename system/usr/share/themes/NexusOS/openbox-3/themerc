@@ -1,0 +1,76 @@
+# NexusOS window frames: dark, thin, cyan edge on the active window
+border.width: 1
+padding.width: 7
+padding.height: 5
+window.handle.width: 3
+window.client.padding.width: 0
+window.client.padding.height: 0
+window.active.border.color: #00b8d4
+window.inactive.border.color: #1a2230
+window.active.client.color: #0c1017
+window.inactive.client.color: #0c1017
+window.active.title.bg: flat solid
+window.active.title.bg.color: #0c1119
+window.inactive.title.bg: flat solid
+window.inactive.title.bg.color: #080b11
+window.active.title.separator.color: #0c1119
+window.inactive.title.separator.color: #080b11
+window.active.label.bg: parentrelative
+window.inactive.label.bg: parentrelative
+window.active.label.text.color: #e8f3ff
+window.inactive.label.text.color: #6f7e92
+window.label.text.justify: left
+window.active.button.unpressed.bg: parentrelative
+window.active.button.unpressed.image.color: #c9d6e6
+window.active.button.hover.bg: flat solid
+window.active.button.hover.bg.color: #1c2635
+window.active.button.hover.image.color: #00e5ff
+window.active.button.pressed.bg: flat solid
+window.active.button.pressed.bg.color: #00b8d4
+window.active.button.pressed.image.color: #00161b
+window.active.button.disabled.bg: parentrelative
+window.active.button.disabled.image.color: #3a4556
+window.active.button.toggled.bg: parentrelative
+window.active.button.toggled.image.color: #00e5ff
+window.inactive.button.unpressed.bg: parentrelative
+window.inactive.button.unpressed.image.color: #5c6a7c
+window.inactive.button.hover.bg: flat solid
+window.inactive.button.hover.bg.color: #1c2635
+window.inactive.button.hover.image.color: #c9d6e6
+window.inactive.button.pressed.bg: flat solid
+window.inactive.button.pressed.bg.color: #00b8d4
+window.inactive.button.pressed.image.color: #00161b
+window.inactive.button.disabled.bg: parentrelative
+window.inactive.button.disabled.image.color: #2a3444
+window.inactive.button.toggled.bg: parentrelative
+window.inactive.button.toggled.image.color: #5c6a7c
+window.active.handle.bg: flat solid
+window.active.handle.bg.color: #0c1119
+window.inactive.handle.bg: flat solid
+window.inactive.handle.bg.color: #080b11
+window.active.grip.bg: flat solid
+window.active.grip.bg.color: #00b8d4
+window.inactive.grip.bg: flat solid
+window.inactive.grip.bg.color: #1a2230
+menu.border.width: 1
+menu.border.color: #1f2a3a
+menu.title.bg: flat solid
+menu.title.bg.color: #0c1119
+menu.title.text.color: #e8f3ff
+menu.items.bg: flat solid
+menu.items.bg.color: #0c1119
+menu.items.text.color: #e8f3ff
+menu.items.disabled.text.color: #5c6a7c
+menu.items.active.bg: flat solid
+menu.items.active.bg.color: #00b8d4
+menu.items.active.text.color: #00161b
+menu.separator.color: #1f2a3a
+osd.border.width: 1
+osd.border.color: #00b8d4
+osd.bg: flat solid
+osd.bg.color: #0c1119
+osd.label.text.color: #e8f3ff
+osd.hilight.bg: flat solid
+osd.hilight.bg.color: #00b8d4
+osd.unhilight.bg: flat solid
+osd.unhilight.bg.color: #1f2a3a
