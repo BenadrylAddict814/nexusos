@@ -51,4 +51,12 @@ if [ -n "$need" ]; then
 fi
 command -v powerprofilesctl >/dev/null 2>&1 && systemctl enable --now power-profiles-daemon.service >/dev/null 2>&1 || true
 [ -f "$HERE/system/usr/lib/nexusos/nexus-setup-zram" ] && bash "$HERE/system/usr/lib/nexusos/nexus-setup-zram" || true
+# 1.6.2: switch off background services NexusOS never uses (each keeps some memory busy)
+#  - PackageKit: GNOME Software's helper; NexusOS updates through its own updater and apps through Flathub
+#  - ModemManager: only for mobile-broadband (SIM) modems; skipped if this computer has one
+for svc in packagekit.service; do systemctl list-unit-files "$svc" >/dev/null 2>&1 && systemctl mask --now "$svc" >/dev/null 2>&1 || true; done
+if ! ls /dev/cdc-wdm* /dev/wwan* >/dev/null 2>&1 && ! ls -d /sys/class/net/wwan* >/dev/null 2>&1; then
+  systemctl list-unit-files ModemManager.service >/dev/null 2>&1 && systemctl disable --now ModemManager.service >/dev/null 2>&1 || true
+fi
+systemctl restart systemd-journald >/dev/null 2>&1 || true
 exit 0

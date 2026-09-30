@@ -743,12 +743,14 @@ function sendTo(w, ch, data) { if (w && !w.isDestroyed()) w.webContents.send(ch,
 function broadcast(ch, data) { for (const wc of TRUSTED) if (!wc.isDestroyed()) wc.send(ch, data); }
 const anyWin = () => win || desktopWin || [...appWins.values()].map((a) => a.win).find((w) => !w.isDestroyed()) || null;
 
-function guard(w) {
+function guard(w, firstUrl) {
   const wc = w.webContents;
   TRUSTED.add(wc);
   wc.once('destroyed', () => TRUSTED.delete(wc));
-  wc.setWindowOpenHandler(({ url }) => { if (/^https?:\/\//i.test(url)) openUrl(url); return { action: 'deny' }; });
-  wc.on('will-navigate', (e) => e.preventDefault());
+  wc.setWindowOpenHandler(({ url }) => { const c = childOpenHandler(wc, url); if (c) return c; if (/^https?:\/\//i.test(url)) openUrl(url); return { action: 'deny' }; });
+  wc.on('did-create-window', (child, d) => childCreated(child, d.url));
+  let allow = firstUrl || null;   // a desktop child window may load its own page once, nothing else
+  wc.on('will-navigate', (e, url) => { if (allow && url === allow) { allow = null; return; } e.preventDefault(); });
   wc.on('will-redirect', (e) => e.preventDefault());
   // Lock down the Browser's <webview>: no bridge, sandboxed, web addresses only
   wc.on('will-attach-webview', (e, prefs, params) => {
@@ -764,6 +766,32 @@ function guard(w) {
   wc.on('did-finish-load', () => { if (config.zoom && config.zoom !== 1) wc.setZoomFactor(config.zoom); });
 }
 const PREFS = () => ({ preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true, webSecurity: true, spellcheck: false, navigateOnDragDrop: false, safeDialogs: true, backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required' });
+// 1.6.2: the taskbar, Start/quick settings and notifications are opened *by* the desktop window, the way a web page
+// opens a pop-up, so Chromium runs them inside the desktop's process instead of starting a process for each one.
+const INDEX_URL = require('url').pathToFileURL(INDEX).href;
+const childWait = new Map(); let childSeq = 0, desktopLoaded = false;
+function makeChild(opts, query) {
+  return new Promise((resolve) => {
+    if (!desktopWin || desktopWin.isDestroyed() || !desktopLoaded) return resolve(makeWin(opts, query));
+    const t = 'c' + (++childSeq) + require('crypto').randomBytes(6).toString('hex');
+    childWait.set(t, { opts, query, resolve });
+    sendTo(desktopWin, 'open-child', { url: INDEX_URL + '?' + new URLSearchParams({ ...query, child: t }), name: t });
+    setTimeout(() => { const w = childWait.get(t); if (w) { childWait.delete(t); resolve(makeWin(opts, query)); } }, 6000);   // fall back to a window of its own
+  });
+}
+function childOpenHandler(wc, url) {
+  if (!desktopWin || wc !== desktopWin.webContents || !url.startsWith(INDEX_URL + '?')) return null;
+  const t = new URL(url).searchParams.get('child'); const w = t && childWait.get(t); if (!w) return null;
+  return { action: 'allow', overrideBrowserWindowOptions: { backgroundColor: '#05060a', title: 'NexusOS', icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, show: false, ...w.opts, webPreferences: PREFS() } };
+}
+function childCreated(child, url) {
+  let t = ''; try { t = new URL(url).searchParams.get('child'); } catch (_) {}
+  const w = childWait.get(t); if (!w) { child.destroy(); return; }
+  childWait.delete(t); guard(child, url);
+  let crashes = 0;
+  child.webContents.on('render-process-gone', (_e, d) => { if (d.reason === 'clean-exit' || child.isDestroyed() || ++crashes > 5) return; setTimeout(() => { if (!child.isDestroyed() && desktopLoaded) child.loadFile(INDEX, { query: w.query }); }, 800); });
+  w.resolve(child);
+}
 function makeWin(opts, query) {
   const w = new BrowserWindow({ backgroundColor: '#05060a', title: 'NexusOS', icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, show: false, ...opts, webPreferences: PREFS() });
   guard(w);
@@ -785,10 +813,33 @@ function createWindow() {
   const b = screen.getPrimaryDisplay().bounds;
   desktopWin = makeWin({ type: 'desktop', frame: false, x: b.x, y: b.y, width: b.width, height: b.height, resizable: false, movable: false, skipTaskbar: true }, { view: 'desktop' });
   desktopWin.once('ready-to-show', () => desktopWin.show());
-  panelWin = makeWin({ type: 'dock', frame: false, x: b.x, y: b.y + b.height - PANEL_H, width: b.width, height: PANEL_H, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false }, { view: 'panel' });
-  panelWin.once('ready-to-show', () => panelWin.showInactive());
-  popupWin = makeWin({ frame: false, width: 640, height: 600, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, minimizable: false, maximizable: false, fullscreenable: false }, { view: 'popup' });
-  popupWin.on('blur', () => { if (!menuOpen) hidePopup(); });
+  const makeBars = async () => {
+    const d = screen.getPrimaryDisplay().bounds;
+    if (!panelWin || panelWin.isDestroyed()) {
+      panelWin = await makeChild({ type: 'dock', frame: false, x: d.x, y: d.y + d.height - PANEL_H, width: d.width, height: PANEL_H, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false }, { view: 'panel' });
+      panelWin.once('ready-to-show', () => panelWin.showInactive());
+      const pw = panelWin; pw.on('closed', () => { if (panelWin === pw) panelWin = null; });
+    }
+    if (!popupWin || popupWin.isDestroyed()) {
+      popupWin = await makeChild({ frame: false, width: 640, height: 600, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, minimizable: false, maximizable: false, fullscreenable: false }, { view: 'popup' });
+      popupWin.on('blur', () => { if (!menuOpen) hidePopup(); });
+      const qw = popupWin; qw.on('closed', () => { if (popupWin === qw) popupWin = null; });
+    }
+  };
+  // (if the desktop's process ever restarts, its child windows go with it: open them again)
+  let reopen = [];
+  desktopWin.webContents.on('did-finish-load', () => {
+    desktopLoaded = true;
+    makeBars().then(() => { for (const [k, a] of reopen.splice(0)) try { openAppWindow(k, a); } catch (_) {} }).catch(() => {});
+  });
+  // the desktop's process also hosts the taskbar, Start, notifications and the light apps: if it ever dies,
+  // close them all and open them again cleanly once the desktop is back
+  desktopWin.webContents.on('render-process-gone', () => {
+    desktopLoaded = false;
+    for (const w of [panelWin, popupWin, toastWin]) if (w && !w.isDestroyed()) w.destroy();
+    panelWin = popupWin = null; toastWin = null; toastReady = false; toastMaking = false;
+    for (const a of [...appWins.values()]) if (a.shared && !a.win.isDestroyed()) { reopen.push([a.key, a.arg]); a.win.destroy(); }
+  });
   win = desktopWin;   // dialogs belong to the desktop
   const fit = () => {
     const d = screen.getPrimaryDisplay().bounds;
@@ -821,14 +872,24 @@ function openAppWindow(key, arg) {
   const [w0, h0] = APP_SIZES[key] || [720, 520];
   const wa = screen.getPrimaryDisplay().workArea, n = appWins.size % 6;
   const width = Math.min(w0, wa.width - 40), height = Math.min(h0, wa.height - 40);   // the work area already leaves room for the taskbar
-  const w = makeWin({ width, height, minWidth: 300, minHeight: 200, x: Math.round(wa.x + (wa.width - width) / 2 - 60 + n * 28), y: Math.round(wa.y + Math.max(10, (wa.height - height) / 2 - 30 + n * 28)), title: APP_TITLES[key] },
-    { view: 'app', app: key, arg: arg == null ? '' : JSON.stringify(arg) });
-  appWins.set(w.id, { key, win: w });
-  const id = w.id;
-  w.on('closed', () => { appWins.delete(id); pushWindows(true); if (key === 'nexa' && ![...appWins.values()].some((a) => a.key === 'nexa')) nexaStop(); });
-  w.once('ready-to-show', () => { w.show(); w.focus(); });
+  if (appPending.has(key) && !APP_MULTI.has(key)) return true;   // already opening
+  const opts = { width, height, minWidth: 300, minHeight: 200, x: Math.round(wa.x + (wa.width - width) / 2 - 60 + n * 28), y: Math.round(wa.y + Math.max(10, (wa.height - height) / 2 - 30 + n * 28)), title: APP_TITLES[key] };
+  const query = { view: 'app', app: key, arg: arg == null ? '' : JSON.stringify(arg) };
+  // 1.6.2: NexusOS's own light apps run inside the desktop's process (about 25 MB less each);
+  // the Browser and Nexa do heavy work, so they keep a process of their own
+  const shared = !APP_OWN_PROCESS.has(key);
+  appPending.add(key);
+  Promise.resolve(shared ? makeChild(opts, query) : makeWin(opts, query)).then((w) => {
+    appPending.delete(key);
+    appWins.set(w.id, { key, win: w, shared, arg: arg == null ? undefined : arg });
+    const id = w.id;
+    w.on('closed', () => { appWins.delete(id); pushWindows(true); if (key === 'nexa' && ![...appWins.values()].some((a) => a.key === 'nexa')) nexaStop(); });
+    let shown = false; const show = () => { if (shown || w.isDestroyed()) return; shown = true; w.show(); w.focus(); };
+    w.once('ready-to-show', show); w.webContents.once('did-finish-load', () => setTimeout(show, 60)); setTimeout(show, 3000);
+  }, () => appPending.delete(key));
   return true;
 }
+const APP_OWN_PROCESS = new Set(['web', 'nexa']); const appPending = new Set();
 function openUrl(url) { if (OS_MODE) openAppWindow('web', url); else sendTo(win, 'open-url', url); }
 
 /* Start and quick settings */
@@ -854,18 +915,20 @@ function hidePopup() {
 /* notifications */
 let toastH = 0;
 // 1.5: the notifications window only exists while there's something to show (saves ~30 MB the rest of the time)
-let toastReady = false, toastIdle = null; const toastQueue = [];
+let toastReady = false, toastIdle = null, toastMaking = false; const toastQueue = [];
 function toastSend(ch, data) {
   if (!OS_MODE) return sendTo(win, ch, data);
   clearTimeout(toastIdle);
-  if (!toastWin || toastWin.isDestroyed()) {
-    const b = screen.getPrimaryDisplay().bounds; toastReady = false; toastH = 0;
-    toastWin = makeWin({ type: 'notification', frame: false, width: 380, height: 10, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false, x: b.x + b.width - 396, y: b.y + 16 }, { view: 'toasts' });
-    const w = toastWin;
-    w.webContents.once('did-finish-load', () => { if (toastWin !== w) return; toastReady = true; for (const [c, x] of toastQueue.splice(0)) sendTo(w, c, x); });
-    w.on('closed', () => { if (toastWin === w) { toastWin = null; toastReady = false; toastH = 0; } });
+  if ((!toastWin || toastWin.isDestroyed()) && !toastMaking) {
+    const b = screen.getPrimaryDisplay().bounds; toastReady = false; toastH = 0; toastMaking = true;
+    makeChild({ type: 'notification', frame: false, width: 380, height: 10, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false, x: b.x + b.width - 396, y: b.y + 16 }, { view: 'toasts' }).then((w) => {
+      toastWin = w; toastMaking = false;
+      const ready = () => { if (toastWin !== w) return; toastReady = true; for (const [c, x] of toastQueue.splice(0)) sendTo(w, c, x); };
+      if (!w.webContents.isLoading() && w.webContents.getURL()) ready(); else w.webContents.once('did-finish-load', ready);
+      w.on('closed', () => { if (toastWin === w) { toastWin = null; toastReady = false; toastH = 0; } });
+    });
   }
-  if (toastReady) sendTo(toastWin, ch, data); else toastQueue.push([ch, data]);
+  if (toastReady && toastWin && !toastWin.isDestroyed()) sendTo(toastWin, ch, data); else toastQueue.push([ch, data]);
 }
 function placeToasts() {
   if (!toastWin || toastWin.isDestroyed()) return;
@@ -1707,7 +1770,9 @@ function nexaStart() {
     nexaDevice = dev ? dev.name : 'processor';
     let tail = '';
     const p = cp.spawn(path.join(eng, 'llama-server'), ['-m', model, '--host', '127.0.0.1', '--port', String(nexaPort), '--api-key', nexaKey,
-      ...(dev ? ['--device', dev.id, '-ngl', '999'] : ['--device', 'none', '-ngl', '0', '-t', String(Math.max(2, os.cpus().length - 2))]), '-c', '8192', '-np', '1', '--jinja', '--no-webui'],
+      ...(dev ? ['--device', dev.id, '-ngl', '999'] : ['--device', 'none', '-ngl', '0', '-t', String(Math.max(2, os.cpus().length - 2))]),
+      // 1.6.2: a smaller, compressed conversation memory (about half the graphics memory, still room for a long chat)
+      '-c', '6144', '-ctk', 'q8_0', '-np', '1', '--jinja', '--no-webui'],
       { cwd: eng, env: envE, stdio: ['ignore', 'ignore', 'pipe'] });
     nexaSrv = p;
     p.stderr.on('data', (d) => { tail = (tail + String(d)).slice(-3000); });

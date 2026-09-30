@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('halcyon', {
   onClips: (fn) => ipcRenderer.on('clips', (_e, d) => fn(d)),
   nexa: { state: call('nexa:state'), install: call('nexa:install'), start: call('nexa:start'), remove: call('nexa:remove'), setCfg: call('nexa:setCfg'), history: call('nexa:history'),
     chat: call('nexa:chat'), stop: call('nexa:stopTalking'), speak: call('nexa:speak'), hear: call('nexa:hear') },
+  onOpenChild: (fn) => ipcRenderer.on('open-child', (_e, d) => fn(d)),
   onNexa: (fn) => { ipcRenderer.on('nexa-stream', (_e, d) => fn('stream', d)); ipcRenderer.on('nexa-setup', (_e, d) => fn('setup', d)); ipcRenderer.on('nexa-state', (_e, d) => fn('state', d)); },
   onClipSaved: (fn) => ipcRenderer.on('clips-saved', (_e, d) => fn(d)),
   lx: (name, ...args) => ipcRenderer.invoke('lx', String(name), ...args),

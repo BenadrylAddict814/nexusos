@@ -478,7 +478,8 @@ const store={get(k,d){try{const v=localStorage.getItem('hx.'+k);return v==null?d
 /* real-PC bridge: present only when running as the desktop app */
 const HX=window.halcyon||null;let SYS=null;
 // NexusOS draws itself as several real windows (desktop, taskbar, Start, notifications, one per app); elsewhere it is one page
-const VIEW=new URLSearchParams(location.search).get('view')||'main';const MW=!!HX&&VIEW!=='main';document.documentElement.classList.add('view-'+VIEW);
+const VIEW=new URLSearchParams(location.search).get('view')||'main';const MW=!!HX&&VIEW!=='main';
+if(HX&&VIEW==='desktop'&&HX.onOpenChild)HX.onOpenChild(d=>{try{window.open(d.url,d.name)}catch(e){}});document.documentElement.classList.add('view-'+VIEW);
 const TEXT_RE=/\.(txt|md|markdown|json|csv|log|ini|cfg|conf|yaml|yml|xml|html?|css|js|ts|py|bat|ps1|sh)$/i;
 const fmtSize=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':n<1073741824?(n/1048576).toFixed(1)+' MB':(n/1073741824).toFixed(2)+' GB';
 const fmtUp=s=>{const d=Math.floor(s/86400),hh=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'d ':'')+hh+'h '+m+'m'};
@@ -1032,7 +1033,7 @@ async function refreshBinIcon(){if(!OSM())return;try{const r=await HX.binList();
 // picture backgrounds
 let wallImg=null;
 async function loadWallpaper(){if(!HX||!HX.getWallpaper)return;const u=await HX.getWallpaper().catch(()=>null);
-  if(u){if(!wallImg){wallImg=h('div',{id:'wallimg'});document.body.prepend(wallImg)}wallImg.style.backgroundImage=`url("${u}")`;document.documentElement.classList.add('picwall')}
+  if(u){if(!wallImg){wallImg=h('div',{id:'wallimg'});document.body.prepend(wallImg)}wallImg.style.backgroundImage=`url("${u}")`;document.documentElement.classList.add('picwall');wc.width=wc.height=1}
   else{document.documentElement.classList.remove('picwall');if(wallImg){wallImg.remove();wallImg=null}}}
 
 /* ---------- 1.4.3: the taskbar as its own always-on-top bar ---------- */

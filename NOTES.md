@@ -1,4 +1,11 @@
-NexusOS 1.6.1: meet Nexa
+NexusOS 1.6.2: lighter
+
+- The taskbar, Start, notifications and NexusOS's own apps (Files, Settings, Task Manager, Clips and the rest) now share one process instead of each starting their own. The desktop uses about 30 MB less on its own and about 80 MB less with a few apps open. The Browser and Nexa keep their own process because they do heavy work.
+- Nexa uses about half as much graphics memory for her conversation memory, leaving more for games when she's open.
+- Background services NexusOS never uses are switched off (PackageKit, and ModemManager on computers without a SIM modem), and the system log can no longer grow large in memory.
+- If the desktop ever crashes, the taskbar and any open apps come back by themselves.
+
+From 1.6.1: meet Nexa
 
 - Nexa comes alive: she blinks, her mouth moves with her voice, she follows your mouse a little, and sparkles and hearts pop when she does something for you. Click her for a reaction.
 - New voice: "Heart", a sweet anime-style voice, slightly deeper by default. Pick from 10 voices and set how deep she sounds with the new Voice depth slider in her settings. (If you already downloaded her in 1.6.0, she fetches the new voice pack, about 130 MB.)
