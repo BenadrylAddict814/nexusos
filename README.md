@@ -4,7 +4,7 @@ A gaming desktop on Debian 13 with NVIDIA graphics, Steam and Discord from a bui
 
 ## How updates work
 1. Change the code, then bump `VERSION`, `app/package.json` and `NOTES.md`.
-2. Push a tag matching the version, e.g. `git tag v1.5.0 && git push origin v1.5.0`.
+2. Push to `main`. When `VERSION` isn't released yet,
 3. GitHub Actions (`.github/workflows/release.yml`) builds `nexusos-update.tar.gz`, writes `manifest.json`
    (version, SHA-256, engine, notes) and signs it with the `NEXUS_SIGNING_KEY` secret (Ed25519).
    It also attaches a fresh `NexusOS-ISO-Kit.zip`.

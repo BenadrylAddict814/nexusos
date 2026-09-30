@@ -1,24 +1,38 @@
-# Publishes a signed NexusOS update whenever a version tag (v1.4.0, v1.5.0, ...) is pushed.
+# Publishes a signed NexusOS update whenever main has a VERSION that hasn't been released yet.
+# (Bump VERSION, app/package.json and NOTES.md, push to main, and the release appears.)
 name: Release NexusOS
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+  workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
 jobs:
   release:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Check the tag matches VERSION
-        run: test "v$(tr -d '[:space:]' < VERSION)" = "${GITHUB_REF_NAME}"
+      - name: Is this version already released?
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$(tr -d '[:space:]' < VERSION)"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" >/dev/null 2>&1; then echo "new=false" >> "$GITHUB_OUTPUT"; echo "$TAG is already released."; else echo "new=true" >> "$GITHUB_OUTPUT"; fi
       - name: Check scripts and code
+        if: steps.v.outputs.new == 'true'
         run: |
           for f in system/usr/bin/nexusos-session system/usr/lib/nexusos/nexus-* migrate.sh iso-kit/kit/build.sh; do
-            head -1 "$f" | grep -q python && python3 -m py_compile "$f" || bash -n "$f"
+            if head -1 "$f" | grep -q python; then python3 -m py_compile "$f"; else bash -n "$f"; fi
           done
           node --check app/main.js && node --check app/preload.js
-      - name: Build the update
+          test "$(python3 -c 'import json;print(json.load(open("app/package.json"))["version"])')" = "$(tr -d '[:space:]' < VERSION)"
+      - name: Build and sign the update
+        if: steps.v.outputs.new == 'true'
         env:
           NEXUS_SIGNING_KEY: ${{ secrets.NEXUS_SIGNING_KEY }}
         run: |
@@ -28,8 +42,10 @@ jobs:
           rm -f "$RUNNER_TEMP/key.pem"
           tools/make-kit.sh
       - name: Publish
+        if: steps.v.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --title "NexusOS ${GITHUB_REF_NAME#v}" --notes-file NOTES.md \
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "NexusOS ${TAG#v}" --notes-file NOTES.md --latest \
             dist/manifest.json dist/manifest.json.sig dist/nexusos-update.tar.gz dist/NexusOS-ISO-Kit.zip
