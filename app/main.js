@@ -632,6 +632,9 @@ const STORE = {
       const args = ['run'];
       if (c && c.gpu && nvidiaPresent()) args.push('--env=__NV_PRIME_RENDER_OFFLOAD=1', '--env=__GLX_VENDOR_LIBRARY_NAME=nvidia', '--env=__VK_LAYER_NV_optimus=NVIDIA_only');
       args.push(id);
+      // Steam's menus take clicks only when its interface isn't drawn by the GPU on a desktop without a compositor
+      // (NexusOS). Games still run on the graphics card.
+      if (id === STEAM_ID) args.push('-cef-disable-gpu');
       cp.spawn('flatpak', args, { detached: true, stdio: 'ignore', env }).unref();
       return true;
     }
@@ -793,7 +796,7 @@ function createWindow() {
   startWindowWatch();
   startTray();
   startUsbWatch();
-  setTimeout(() => steamPreferNvidia().catch(() => {}), 20000);
+  setTimeout(() => steamPreferNvidia().catch(() => {}).then(() => ensureNvidiaFlatpakGL()).catch(() => {}), 20000);
   run('openbox', ['--reconfigure']).catch(() => {});   // pick up new window-manager settings after an update
   try { globalShortcut.register('Control+Shift+Escape', () => openAppWindow('taskmgr')); } catch (_) {}
 }
@@ -1327,6 +1330,29 @@ async function writeMangoConfig() {
   }
 }
 // Steam games (Proton uses Vulkan) always go to the NVIDIA GPU on hybrid laptops, however Steam was started
+// 1.5.1: Flatpak apps (Steam) need their own copy of the NVIDIA driver files, 64-bit and 32-bit, matching the
+// installed driver exactly. After a driver update they go missing and Steam warns "i386 ... extensions are not installed".
+let nvExtBusy = false;
+async function ensureNvidiaFlatpakGL() {
+  if (!OS_MODE || nvExtBusy || !nvidiaPresent() || !(await steamInstalled())) return;
+  let v = ''; try { v = fs.readFileSync('/sys/module/nvidia/version', 'utf8').trim(); } catch (_) { return; }
+  if (!/^\d+(\.\d+){1,3}$/.test(v)) return;
+  const tag = v.replace(/\./g, '-'), want = ['org.freedesktop.Platform.GL.nvidia-' + tag, 'org.freedesktop.Platform.GL32.nvidia-' + tag];
+  const out = await run('flatpak', ['list', '--runtime', '--columns=application'], { timeout: 20000 }).catch(() => null); if (out == null) return;
+  const have = new Set(out.split('\n').map((l) => l.trim()));
+  const missing = want.filter((x) => !have.has(x)); if (!missing.length) return;
+  nvExtBusy = true;
+  try {
+    await run('flatpak', ['remote-add', '--user', '--if-not-exists', 'flathub', 'https://dl.flathub.org/repo/flathub.flatpakrepo'], { timeout: 60000 }).catch(() => {});
+    toastSend('toast', { t: 'Setting up NVIDIA graphics for Steam', s: `Downloading the driver files for your NVIDIA driver (${v}). Restart Steam when it's done.` });
+    const br = await steamRuntimeBranch();
+    let ok = false;
+    for (const b of ['1.4', br].filter(Boolean)) {
+      try { await run('flatpak', ['install', '--user', '-y', '--noninteractive', 'flathub', ...missing.map((x) => x + '//' + b)], { timeout: 900000 }); ok = true; break; } catch (_) {}
+    }
+    toastSend('toast', ok ? { t: 'NVIDIA graphics for Steam are ready', s: 'Quit Steam (bottom-right arrow) and open it again.' } : { t: 'Couldn’t set up NVIDIA graphics for Steam', s: 'Check your internet connection. NexusOS will try again next time you start.' });
+  } finally { nvExtBusy = false; }
+}
 async function steamPreferNvidia() {
   if (!OS_MODE || !nvidiaPresent() || !(await steamInstalled())) return;
   const ov = await run('flatpak', ['override', '--user', '--show', STEAM_ID], { timeout: 10000 }).catch(() => '');

@@ -1,11 +1,6 @@
-NexusOS 1.5.0: the gaming update
+NexusOS 1.5.1
 
-- Clips: a new app that saves the last moments of your game with one key, like Medal or ShadowPlay (F8 by default). It records with your graphics card, so games keep their frame rate, and it only runs while you want it: open Clips to start, close the window and it keeps going under the arrow at the bottom right, quit it there. Pick the clip length, quality, frame rate, game sound, microphone, the key, and what to record (the game you're playing, the whole screen or one window). Clips are named after the game and saved in Videos > Clips. The first time, Clips downloads its recorder (GPU Screen Recorder, from Flathub).
-- Game overlay: FPS, GPU temperature and usage, CPU and memory on top of your Steam games. Turn it on in Settings > Gaming; Right Shift + F12 shows or hides it in a game.
-- Performance profiles: Battery saver, Balanced or Performance, in quick settings (bottom right) and Settings > Gaming.
-- Restart into Windows: in the power menu. The computer starts Windows once; after that it starts NexusOS as normal.
-- Steam games always use the NVIDIA graphics card, however Steam was opened.
-- Less memory: the desktop uses about 35 MB less, the notifications window only exists while it's showing something, and NexusOS now watches for window changes instead of checking twice a second. Compressed memory (zram) lets big games, Discord and a browser run together without the computer slowing to a crawl.
-- A crashed part of the desktop (taskbar, notifications) now comes back by itself.
+- Steam's menus work: right-click menus (like Manage > Uninstall) now take clicks instead of clicking whatever is behind them. Steam opened from NexusOS draws its interface without the graphics card; games still run on the NVIDIA card.
+- NVIDIA graphics for Steam set themselves up: when the NVIDIA driver updates, NexusOS downloads the matching driver files Steam needs (the "i386 compatibility flatpak extensions are not installed" warning), then tells you to restart Steam.
 
-The update installs a few system packages (performance profiles and memory compression), so it takes a minute or two longer than usual.
+Also includes everything from 1.5.0 (Clips, game overlay, performance profiles, Restart into Windows, lower memory) if you skipped it.
