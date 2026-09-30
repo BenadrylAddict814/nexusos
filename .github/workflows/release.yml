@@ -30,6 +30,7 @@ jobs:
             if head -1 "$f" | grep -q python; then python3 -m py_compile "$f"; else bash -n "$f"; fi
           done
           node --check app/main.js && node --check app/preload.js
+          find system -name __pycache__ -type d -prune -exec rm -rf {} +
           test "$(python3 -c 'import json;print(json.load(open("app/package.json"))["version"])')" = "$(tr -d '[:space:]' < VERSION)"
       - name: Build and sign the update
         if: steps.v.outputs.new == 'true'
