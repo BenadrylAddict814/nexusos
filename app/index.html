@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' file: data: blob:; media-src 'self' file: data:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' file: data: blob:; media-src 'self' file: data: blob:">
 <title>NexusOS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -361,10 +361,18 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 /* ===== 1.6: Nexa ===== */
 .nexa{display:grid;grid-template-columns:minmax(260px,38%) 1fr;height:100%;overflow:hidden;position:relative;background:radial-gradient(120% 90% at 0% 100%,rgba(255,95,162,.16),transparent 60%),radial-gradient(90% 80% at 100% 0%,rgba(0,229,255,.12),transparent 60%)}
 .nstage{position:relative;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;border-right:1px solid var(--line);background:linear-gradient(transparent 0 97%,rgba(127,160,180,.10) 97%) 0 0/100% 32px,linear-gradient(90deg,transparent 0 97%,rgba(127,160,180,.10) 97%) 0 0/32px 100%}
-.navatar{width:118%;max-width:none;margin-bottom:-4%;transform-origin:50% 100%;animation:nbob 4.2s ease-in-out infinite;-webkit-mask-image:linear-gradient(#000 78%,transparent);mask-image:linear-gradient(#000 78%,transparent);user-select:none;pointer-events:none}
+.navwrap{position:relative;width:118%;flex:none;margin-bottom:-4%;transform-origin:50% 100%;animation:nbob 4.2s ease-in-out infinite;-webkit-mask-image:linear-gradient(#000 78%,transparent);mask-image:linear-gradient(#000 78%,transparent);cursor:pointer;
+  translate:calc(var(--lx,0)*6px) calc(var(--ly,0)*3px);rotate:calc(var(--lx,0)*1.2deg);transition:translate .4s ease-out,rotate .4s ease-out}
+.navatar{display:block;width:100%;max-width:none;user-select:none;pointer-events:none}
+.nov{position:absolute;inset:0;width:100%;height:auto;opacity:0;pointer-events:none;user-select:none}.nov.on{opacity:1}
+.navwrap.hop{animation:nhop .55s cubic-bezier(.3,1.6,.5,1),nbob 4.2s ease-in-out .55s infinite}@keyframes nhop{0%{transform:translateY(0) scale(1)}35%{transform:translateY(-22px) scale(1.02,.98)}70%{transform:translateY(2px) scale(.99,1.01)}100%{transform:translateY(0)}}
+.nfx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.np{position:absolute;font-size:calc(16px*var(--s,1));color:#fff;text-shadow:0 0 8px #ff5fa2,0 0 14px #00e5ff;animation:nfloat 1.6s ease-out forwards;opacity:0}
+.np.heart{color:#ff5fa2;text-shadow:0 0 8px rgba(255,95,162,.8)}
+@keyframes nfloat{0%{opacity:0;transform:translate(0,0) scale(.3) rotate(0)}15%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1) rotate(40deg)}}
 @keyframes nbob{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.008)}}
-.nstage.talking .navatar{animation:ntalk .38s ease-in-out infinite alternate}@keyframes ntalk{from{transform:translateY(0) rotate(-.4deg)}to{transform:translateY(-5px) rotate(.5deg)}}
-.nstage.think .navatar{animation:nthink 2.4s ease-in-out infinite}@keyframes nthink{0%,100%{transform:rotate(-1.2deg)}50%{transform:rotate(1deg) translateY(-3px)}}
+.nstage.talking .navwrap:not(.hop){animation:ntalk .42s ease-in-out infinite alternate}@keyframes ntalk{from{transform:translateY(0) rotate(-.4deg)}to{transform:translateY(-5px) rotate(.5deg)}}
+.nstage.think .navwrap:not(.hop){animation:nthink 2.4s ease-in-out infinite}@keyframes nthink{0%,100%{transform:rotate(-1.2deg)}50%{transform:rotate(1deg) translateY(-3px)}}
 .nglow{position:absolute;left:50%;bottom:30%;width:70%;aspect-ratio:1;transform:translateX(-50%) scale(calc(.9 + var(--lvl,0)*.35));border-radius:50%;background:radial-gradient(circle,rgba(255,95,162,.35),rgba(0,229,255,.12) 55%,transparent 70%);filter:blur(8px);transition:transform .08s;opacity:.7}
 .nstage.listen .nglow{opacity:1;background:radial-gradient(circle,rgba(0,229,255,.5),rgba(255,95,162,.15) 55%,transparent 70%)}
 .nplate{position:absolute;left:14px;top:14px;display:flex;flex-direction:column;gap:2px;background:rgba(10,12,20,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 12px;color:#fff}
@@ -385,7 +393,8 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 .nset{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:5;padding:20px}
 .nsetbox{background:var(--bg,#0b0e14);border:1px solid var(--line);border-radius:14px;padding:16px 18px;width:min(620px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:8px}.nsetbox h3{margin:0 0 4px}
 .nsetbox .srow.col{flex-direction:column;align-items:stretch;gap:8px}.nsetbox textarea.txt{width:100%;resize:vertical;font:13px var(--body)}
-@media (max-width:760px){.nexa{grid-template-columns:1fr;grid-template-rows:38% 1fr}.nstage{border-right:0;border-bottom:1px solid var(--line)}.navatar{width:70%}}
+@media (max-width:760px){.nexa{grid-template-columns:1fr;grid-template-rows:38% 1fr}.nstage{border-right:0;border-bottom:1px solid var(--line)}.navwrap{width:70%}}
+@media (prefers-reduced-motion:reduce){.navwrap,.nstage.talking .navwrap,.nstage.think .navwrap{animation:none!important}.np{display:none}}
 /* ===== 1.5: Clips ===== */
 .clips{display:flex;flex-direction:column;height:100%;overflow:hidden;position:relative}
 .clhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:16px 18px;border-bottom:1px solid var(--line)}
@@ -1439,7 +1448,10 @@ const APPS={
   if(!HX||!OSM()||!HX.nexa){wrap.append(h('p',{class:'hint',style:'padding:20px'},'Nexa lives on NexusOS.'));return}
   const N=HX.nexa;let st=null,cfg=null,msgs=[],busy=false,reqId='',cur=null,sayBuf='',sayChain=Promise.resolve(),playQ=[],playing=null,rec=null,alive=true,ready=false;
   const img=h('img',{class:'navatar',alt:'',draggable:false}),glow=h('div',{class:'nglow'}),nm=h('b',{class:'nname'}),stat=h('span',{class:'nstat2'},'');
-  const stage=h('div',{class:'nstage idle'},glow,img,h('div',{class:'nplate'},nm,stat));
+  // her face frames sit on top of the picture: a blink, and two mouth shapes for talking
+  const ov=k=>h('img',{class:'nov',alt:'',draggable:false,'data-k':k}),blinkI=ov('blink'),closedI=ov('closed'),midI=ov('mid');
+  const fx=h('div',{class:'nfx'}),av=h('div',{class:'navwrap',title:'Poke her'},img,blinkI,closedI,midI);
+  const stage=h('div',{class:'nstage idle'},glow,av,fx,h('div',{class:'nplate'},nm,stat));
   const right=h('div',{class:'nright'});wrap.append(stage,right);
   const log=h('div',{class:'nlog'}),inp=h('textarea',{class:'ninp',rows:1,placeholder:'Say something…','aria-label':'Message'});
   const mic=h('button',{class:'nbtn',title:'Talk with your microphone','aria-label':'Talk'},svgI('<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'));
@@ -1450,20 +1462,38 @@ const APPS={
   function svgI(p){return h('span',{html:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`})}
   const setStat=(t,mode)=>{stat.textContent=t;stage.className='nstage '+(mode||'idle')};
   const drawSpk=()=>{spk.innerHTML='';spk.append(svgI(cfg.speak?'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>':'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>'));spk.classList.toggle('off',!cfg.speak)};
-  const look=()=>{img.src='nexa/nexa-'+(cfg.skin==='tan'?'tan':'light')+'.webp';nm.textContent=cfg.name;api.setTitle&&api.setTitle(cfg.name)};
+  const look=()=>{const b='nexa/nexa-'+(cfg.skin==='tan'?'tan':'light');img.src=b+'.webp';blinkI.src=b+'-blink.webp';closedI.src=b+'-closed.webp';midI.src=b+'-mid.webp';nm.textContent=cfg.name;api.setTitle&&api.setTitle(cfg.name)};
+  // ---- alive: blinking, mouth, sparkles, looking at your cursor, reacting when poked
+  let mouth='rest';const setMouth=m=>{if(m===mouth)return;mouth=m;closedI.classList.toggle('on',m==='closed');midI.classList.toggle('on',m==='mid')};
+  (function blinkLoop(){if(!alive)return;const one=()=>{blinkI.classList.add('on');setTimeout(()=>blinkI.classList.remove('on'),130)};one();if(Math.random()<.2)setTimeout(one,260);setTimeout(blinkLoop,2200+Math.random()*4200)})();
+  function burst(kind,n){const r=av.getBoundingClientRect(),sr=stage.getBoundingClientRect();for(let i=0;i<(n||7);i++){const e=h('span',{class:'np '+kind},kind==='heart'?'♥':'✦');
+      const x=r.left-sr.left+r.width*(.3+Math.random()*.45),y=r.top-sr.top+r.height*(.12+Math.random()*.3);e.style.left=x+'px';e.style.top=y+'px';
+      e.style.setProperty('--dx',((Math.random()-.5)*160).toFixed(0)+'px');e.style.setProperty('--dy',(-60-Math.random()*110).toFixed(0)+'px');e.style.setProperty('--s',(.7+Math.random()*.8).toFixed(2));e.style.animationDelay=(i*45)+'ms';
+      fx.append(e);setTimeout(()=>e.remove(),1700+i*45)}}
+  setInterval(()=>{if(alive&&!document.hidden&&Math.random()<.35)burst('spark',2)},6000);
+  stage.addEventListener('mousemove',e=>{const r=stage.getBoundingClientRect();av.style.setProperty('--lx',(((e.clientX-r.left)/r.width-.5)*2).toFixed(2));av.style.setProperty('--ly',(((e.clientY-r.top)/r.height-.5)*2).toFixed(2))});
+  stage.addEventListener('mouseleave',()=>{av.style.setProperty('--lx',0);av.style.setProperty('--ly',0)});
+  const POKES=['Hey! That tickles!','Hehe, need something?','Boop! You found me.','I’m right here, you know.','Careful, I bite! Just kidding.','Ready when you are!'];
+  av.onclick=()=>{av.classList.remove('hop');void av.offsetWidth;av.classList.add('hop');burst('heart',6);if(!busy&&!playing&&cfg.speak){reqId='poke';say(POKES[Math.floor(Math.random()*POKES.length)])}};
   function bubble(role,text){const e=h('div',{class:'nmsg '+(role==='user'?'me':'her')},text||'');log.append(e);log.scrollTop=log.scrollHeight;return e}
   function chip(t){const e=h('div',{class:'nchip'},t);if(cur&&cur.isConnected&&!cur.textContent)log.insertBefore(e,cur);else log.append(e);log.scrollTop=log.scrollHeight;return e}
   const TOOL_LABEL={open_app:a=>'Opening '+(a.app||'an app'),list_steam_games:()=>'Checking your Steam games',launch_steam_game:a=>'Starting '+(a.name||'a game'),set_volume:a=>'Volume → '+a.percent+'%',set_brightness:a=>'Brightness → '+a.percent+'%',set_performance_mode:a=>'Performance mode → '+String(a.mode||'').replace('_',' '),save_clip:()=>'Saving a clip',set_wallpaper:()=>'Changing the background',system_status:()=>'Checking the computer',power:a=>'Asking you about: '+String(a.action||'').replace('_',' ')};
   // ---- her voice: speak finished sentences while the rest is still being written
   const fileUrl=p=>'file://'+p.split('/').map(encodeURIComponent).join('/');
   function say(t){if(!cfg.speak)return;t=t.trim();if(!t)return;const my=reqId;sayChain=sayChain.then(()=>my===reqId&&alive?N.speak(t,cfg.voice):null).then(p=>{if(p&&my===reqId&&alive){playQ.push(p);pump()}}).catch(()=>{})}
-  function pump(){if(playing||!playQ.length)return;const a=new Audio(fileUrl(playQ.shift()));playing=a;stage.classList.add('talking');a.onended=a.onerror=()=>{playing=null;if(!playQ.length)stage.classList.remove('talking');pump()};a.play().catch(()=>a.onended())}
+  let actx=null,an=null,lipRaf=0;
+  function lip(){if(!playing||!an){setMouth('rest');lipRaf=0;return}const d=new Uint8Array(an.fftSize);an.getByteTimeDomainData(d);let s=0;for(let i=0;i<d.length;i+=2){const v=(d[i]-128)/128;s+=v*v}const rms=Math.sqrt(s/(d.length/2));
+    setMouth(rms<.018?'closed':rms<.07?'mid':'rest');lipRaf=requestAnimationFrame(lip)}
+  function pump(){if(playing||!playQ.length)return;const it=playQ.shift(),rate=(it&&it.rate)||1,url=URL.createObjectURL(new Blob([it.wav],{type:'audio/wav'}));
+    const a=new Audio(url);a.preservesPitch=false;a.playbackRate=rate;playing=a;stage.classList.add('talking');
+    try{if(!actx)actx=new AudioContext();const src=actx.createMediaElementSource(a);an=actx.createAnalyser();an.fftSize=1024;src.connect(an);an.connect(actx.destination);if(actx.state==='suspended')actx.resume()}catch(e){an=null}
+    a.onended=a.onerror=()=>{if(a.done)return;a.done=true;URL.revokeObjectURL(url);playing=null;an=null;setMouth('rest');if(!playQ.length)stage.classList.remove('talking');pump()};a.play().then(()=>{if(!lipRaf)lipRaf=requestAnimationFrame(lip)}).catch(()=>a.onended())}
   function feedSay(d){sayBuf+=d;let m;while((m=/^([\s\S]*?[.!?…](?=\s)|[\s\S]*?\n)/.exec(sayBuf))&&m[1].trim().length>=2){say(m[1]);sayBuf=sayBuf.slice(m[1].length)}}
-  function hush(){reqId='';sayBuf='';playQ=[];if(playing){playing.pause();playing=null}stage.classList.remove('talking');N.stop().catch(()=>{})}
+  function hush(){reqId='';sayBuf='';playQ=[];if(playing){playing.pause();playing=null}an=null;setMouth('rest');stage.classList.remove('talking');N.stop().catch(()=>{})}
   HX.onNexa((kind,d)=>{if(kind==='stream'&&d.id===reqId&&cur){
       if(d.delta){cur.textContent+=d.delta;feedSay(d.delta);log.scrollTop=log.scrollHeight}
       if(d.tool){const f=TOOL_LABEL[d.tool];chip((f?f(d.args||{}):d.tool)+'…');}
-      if(d.toolDone){}}
+      if(d.toolDone&&!/^(No |That failed|Unknown|The user said no|Not allowed|Which app)/.test(d.result||''))burst('spark',8)}
     if(kind==='setup')drawSetupProgress(d);
     if(kind==='state'&&!d.up&&ready){ready=false;setStat('Asleep','idle')}});
   async function send(text){text=(text||'').trim();if(!text||busy)return;hush();
@@ -1504,6 +1534,8 @@ const APPS={
     box.append(h('h3',{},'Settings'),srow('Name','',name),h('div',{class:'srow col'},h('div',{class:'sl'},h('span',{},'Personality'),h('small',{},'Describe how she talks and acts. Takes effect from your next message.')),pers),
       srow('Look','',skin),srow('Voice','',voice,h('button',{class:'pbtn',on:{click:async()=>{reqId='test';say('Hi! This is how I sound. Pretty cute, right?')}}},'Test')),
       h('p',{class:'hint'},st.device?('Her brain is running on: '+st.device+(st.device==='processor'?' (no graphics card found, so she’s slower)':'')):''),
+      (()=>{const r=h('input',{type:'range',min:-4,max:3,step:.5,value:cfg.pitch,'aria-label':'Voice depth'}),lab=h('small',{},'');const upd=()=>{const v=+r.value;lab.textContent=v===0?'Normal':v<0?(v<=-3?'Much deeper':v<=-1.5?'Deeper':'A little deeper'):'Higher'};upd();
+        r.oninput=upd;r.onchange=async()=>{await save({pitch:+r.value});reqId='test';say('Is this better? I can go deeper, or higher, whatever you like.')};return srow('Voice depth','Lower makes her voice deeper.',r,lab)})(),
       srow('Speak her replies','',sswitch(cfg.speak,async v=>{await save({speak:v});return v},'Speak')),
       srow('Let her control NexusOS','Open apps and games, change volume, brightness, performance mode and background, save clips. Power actions always ask you first.',sswitch(cfg.control,async v=>{await save({control:v});return v},'Control')),
       h('div',{class:'row2 wrap'},h('button',{class:'pbtn',on:{click:async()=>{if(!await ask('Forget your chat?',cfg.name+' won’t remember anything you’ve said so far.','Forget',true))return;msgs=[];log.innerHTML='';N.history([]).catch(()=>{});ov.remove()}}},'Forget our chat'),
@@ -1525,7 +1557,7 @@ const APPS={
     try{msgs=await N.history()}catch(e){msgs=[]}log.innerHTML='';for(const m of msgs.slice(-30))bubble(m.role,m.content);
     setStat('Waking up…','think');inp.focus();
     try{await N.start();if(!alive)return;ready=true;setStat('Here with you','idle');
-      if(!msgs.length){const hi=`Hi! I'm ${cfg.name}, your NexusOS buddy. Ask me anything, or tell me to open a game, turn up the volume, or switch to performance mode!`;reqId='hi';bubble('assistant',hi);say(hi)}}
+      burst('heart',5);if(!msgs.length){const hi=`Hi! I'm ${cfg.name}, your NexusOS buddy. Ask me anything, or tell me to open a game, turn up the volume, or switch to performance mode!`;reqId='hi';bubble('assistant',hi);say(hi)}}
     catch(e){setStat('Couldn’t wake up','idle');chip('I couldn’t start: '+errMsg(e))}}
   init();
   api.onClose=()=>{alive=false;hush();if(rec)stopRec()}}},

@@ -1,4 +1,9 @@
-NexusOS 1.6.0: meet Nexa
+NexusOS 1.6.1: meet Nexa
+
+- Nexa comes alive: she blinks, her mouth moves with her voice, she follows your mouse a little, and sparkles and hearts pop when she does something for you. Click her for a reaction.
+- New voice: "Heart", a sweet anime-style voice, slightly deeper by default. Pick from 10 voices and set how deep she sounds with the new Voice depth slider in her settings. (If you already downloaded her in 1.6.0, she fetches the new voice pack, about 130 MB.)
+
+From 1.6.0:
 
 - Nexa, your NexusOS assistant: the hoodie girl, in her own app (Start menu). Chat by typing or by talking with your microphone, and she answers out loud.
 - She runs entirely on this laptop: no account, nothing sent over the internet, works offline. Her brain uses the NVIDIA card while her window is open; close her and all of it stops, so your games get the memory and graphics card back.

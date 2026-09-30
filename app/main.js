@@ -1636,15 +1636,17 @@ const NEXA_PARTS = [
     url: `https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/${NEXA_MODEL_REV}/Qwen3-4B-Instruct-2507-Q4_K_M.gguf` },
   { key: 'speech', name: 'Voice and hearing: the engine', size: 28156791, dir: 'sherpa', check: 'bin/sherpa-onnx-offline-tts', sha256: 'c0bdb7907d3a74bba1d55d22bf4d9fa75586cf1530614ebe88a27b9118e015c4',
     url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-v1.13.8-linux-x64-shared.tar.bz2' },
-  { key: 'voice', name: 'Her voice (Kokoro)', size: 103248205, dir: 'voice', check: 'model.int8.onnx', sha256: 'c9f0dd393615805b0bab050c340834d5e684e732aec91c0e860cd30e982c08bd',
-    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-en-v0_19.tar.bz2' },
+  { key: 'voice', name: 'Her voice (Kokoro)', size: 132303094, dir: 'voice2', check: 'lexicon-us-en.txt', sha256: '4c3052abaa60943a341f193888cf6abd68787dae6ab8ae5c925a706caa247e4e',
+    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-multi-lang-v1_0.tar.bz2' },
   { key: 'ears', name: 'Her hearing (Whisper)', size: 208576005, dir: 'ears', check: 'base.en-encoder.int8.onnx', sha256: '475bc7052ce299c007f6d5d5407ba8601f819a2867f6eecee510ed17df581542',
     url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-base.en.tar.bz2' },
 ];
-const NEXA_VOICES = { af_bella: [1, 'Bella (warm)'], af_sky: [4, 'Sky (bright)'], af_sarah: [3, 'Sarah (calm)'], af_nicole: [2, 'Nicole (soft, whispery)'], bf_emma: [7, 'Emma (British)'], bf_isabella: [8, 'Isabella (British)'] };
-const NEXA_DEFAULTS = { name: 'Nexa', skin: 'light', voice: 'af_bella', speak: true, control: true,
+// Kokoro v1.0 speaker numbers
+const NEXA_VOICES = { af_heart: [3, 'Heart (sweet, expressive)'], af_bella: [2, 'Bella (warm)'], af_kore: [5, 'Kore (smooth)'], af_aoede: [1, 'Aoede (soft)'], af_nicole: [6, 'Nicole (whispery)'],
+  jf_alpha: [37, 'Alpha (anime accent)'], af_sky: [10, 'Sky (bright)'], af_sarah: [9, 'Sarah (calm)'], bf_emma: [21, 'Emma (British)'], bf_lily: [23, 'Lily (British)'] };
+const NEXA_DEFAULTS = { name: 'Nexa', skin: 'light', voice: 'af_heart', pitch: -1.5, speak: true, control: true,
   personality: 'Cheerful, playful and a little teasing, like a gamer best friend. Genuinely helpful and honest; gets excited about games; keeps things short and sweet.' };
-const nexaCfg = () => ({ ...NEXA_DEFAULTS, ...(config.nexa || {}) });
+const nexaCfg = () => { const c = { ...NEXA_DEFAULTS, ...(config.nexa || {}) }; if (!NEXA_VOICES[c.voice]) c.voice = NEXA_DEFAULTS.voice; return c; };
 const nexaPartDone = (p) => p.file ? fs.existsSync(path.join(NEXA_DIR(), p.file)) : fs.existsSync(path.join(NEXA_DIR(), p.dir, p.check));
 let nexaInstalling = false;
 function sha256File(f) {
@@ -1677,12 +1679,13 @@ async function nexaInstall() {
       }
       broadcast('nexa-setup', { key: p.key, name: p.name, state: 'done' });
     }
+    await fs.promises.rm(path.join(dir, 'voice'), { recursive: true, force: true });   // 1.6.0's older, smaller voice pack
     return true;
   } finally { nexaInstalling = false; }
 }
 async function nexaRemove() {
   await nexaStop();
-  for (const d of ['engine', 'sherpa', 'voice', 'ears', 'model.gguf', 'tmp']) await fs.promises.rm(path.join(NEXA_DIR(), d), { recursive: true, force: true });
+  for (const d of ['engine', 'sherpa', 'voice', 'voice2', 'ears', 'model.gguf', 'tmp']) await fs.promises.rm(path.join(NEXA_DIR(), d), { recursive: true, force: true });
   return true;
 }
 // ---- her brain: llama-server, only while her window is open
@@ -1894,13 +1897,14 @@ handleS('nexa:speak', async (wc, text, voice) => {
   if (!isNexaPage(wc)) throw new Error('Not allowed.');
   const t = String(text || '').replace(/[*_`#>~]/g, '').replace(/\p{Extended_Pictographic}/gu, '').replace(/\s+/g, ' ').trim().slice(0, 600);
   if (!t || !/[\p{L}\p{N}]/u.test(t)) return null;
-  const v = NEXA_VOICES[voice] || NEXA_VOICES[nexaCfg().voice] || NEXA_VOICES.af_bella;
-  const vd = path.join(NEXA_DIR(), 'voice'); if (!fs.existsSync(path.join(vd, 'model.int8.onnx'))) throw new Error('Her voice isn’t downloaded.');
+  const c = nexaCfg(); const v = NEXA_VOICES[voice] || NEXA_VOICES[c.voice];
+  const vd = path.join(NEXA_DIR(), 'voice2'); if (!fs.existsSync(path.join(vd, 'model.int8.onnx'))) throw new Error('Her voice isn’t downloaded.');
   const out = path.join(await nexaTmp(), `say-${process.pid}-${++nexaSeq}.wav`);
+  // "deeper": speak a little faster here, then her window plays it back slower, which lowers the pitch at normal speed
+  const rate = Math.pow(2, Math.max(-4, Math.min(3, +c.pitch || 0)) / 12);
   await nexaRun('sherpa-onnx-offline-tts', [`--kokoro-model=${vd}/model.int8.onnx`, `--kokoro-voices=${vd}/voices.bin`, `--kokoro-tokens=${vd}/tokens.txt`, `--kokoro-data-dir=${vd}/espeak-ng-data`,
-    `--sid=${v[0]}`, `--num-threads=${Math.max(2, Math.min(8, os.cpus().length - 2))}`, `--output-filename=${out}`, t], 120000);
-  setTimeout(() => fs.promises.rm(out, { force: true }).catch(() => {}), 120000);
-  return out;
+    `--kokoro-lexicon=${vd}/lexicon-us-en.txt`, `--kokoro-length-scale=${rate.toFixed(4)}`, `--sid=${v[0]}`, `--num-threads=${Math.max(2, Math.min(8, os.cpus().length - 2))}`, `--output-filename=${out}`, t], 120000);
+  try { return { wav: await fs.promises.readFile(out), rate }; } finally { fs.promises.rm(out, { force: true }).catch(() => {}); }
 });
 // ---- her ears: a short recording from the microphone (16 kHz WAV made in her window) turned into text
 handleS('nexa:hear', async (wc, bytes) => {
@@ -1929,6 +1933,7 @@ handle('nexa:setCfg', (o) => {
   if (o.skin === 'light' || o.skin === 'tan') c.skin = o.skin;
   if (Object.prototype.hasOwnProperty.call(NEXA_VOICES, o.voice)) c.voice = o.voice;
   for (const k of ['speak', 'control']) if (typeof o[k] === 'boolean') c[k] = o[k];
+  if (Number.isFinite(o.pitch)) c.pitch = Math.max(-4, Math.min(3, Math.round(o.pitch * 2) / 2));
   config.nexa = c; saveConfig(); return c;
 });
 // her memory of the conversation, so she remembers you next time
