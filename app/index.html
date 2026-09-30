@@ -329,7 +329,7 @@ select.txt{max-width:100%} select.txt option{background:var(--surface-solid);col
 .dicon.drop{background:color-mix(in srgb,var(--accent) 35%,transparent);outline:2px solid var(--accent)}
 .dicon .dname{max-width:84px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;text-align:center;word-break:break-word}
 .band{position:absolute;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent);pointer-events:none;z-index:4}
-#wallimg{position:fixed;inset:0;background:#000 center/cover no-repeat}
+#wallimg{position:fixed;inset:0;background:#000 center/cover no-repeat}.pic.big{width:192px;height:108px}.picwall .dicon,.picwall .dicon *{color:#fff;text-shadow:0 0 2px #000,0 1px 3px #000,0 0 6px rgba(0,0,0,.8)}
 .picwall #wall{display:none}
 .files li.drop{background:color-mix(in srgb,var(--accent) 25%,transparent)}
 dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 10px;font-size:13px} dl.props dt{color:var(--muted)} dl.props dd{margin:0;overflow-wrap:anywhere;user-select:text}
@@ -662,6 +662,8 @@ const PAGES={
      acc.innerHTML='';accents.forEach(a=>acc.append(h('button',{class:'acc'+(a===S.accent?' on':''),style:'background:'+a,'aria-label':'Accent '+a,on:{click:()=>{S.accent=a;apply(S);draw()}}})));
      wp.innerHTML='';WALLS.forEach((w,i)=>wp.append(h('button',{class:'wp'+(i===S.wall?' on':''),style:`background:linear-gradient(135deg,${w.c.join(',')})`,'aria-label':w.n,title:w.n,on:{click:()=>{S.wall=i;apply(S);if(HX&&HX.clearWallpaper)HX.clearWallpaper().catch(()=>{});draw()}}})))};
    sec(c,'Mode').append(seg);sec(c,'Accent colour').append(acc);sec(c,'Animated background','These move gently, and stop while you’re in a game.').append(wp);draw();
+   if(HX&&HX.builtinWallpapers){const bs=sec(c,'NexusOS backgrounds'),brow=h('div',{class:'picrow'});bs.append(brow);
+     HX.builtinWallpapers().then(list=>{for(const w of list)brow.append(h('button',{class:'pic big'+(w.on?' on':''),title:w.name,'aria-label':w.name,style:`background-image:url("${w.thumb}")`,on:{click:async()=>{await HX.useBuiltinWallpaper(w.id);openSettings('appearance')}}}))}).catch(()=>{})}
    if(HX&&HX.getWallpaper&&SYS){const ps=sec(c,'Picture background','Pick one of your pictures, or right-click any picture in Files and choose “Set as desktop background”.');const cur=h('div',{class:'row2'}),row=h('div',{class:'picrow'});ps.append(cur,row);
      HX.getWallpaper().then(u=>{if(u)cur.append(h('div',{class:'pic on',style:`background-image:url("${u}")`,title:'Current background'}),h('button',{class:'pbtn',on:{click:async()=>{await HX.clearWallpaper();openSettings('appearance')}}},'Use the animated background'))});
      HX.list(SYS.drive+SYS.sep+'Pictures').then(async res=>{const imgs=res.entries.filter(f=>!f.dir&&IMG_RE.test(f.name)&&f.size<8e6).slice(0,12);if(!imgs.length){row.append(h('p',{class:'hint'},'No pictures in your Pictures folder yet.'));return}

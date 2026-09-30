@@ -55,6 +55,8 @@ contextBridge.exposeInMainWorld('halcyon', {
   setWallpaper: call('wall:set'),
   getWallpaper: call('wall:get'),
   clearWallpaper: call('wall:clear'),
+  builtinWallpapers: call('wall:builtins'),
+  useBuiltinWallpaper: call('wall:useBuiltin'),
   trayList: call('tray:list'),
   trayAct: call('tray:act'),
   trayMenu: call('tray:menu'),

@@ -93,6 +93,8 @@ const CONFIG_FILE = path.join(app.getPath('userData'), 'system.json');
 let config = {};
 try { config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) || {}; } catch (_) { config = {}; }
 function saveConfig() { try { fs.mkdirSync(path.dirname(CONFIG_FILE), { recursive: true }); fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 1)); } catch (_) {} }
+// 1.4.5: the NexusOS hoodie background becomes the default once, even for people who were on the animated one (a picture of your own stays)
+if (!config.walls145) { if (!config.wallpaper) delete config.wallpaper; config.walls145 = true; saveConfig(); }
 
 /* ---------------------------------------------------------------- running system tools safely */
 function run(cmd, args, { timeout = 15000, input, env } = {}) {
@@ -1198,12 +1200,23 @@ handle('wall:set', async (p) => {
   const to = path.join(WALL_DIR(), 'wallpaper' + ext); await fs.promises.copyFile(from, to);
   config.wallpaper = path.basename(to); saveConfig(); broadcast('sys-changed', 'wallpaper'); return true;
 });
+// 1.4.5: backgrounds that come with NexusOS (app/wallpapers). A fresh install starts on the first one.
+const BUILTIN_WALLS = { 'nexus-hoodie': 'NexusOS hoodie', 'nexus-hoodie-tan': 'NexusOS hoodie (tan)' };
+const curWall = () => (config.wallpaper === undefined ? 'builtin:nexus-hoodie' : config.wallpaper);
+handle('wall:builtins', () => Object.entries(BUILTIN_WALLS).map(([id, name]) => ({ id, name, url: `wallpapers/${id}.jpg`, thumb: `wallpapers/${id}-thumb.jpg`, on: curWall() === 'builtin:' + id })));
+handle('wall:useBuiltin', async (id) => {
+  if (!Object.prototype.hasOwnProperty.call(BUILTIN_WALLS, id)) throw new Error('Unknown background');
+  if (config.wallpaper && !String(config.wallpaper).startsWith('builtin:')) await fs.promises.rm(path.join(WALL_DIR(), path.basename(config.wallpaper)), { force: true });
+  config.wallpaper = 'builtin:' + id; saveConfig(); broadcast('sys-changed', 'wallpaper'); return true;
+});
 handle('wall:get', async () => {
-  if (!config.wallpaper) return null; const p = path.join(WALL_DIR(), path.basename(config.wallpaper));
+  const w = curWall(); if (!w) return null;
+  if (String(w).startsWith('builtin:')) { const id = String(w).slice(8); return Object.prototype.hasOwnProperty.call(BUILTIN_WALLS, id) && fs.existsSync(path.join(__dirname, 'wallpapers', id + '.jpg')) ? `wallpapers/${id}.jpg` : null; }
+  const p = path.join(WALL_DIR(), path.basename(config.wallpaper));
   const mime = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp' }[path.extname(p).toLowerCase()];
   try { return `data:${mime};base64,` + (await fs.promises.readFile(p)).toString('base64'); } catch (_) { return null; }
 });
-handle('wall:clear', async () => { if (config.wallpaper) await fs.promises.rm(path.join(WALL_DIR(), path.basename(config.wallpaper)), { force: true }); config.wallpaper = null; saveConfig(); broadcast('sys-changed', 'wallpaper'); return true; });
+handle('wall:clear', async () => { if (config.wallpaper && !String(config.wallpaper).startsWith('builtin:')) await fs.promises.rm(path.join(WALL_DIR(), path.basename(config.wallpaper)), { force: true }); config.wallpaper = null; saveConfig(); broadcast('sys-changed', 'wallpaper'); return true; });
 
 /* ---------------------------------------------------------------- 1.4.4: the system tray (apps running in the background) */
 let trayProc = null, trayItems = [], trayReq = 0, trayRestarts = 0; const trayWait = new Map();

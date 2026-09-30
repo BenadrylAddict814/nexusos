@@ -1,5 +1,8 @@
-NexusOS 1.4.4
+NexusOS 1.4.5
 
-- Background apps: a little arrow at the bottom right of the taskbar shows the apps still running in the background (Discord, Steam and friends), just like Windows. Click an icon to open the app; right-click for the app's own options and "Quit", which really closes it instead of leaving it idling.
-- Taskbar: right-click a Flatpak app for "Quit", which fully stops it.
-- USB sounds: a chime when you plug in a USB device and a softer one when you pull it out. USB drives also pop up a note saying they're ready. Turn the sound off in Settings > Sound.
+- New default background: the NexusOS hoodie girl, in 1920×1080. A second version with a tan skin tone is included too. Switch between them in Settings > Appearance > NexusOS backgrounds; the animated backgrounds and your own pictures are still there.
+
+Also includes everything from 1.4.4, if you skipped it:
+- Background apps: the arrow at the bottom right of the taskbar shows apps still running in the background. Click to open one; right-click for its options and "Quit", which really closes it.
+- Taskbar: right-click a Flatpak app for "Quit".
+- USB sounds: a chime when you plug in a USB device and a softer one when you pull it out, plus a note when a USB drive is ready. Turn it off in Settings > Sound.

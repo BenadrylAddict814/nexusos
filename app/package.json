@@ -1,7 +1,7 @@
 {
   "name": "nexusos",
   "productName": "NexusOS",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "description": "NexusOS: a gaming desktop that runs on Windows, or as its own OS.",
   "main": "main.js",
   "author": "Xiaoming",
@@ -20,7 +20,8 @@
       "preload.js",
       "index.html",
       "icon.png",
-      "sounds/**"
+      "sounds/**",
+      "wallpapers/**"
     ]
   }
 }
