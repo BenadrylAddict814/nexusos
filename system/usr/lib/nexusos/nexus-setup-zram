@@ -1,0 +1,30 @@
+#!/bin/bash
+# NexusOS: compressed swap in RAM (zram). When memory runs low (big games + Discord + a browser), the least-used
+# memory gets compressed to about a third instead of the computer slowing to a crawl. Runs as root.
+set -u
+[ "$(id -u)" = 0 ] || exit 1
+command -v zramctl >/dev/null 2>&1 || exit 0
+[ -f /usr/lib/systemd/system/zramswap.service ] || [ -f /lib/systemd/system/zramswap.service ] || exit 0
+f=/etc/default/zramswap
+if [ ! -f "$f" ] || ! grep -q '^# NexusOS' "$f" 2>/dev/null; then
+  [ -f "$f" ] && ! grep -q '^# NexusOS' "$f" && grep -Eq '^(ALGO|PERCENT|SIZE)=' "$f" && exit 0   # someone set it up themselves: leave it
+  cat > "$f" <<'CONF'
+# NexusOS: compressed swap in memory (see /usr/lib/nexusos/nexus-setup-zram)
+ALGO=zstd
+PERCENT=50
+PRIORITY=100
+CONF
+fi
+cat > /etc/sysctl.d/91-nexusos-zram.conf <<'CONF'
+# NexusOS: tuned for compressed swap in memory (zram)
+vm.swappiness = 100
+vm.page-cluster = 0
+CONF
+if [ -d /run/systemd/system ]; then
+  systemctl enable zramswap.service >/dev/null 2>&1 || true
+  systemctl restart zramswap.service >/dev/null 2>&1 || true
+  sysctl -q -p /etc/sysctl.d/91-nexusos-zram.conf >/dev/null 2>&1 || true
+else
+  systemctl enable zramswap.service >/dev/null 2>&1 || true     # building the ISO: start on first boot
+fi
+exit 0

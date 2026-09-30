@@ -26,6 +26,11 @@ const OS_MODE = IS_LINUX && (process.argv.includes('--session') || process.env.H
 const VERSION = String(require('./package.json').version || '0');
 
 app.enableSandbox();
+// 1.5: leave out Chromium parts NexusOS never uses, so the desktop takes less memory
+if (IS_LINUX) {
+  app.commandLine.appendSwitch('disable-features', 'SpareRendererForSitePerProcess,MediaRouter,OptimizationHints,Translate,AutofillServerCommunication,CalculateNativeWinOcclusion,InterestFeedContentSuggestions,BackForwardCache');
+  app.commandLine.appendSwitch('disable-background-networking');
+}
 // NexusOS was renamed NexusOS in 1.3: carry the old drive and settings across once.
 {
   const base = app.getPath('appData'), oldDir = path.join(base, 'NexusOS'), newDir = path.join(base, 'NexusOS');
@@ -284,8 +289,57 @@ const LX = {
   power: async (action) => {
     const a = { shutdown: 'poweroff', restart: 'reboot', sleep: 'suspend' }[action];
     if (action === 'logout') { setTimeout(() => app.exit(0), 50); return true; }
+    if (action === 'windows') { await run('pkexec', ['/usr/lib/nexusos/nexus-system', 'reboot-windows'], { timeout: 60000 }); return true; }
     if (!a) throw new Error('Unknown power action');
     await run('systemctl', [a]); return true;
+  },
+
+  /* 1.5: is there a Windows to restart into? (the firmware's boot list, or GRUB's menu) */
+  async canBootWindows() {
+    if (!IS_LINUX) return false;
+    const efi = await run('efibootmgr', [], { timeout: 5000 }).catch(() => '');
+    if (/^Boot[0-9A-F]{4}\*?\s+Windows Boot Manager/mi.test(efi)) return true;
+    try { return /^menuentry '[^']*Windows/m.test(await fs.promises.readFile('/boot/grub/grub.cfg', 'utf8')); } catch (_) { return false; }
+  },
+  /* 1.5: performance profiles (power-profiles-daemon) */
+  async perfProfile() {
+    const out = await run('powerprofilesctl', ['list'], { timeout: 5000 }).catch(() => null);
+    if (out == null) return { available: false };
+    const profiles = [...out.matchAll(/^\s*(\*)?\s*(power-saver|balanced|performance):/gm)].map((m) => ({ id: m[2], on: !!m[1] }));
+    const deg = /degraded:\s*yes\s*\(([^)]*)\)/i.exec(out);
+    return { available: profiles.length > 0, current: (profiles.find((p) => p.on) || {}).id || 'balanced', profiles: profiles.map((p) => p.id), degraded: deg ? deg[1] : null };
+  },
+  async setPerfProfile(p) {
+    if (!['power-saver', 'balanced', 'performance'].includes(p)) throw new Error('Unknown profile');
+    await run('powerprofilesctl', ['set', p], { timeout: 10000 }); broadcast('sys-changed', 'perf'); return true;
+  },
+
+  /* 1.5: game overlay (MangoHud) for Steam games: FPS, GPU temperature and load, Right Shift + F12 shows/hides it */
+  async overlay() {
+    const steam = await steamInstalled();
+    const ov = steam ? await run('flatpak', ['override', '--user', '--show', STEAM_ID], { timeout: 10000 }).catch(() => '') : '';
+    const layer = steam ? await mangoLayerInstalled() : false;
+    const c = config.overlay || {};
+    return { steam, layer, enabled: /^MANGOHUD=1$/m.test(ov), style: c.style === 'fps' ? 'fps' : 'full', position: ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(c.position) ? c.position : 'top-left' };
+  },
+  async setOverlay(opts) {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const c = config.overlay = { ...(config.overlay || {}) };
+    if (o.style !== undefined) c.style = o.style === 'fps' ? 'fps' : 'full';
+    if (o.position !== undefined && ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(o.position)) c.position = o.position;
+    saveConfig(); await writeMangoConfig();
+    if (o.enabled === true) {
+      if (!(await steamInstalled())) throw new Error('Install Steam first (App Store).');
+      if (!(await mangoLayerInstalled())) {
+        const br = await steamRuntimeBranch(); if (!br) throw new Error('Couldn’t read which runtime Steam uses.');
+        await run('flatpak', ['remote-add', '--user', '--if-not-exists', 'flathub', 'https://dl.flathub.org/repo/flathub.flatpakrepo'], { timeout: 60000 });
+        await streamJob('overlay', 'flatpak', ['install', '--user', '-y', '--noninteractive', 'flathub', 'org.freedesktop.Platform.VulkanLayer.MangoHud//' + br]);
+      }
+      await run('flatpak', ['override', '--user', '--env=MANGOHUD=1', STEAM_ID], { timeout: 20000 });
+    } else if (o.enabled === false) {
+      await run('flatpak', ['override', '--user', '--unset-env=MANGOHUD', STEAM_ID], { timeout: 20000 }).catch(() => {});
+    }
+    return LX.overlay();
   },
 
   /* Date and time */
@@ -674,9 +728,9 @@ let menuOpen = false;   // a right-click menu is open (Start mustn't close under
 let desktopWin = null, panelWin = null, popupWin = null, toastWin = null, popupWhich = null, popupPrevActive = 0;
 const PANEL_H = 52;
 const INDEX = path.join(__dirname, 'index.html');
-const APP_SIZES = { files: [880, 560], notes: [640, 520], web: [1180, 760], calc: [320, 480], term: [700, 440], paint: [760, 560], mines: [340, 440], settings: [900, 620], about: [560, 600], store: [940, 640], bin: [760, 500], taskmgr: [900, 620] };
+const APP_SIZES = { clips: [960, 640], files: [880, 560], notes: [640, 520], web: [1180, 760], calc: [320, 480], term: [700, 440], paint: [760, 560], mines: [340, 440], settings: [900, 620], about: [560, 600], store: [940, 640], bin: [760, 500], taskmgr: [900, 620] };
 const APP_MULTI = new Set(['notes']);
-const APP_TITLES = { files: 'Files', notes: 'Notes', web: 'Browser', calc: 'Calculator', term: 'Terminal', paint: 'Paint', mines: 'Mines', settings: 'Settings', about: 'About NexusOS', store: 'App Store', bin: 'Bin', taskmgr: 'Task Manager' };
+const APP_TITLES = { files: 'Files', notes: 'Notes', web: 'Browser', calc: 'Calculator', term: 'Terminal', paint: 'Paint', mines: 'Mines', settings: 'Settings', about: 'About NexusOS', store: 'App Store', bin: 'Bin', taskmgr: 'Task Manager', clips: 'Clips' };
 
 function sendTo(w, ch, data) { if (w && !w.isDestroyed()) w.webContents.send(ch, data); }
 function broadcast(ch, data) { for (const wc of TRUSTED) if (!wc.isDestroyed()) wc.send(ch, data); }
@@ -706,6 +760,9 @@ const PREFS = () => ({ preload: path.join(__dirname, 'preload.js'), contextIsola
 function makeWin(opts, query) {
   const w = new BrowserWindow({ backgroundColor: '#05060a', title: 'NexusOS', icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, show: false, ...opts, webPreferences: PREFS() });
   guard(w);
+  // if a desktop part's renderer ever crashes, bring it back instead of leaving a hole (no toasts, no taskbar…)
+  let crashes = 0;
+  w.webContents.on('render-process-gone', (_e, d) => { if (d.reason === 'clean-exit' || w.isDestroyed() || ++crashes > 5) return; setTimeout(() => { if (!w.isDestroyed()) w.loadFile(INDEX, { query }); }, 800); });
   w.loadFile(INDEX, { query });
   return w;
 }
@@ -725,7 +782,6 @@ function createWindow() {
   panelWin.once('ready-to-show', () => panelWin.showInactive());
   popupWin = makeWin({ frame: false, width: 640, height: 600, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, minimizable: false, maximizable: false, fullscreenable: false }, { view: 'popup' });
   popupWin.on('blur', () => { if (!menuOpen) hidePopup(); });
-  toastWin = makeWin({ type: 'notification', frame: false, width: 380, height: 10, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false, x: b.x + b.width - 396, y: b.y + 16 }, { view: 'toasts' });
   win = desktopWin;   // dialogs belong to the desktop
   const fit = () => {
     const d = screen.getPrimaryDisplay().bounds;
@@ -737,6 +793,7 @@ function createWindow() {
   startWindowWatch();
   startTray();
   startUsbWatch();
+  setTimeout(() => steamPreferNvidia().catch(() => {}), 20000);
   run('openbox', ['--reconfigure']).catch(() => {});   // pick up new window-manager settings after an update
   try { globalShortcut.register('Control+Shift+Escape', () => openAppWindow('taskmgr')); } catch (_) {}
 }
@@ -771,8 +828,8 @@ function showPopup(which, at) {
   if (!popupWin || popupWin.isDestroyed()) return;
   if (popupWin.isVisible() && popupWhich === which) return hidePopup();
   const d = screen.getPrimaryDisplay().bounds;
-  const n = trayItems.length, rows = Math.max(1, Math.ceil(n / 4));
-  const [w, h] = which === 'quick' ? [380, 600] : which === 'tray' ? [320, Math.min(540, 132 + rows * 88)] : [660, 620];
+  const n = allTray().length, rows = Math.max(1, Math.ceil(n / 4));
+  const [w, h] = which === 'quick' ? [380, 650] : which === 'tray' ? [320, Math.min(540, 132 + rows * 88)] : [660, 620];
   const ax = Number(at) || 0;
   const x = which === 'quick' ? d.x + d.width - w - 12 : which === 'tray' ? Math.max(d.x + 8, Math.min(d.x + d.width - w - 8, d.x + Math.round(ax - w / 2))) : Math.round(d.x + (d.width - w) / 2);
   popupWin.setBounds({ x, y: d.y + d.height - PANEL_H - h - 8, width: w, height: h });
@@ -788,10 +845,25 @@ function hidePopup() {
 
 /* notifications */
 let toastH = 0;
+// 1.5: the notifications window only exists while there's something to show (saves ~30 MB the rest of the time)
+let toastReady = false, toastIdle = null; const toastQueue = [];
+function toastSend(ch, data) {
+  if (!OS_MODE) return sendTo(win, ch, data);
+  clearTimeout(toastIdle);
+  if (!toastWin || toastWin.isDestroyed()) {
+    const b = screen.getPrimaryDisplay().bounds; toastReady = false; toastH = 0;
+    toastWin = makeWin({ type: 'notification', frame: false, width: 380, height: 10, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false, x: b.x + b.width - 396, y: b.y + 16 }, { view: 'toasts' });
+    const w = toastWin;
+    w.webContents.once('did-finish-load', () => { if (toastWin !== w) return; toastReady = true; for (const [c, x] of toastQueue.splice(0)) sendTo(w, c, x); });
+    w.on('closed', () => { if (toastWin === w) { toastWin = null; toastReady = false; toastH = 0; } });
+  }
+  if (toastReady) sendTo(toastWin, ch, data); else toastQueue.push([ch, data]);
+}
 function placeToasts() {
   if (!toastWin || toastWin.isDestroyed()) return;
   const d = screen.getPrimaryDisplay().bounds;
-  if (toastH <= 0) { toastWin.hide(); return; }
+  if (toastH <= 0) { toastWin.hide(); clearTimeout(toastIdle); toastIdle = setTimeout(() => { if (toastH <= 0 && toastWin && !toastWin.isDestroyed() && !toastQueue.length) toastWin.destroy(); }, 20000); return; }
+  clearTimeout(toastIdle);
   toastWin.setBounds({ x: d.x + d.width - 396, y: d.y + 16, width: 380, height: Math.min(toastH, d.height - PANEL_H - 40) });
   if (!toastWin.isVisible()) toastWin.showInactive();
 }
@@ -813,7 +885,7 @@ function wmClassMap() {   // StartupWMClass / app-id -> flatpak app, from instal
   }
   WMCLASS_CACHE.t = Date.now(); WMCLASS_CACHE.map = map; return map;
 }
-let lastWinSig = '', activeX = 0, watchTimer = null;
+let lastWinSig = '', activeX = 0, watchTimer = null, lastWinList = [];
 async function listWindows() {
   const out = await run('wmctrl', ['-lpx'], { timeout: 4000 }).catch(() => '');
   const act = await run('xprop', ['-root', '_NET_ACTIVE_WINDOW'], { timeout: 3000 }).catch(() => '');
@@ -837,12 +909,27 @@ async function pushWindows(force) {
   if (!panelWin || panelWin.isDestroyed()) return;
   const list = await listWindows();
   const sig = JSON.stringify(list);
+  lastWinList = list;
   if (force || sig !== lastWinSig) { lastWinSig = sig; sendTo(panelWin, 'windows', list); sendTo(desktopWin, 'windows', list); }
   // hide Start if the person clicked into another window
   // (only when a different window than before Start opened becomes active, so a slow focus change can't close it)
   if (!menuOpen && popupWin && popupWin.isVisible() && activeX && activeX !== xid(popupWin) && activeX !== popupPrevActive) hidePopup();
 }
-function startWindowWatch() { clearInterval(watchTimer); watchTimer = setInterval(() => pushWindows(false).catch(() => {}), 900); }
+// 1.5: react to window changes as they happen (xprop -spy) instead of asking twice a second, so NexusOS
+// wakes up far less while you play; a slow check still catches title changes
+let spyProc = null, spyT = null;
+function startWindowWatch() {
+  clearInterval(watchTimer);
+  const poke = () => { clearTimeout(spyT); spyT = setTimeout(() => pushWindows(false).catch(() => {}), 120); };
+  try {
+    spyProc = cp.spawn('xprop', ['-root', '-spy', '_NET_ACTIVE_WINDOW', '_NET_CLIENT_LIST'], { stdio: ['ignore', 'pipe', 'ignore'] });
+    spyProc.stdout.on('data', poke);
+    spyProc.on('error', () => { spyProc = null; });
+    spyProc.on('exit', () => { spyProc = null; clearInterval(watchTimer); watchTimer = setInterval(() => pushWindows(false).catch(() => {}), 900); });
+  } catch (_) { spyProc = null; }
+  watchTimer = setInterval(() => pushWindows(false).catch(() => {}), spyProc ? 3000 : 900);
+}
+app.on('will-quit', () => { if (spyProc) try { spyProc.kill(); } catch (_) {} });
 async function windowAction(id, action) {
   if (!/^0x[0-9a-f]+$/i.test(String(id))) throw new Error('Bad window');
   const x = parseInt(id, 16);
@@ -880,7 +967,7 @@ function setupDownloads() {
     const target = uniquePath(path.join(DRIVE, 'Downloads'), cleanName(item.getFilename() || 'download'));
     item.setSavePath(target);
     const id = ++dlId, name = path.basename(target);
-    const send = (m) => sendTo(OS_MODE ? toastWin : win, 'download', { id, name, path: target, risky: isRisky(target), ...m });
+    const send = (m) => toastSend('download', { id, name, path: target, risky: isRisky(target), ...m });
     send({ state: 'start', received: 0, total: item.getTotalBytes() });
     let last = 0;
     item.on('updated', (_ev, state) => {
@@ -1089,7 +1176,7 @@ handle('win:popup', (which, at) => { if (!['start', 'quick', 'tray'].includes(wh
 handle('win:popupHide', () => { hidePopup(); return true; });
 handle('win:list', () => listWindows());
 handle('win:act', (id, action) => { if (!['activate', 'minimize', 'close', 'toggle'].includes(action)) throw new Error('Unknown action'); return windowAction(id, action); });
-handle('toast', (t, s) => { sendTo(toastWin || win, 'toast', { t: String(t || '').slice(0, 120), s: String(s || '').slice(0, 300) }); return true; });
+handle('toast', (t, s) => { toastSend('toast', { t: String(t || '').slice(0, 120), s: String(s || '').slice(0, 300) }); return true; });
 handle('toast:size', (h) => { toastH = Math.max(0, Math.min(2000, Number(h) || 0)); placeToasts(); return true; });
 handle('dlg:confirm', async (title, text, ok) => {
   const r = await dialog.showMessageBox(null, { type: 'question', title: 'NexusOS', message: String(title || '').slice(0, 120), detail: String(text || '').slice(0, 400), buttons: [String(ok || 'OK').slice(0, 30), 'Cancel'], defaultId: 1, cancelId: 1, noLink: true });
@@ -1218,6 +1305,34 @@ handle('wall:get', async () => {
 });
 handle('wall:clear', async () => { if (config.wallpaper && !String(config.wallpaper).startsWith('builtin:')) await fs.promises.rm(path.join(WALL_DIR(), path.basename(config.wallpaper)), { force: true }); config.wallpaper = null; saveConfig(); broadcast('sys-changed', 'wallpaper'); return true; });
 
+/* ---------------------------------------------------------------- 1.5: gaming helpers */
+const STEAM_ID = 'com.valvesoftware.Steam';
+const steamInstalled = () => run('flatpak', ['info', STEAM_ID], { timeout: 10000 }).then(() => true, () => false);
+const steamRuntimeBranch = async () => { const r = await run('flatpak', ['info', '--show-runtime', STEAM_ID], { timeout: 10000 }).catch(() => ''); const m = /\/([^/\s]+)\s*$/.exec(r.trim()); return m ? m[1] : null; };
+async function mangoLayerInstalled() {
+  const br = await steamRuntimeBranch(); if (!br) return false;
+  const out = await run('flatpak', ['list', '--runtime', '--columns=application,branch'], { timeout: 15000 }).catch(() => '');
+  return out.split('\n').some((l) => { const [a, b] = l.trim().split('\t'); return a === 'org.freedesktop.Platform.VulkanLayer.MangoHud' && b === br; });
+}
+const MANGO_MARK = '# Written by NexusOS (Settings > Gaming). Delete this line to keep your own changes.';
+async function writeMangoConfig() {
+  const c = config.overlay || {}; const pos = ['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(c.position) ? c.position : 'top-left';
+  const common = [MANGO_MARK, 'legacy_layout=false', 'position=' + pos, 'toggle_hud=Shift_R+F12', 'round_corners=8', 'background_alpha=0.45', 'font_size=20', 'text_outline'];
+  const body = c.style === 'fps' ? ['fps_only', 'fps_color_change'] : ['fps', 'fps_color_change', 'frame_timing', 'gpu_stats', 'gpu_temp', 'gpu_power', 'vram', 'cpu_stats', 'cpu_temp', 'ram'];
+  const text = [...common, ...body].join('\n') + '\n';
+  for (const dir of [path.join(os.homedir(), '.config/MangoHud'), path.join(os.homedir(), '.var/app', STEAM_ID, 'config/MangoHud')]) {
+    const f = path.join(dir, 'MangoHud.conf');
+    try { const cur = await fs.promises.readFile(f, 'utf8'); if (!cur.startsWith(MANGO_MARK)) continue; } catch (_) {}
+    try { await fs.promises.mkdir(dir, { recursive: true }); await fs.promises.writeFile(f, text); } catch (_) {}
+  }
+}
+// Steam games (Proton uses Vulkan) always go to the NVIDIA GPU on hybrid laptops, however Steam was started
+async function steamPreferNvidia() {
+  if (!OS_MODE || !nvidiaPresent() || !(await steamInstalled())) return;
+  const ov = await run('flatpak', ['override', '--user', '--show', STEAM_ID], { timeout: 10000 }).catch(() => '');
+  if (!/__VK_LAYER_NV_optimus=NVIDIA_only/.test(ov)) await run('flatpak', ['override', '--user', '--env=__VK_LAYER_NV_optimus=NVIDIA_only', STEAM_ID], { timeout: 20000 }).catch(() => {});
+}
+
 /* ---------------------------------------------------------------- 1.4.4: the system tray (apps running in the background) */
 let trayProc = null, trayItems = [], trayReq = 0, trayRestarts = 0; const trayWait = new Map();
 function startTray() {
@@ -1229,29 +1344,38 @@ function startTray() {
     buf += String(d); let i;
     while ((i = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch (_) { continue; }
-      if (m.type === 'items') { trayItems = Array.isArray(m.items) ? m.items.slice(0, 64) : []; sendTo(panelWin, 'tray', trayItems); sendTo(popupWin, 'tray', trayItems); }
+      if (m.type === 'items') { trayItems = Array.isArray(m.items) ? m.items.slice(0, 64) : []; sendTray(); }
       else if ((m.type === 'menu' || m.type === 'error') && trayWait.has(m.req)) { const r = trayWait.get(m.req); trayWait.delete(m.req); r(m.type === 'menu' ? (m.items || []) : []); }
       else if (m.type === 'ready') trayRestarts = 0;
     }
   });
-  trayProc.on('exit', () => { trayProc = null; trayItems = []; sendTo(panelWin, 'tray', []); if (trayRestarts++ < 5) setTimeout(startTray, 3000); });
+  trayProc.on('exit', () => { trayProc = null; trayItems = []; sendTray(); if (trayRestarts++ < 5) setTimeout(startTray, 3000); });
   trayProc.on('error', () => { trayProc = null; });
 }
 function traySend(obj) { if (trayProc && trayProc.stdin.writable) trayProc.stdin.write(JSON.stringify(obj) + '\n'); }
-const trayItem = (key) => trayItems.find((t) => t.key === key);
-handle('tray:list', () => trayItems);
+// NexusOS's own background helpers (Clips) sit in the same list as other apps' tray icons
+const CLIPS_ICON = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#1b1030"/><rect x="4" y="7" width="12" height="10" rx="2.5" fill="none" stroke="#ff2e88" stroke-width="1.8"/><path d="M16 10.5 20 8v8l-4-2.5z" fill="#ff2e88"/><circle cx="10" cy="12" r="2.2" fill="#00e5ff"/></svg>').toString('base64');
+const ownTray = () => (clipProc ? [{ key: 'nexus:clips', id: 'clips', title: 'Clips', tooltip: `Clips — press ${clipCfg().key} to save the last ${clipCfg().seconds} seconds`, status: 'Active', icon: CLIPS_ICON, hasMenu: true, own: true }] : []);
+const allTray = () => [...ownTray(), ...trayItems];
+function sendTray() { const l = allTray(); sendTo(panelWin, 'tray', l); sendTo(popupWin, 'tray', l); }
+const trayItem = (key) => allTray().find((t) => t.key === key);
+handle('tray:list', () => allTray());
 handle('tray:act', (key, action) => {
+  if (key === 'nexus:clips') { hidePopup(); if (action === 'activate') openAppWindow('clips'); return true; }
   if (!trayItem(key)) throw new Error('That app has closed.');
   if (!['activate', 'secondary', 'contextmenu'].includes(action)) throw new Error('Unknown action');
   const d = screen.getPrimaryDisplay().bounds; hidePopup();
   traySend({ cmd: action, key, x: d.x + d.width - 200, y: d.y + d.height - PANEL_H }); return true;
 });
 handle('tray:menu', (key) => new Promise((resolve) => {
+  if (key === 'nexus:clips') return resolve([{ id: 1, label: `Save a clip now (${clipCfg().key})` }, { id: 2, label: 'Open Clips' }]);
   if (!trayItem(key) || !trayProc) return resolve([]);
   const req = ++trayReq; trayWait.set(req, resolve); traySend({ cmd: 'menu', req, key });
   setTimeout(() => { if (trayWait.has(req)) { trayWait.delete(req); resolve([]); } }, 4000);
 }));
-handle('tray:event', (key, id) => { if (!trayItem(key) || !Number.isInteger(id)) throw new Error('That app has closed.'); traySend({ cmd: 'event', key, id }); return true; });
+handle('tray:event', (key, id) => {
+  if (key === 'nexus:clips') { hidePopup(); if (id === 1) clipsSave(); else if (id === 2) openAppWindow('clips'); else if (id === 3) clipsStop(); return true; }
+  if (!trayItem(key) || !Number.isInteger(id)) throw new Error('That app has closed.'); traySend({ cmd: 'event', key, id }); return true; });
 // Quit an app completely (not just close its window): Flatpak apps with "flatpak kill", others by process
 async function quitApp(appId, pid) {
   if (appId) {
@@ -1261,7 +1385,7 @@ async function quitApp(appId, pid) {
   if (Number.isInteger(pid) && pid > 1) return LX.endTask([pid], false);
   throw new Error('NexusOS couldn’t tell which program that is.');
 }
-handle('tray:quit', (key) => { const t = trayItem(key); if (!t) throw new Error('That app has closed.'); return quitApp(t.appId, t.pid); });
+handle('tray:quit', (key) => { if (key === 'nexus:clips') return clipsStop().then(() => true); const t = trayItem(key); if (!t) throw new Error('That app has closed.'); return quitApp(t.appId, t.pid); });
 handle('app:quitFlatpak', (appId) => quitApp(appId, 0));
 
 /* ---------------------------------------------------------------- 1.4.4: a chime when a USB device is plugged in or pulled out */
@@ -1285,14 +1409,184 @@ function startUsbWatch() {
 }
 async function usbFire() {
   const kind = usbPending; usbPending = null;
-  if (config.usbSound !== false) sendTo(toastWin, 'usb', { kind });
+  if (config.usbSound !== false) playSound(kind === 'in' ? 'usb-in' : 'usb-out');
   // a USB stick takes a moment to show up as a drive: offer to open it
   if (kind === 'in') await new Promise((r) => setTimeout(r, 2500));
   const now = await removableSet(); const before = usbKnown || new Set(); usbKnown = now;
   const added = [...now].filter((p) => !before.has(p));
   if (kind === 'in' && added.length) {
     const d = (await LX.drives().catch(() => [])).find((x) => x.path === added[0]);
-    sendTo(toastWin, 'toast', { t: 'USB drive connected', s: `${(d && d.label) || 'USB drive'} is ready. Open it from Files.` });
+    toastSend('toast', { t: 'USB drive connected', s: `${(d && d.label) || 'USB drive'} is ready. Open it from Files.` });
   }
 }
 handle('app:usbSound', (v) => { if (v !== undefined) { config.usbSound = !!v; saveConfig(); } return config.usbSound !== false; });
+
+// short system sounds go through the sound server directly (no Chromium audio process kept around)
+function playSound(name) {
+  const f = path.join(__dirname, 'sounds', name + '.wav'); if (!fs.existsSync(f)) return;
+  const tries = [['paplay', [f]], ['pw-play', [f]], ['aplay', ['-q', f]]];
+  const next = () => { const t = tries.shift(); if (!t) return; const p = cp.spawn(t[0], t[1], { stdio: 'ignore' }); p.on('error', next); };
+  next();
+}
+
+
+/* ---------------------------------------------------------------- 1.5: Clips (instant replay, like Medal or ShadowPlay)
+ * GPU Screen Recorder (Flathub) keeps the last N seconds in a small buffer using the GPU's video encoder,
+ * and saves them when you press the clip key. Nothing runs until you open Clips; closing its window keeps
+ * it clipping in the background (it shows under the taskbar arrow, where you can quit it). */
+const GSR_ID = 'com.dec05eba.gpu_screen_recorder';
+const CLIP_DEFAULTS = { seconds: 30, quality: 'high', fps: 60, target: 'focused', gameAudio: true, mic: '', key: 'F8', storage: 'ram', notify: true, autostart: true };
+const CLIP_KBPS = { standard: 10000, high: 20000, ultra: 40000 };
+const clipCfg = () => ({ ...CLIP_DEFAULTS, ...(config.clips || {}) });
+const clipsDir = () => path.join(os.homedir(), 'Videos', 'Clips');
+let clipProc = null, clipPid = 0, clipErr = '', clipStarting = false, clipKeyOn = '', clipWatch = null, clipLastSave = 0;
+const clipState = () => ({ running: !!clipProc, starting: clipStarting, error: clipErr, cfg: clipCfg(), dir: clipsDir(), memMB: clipCfg().storage === 'disk' ? 0 : Math.round(CLIP_KBPS[clipCfg().quality] / 8 / 1000 * clipCfg().seconds) });
+function clipsChanged() { broadcast('clips', clipState()); sendTray(); }
+const gsrInstalled = () => run('flatpak', ['info', GSR_ID], { timeout: 10000 }).then(() => true, () => false);
+function gsrArgs(c) {
+  const d = screen.getPrimaryDisplay(); const W = Math.round(d.size.width * d.scaleFactor), H = Math.round(d.size.height * d.scaleFactor);
+  let target = 'focused';
+  if (c.target === 'screen') target = 'screen';
+  else if (/^window:\d+$/.test(c.target)) target = c.target.slice(7);
+  const a = ['-w', target];
+  if (target === 'focused') a.push('-s', `${W}x${H}`);
+  a.push('-c', 'mp4', '-k', 'h264', '-ac', 'aac', '-f', String(c.fps === 30 ? 30 : 60), '-fm', 'cfr', '-bm', 'cbr', '-q', String(CLIP_KBPS[c.quality] || CLIP_KBPS.high),
+    '-r', String(Math.max(5, Math.min(600, c.seconds | 0))), '-replay-storage', c.storage === 'disk' ? 'disk' : 'ram', '-cursor', 'yes', '-o', clipsDir());
+  const audio = []; if (c.gameAudio) audio.push('default_output');
+  if (c.mic === 'default') audio.push('default_input'); else if (c.mic && /^[\w.:@-]{1,200}$/.test(c.mic)) audio.push('device:' + c.mic);
+  if (audio.length) a.push('-a', audio.join('|'));
+  return a;
+}
+// the recorder runs inside Flatpak's sandbox: find its real process to send it signals
+function findDescendant(root, comm) {
+  const kids = new Map();
+  for (const d of fs.readdirSync('/proc')) {
+    if (!/^\d+$/.test(d)) continue;
+    try { const st = fs.readFileSync(`/proc/${d}/stat`, 'utf8'); const r = st.lastIndexOf(')'); const ppid = +st.slice(r + 2).split(' ')[1]; const name = st.slice(st.indexOf('(') + 1, r);
+      if (!kids.has(ppid)) kids.set(ppid, []); kids.get(ppid).push([+d, name]); } catch (_) {}
+  }
+  const q = [root];
+  while (q.length) { const p = q.shift(); for (const [pid, name] of kids.get(p) || []) { if (name.startsWith(comm)) return pid; q.push(pid); } }
+  return 0;
+}
+async function clipsStart() {
+  if (!OS_MODE) throw new Error('Clips works on NexusOS.');
+  if (clipProc || clipStarting) return clipState();
+  clipStarting = true; clipErr = ''; clipsChanged();
+  try {
+    if (!(await gsrInstalled())) throw new Error('NOT_INSTALLED');
+    await fs.promises.mkdir(clipsDir(), { recursive: true });
+    const c = clipCfg(); let errBuf = '';
+    const p = cp.spawn('flatpak', ['run', '--command=gpu-screen-recorder', '--filesystem=' + clipsDir(), GSR_ID, ...gsrArgs(c)], { stdio: ['ignore', 'ignore', 'pipe'] });
+    clipProc = p;
+    p.stderr.on('data', (d) => { errBuf = (errBuf + String(d)).slice(-2000); });
+    p.on('exit', (code) => {
+      if (clipProc !== p) return;
+      clipProc = null; clipPid = 0; clipKeys(false);
+      if (code && !p.nexusStop) clipErr = gsrError(errBuf);
+      clipsChanged();
+    });
+    // wait for the real recorder to come up (or fail)
+    for (let i = 0; i < 40 && clipProc === p && !clipPid; i++) { await new Promise((r) => setTimeout(r, 250)); clipPid = findDescendant(p.pid, 'gpu-screen-reco'); }
+    if (clipProc !== p) throw new Error(clipErr || 'The recorder stopped straight away.');
+    clipKeys(true); startClipWatch();
+  } catch (e) {
+    clipErr = e.message === 'NOT_INSTALLED' ? '' : errMsgOf(e);
+    clipStarting = false; clipsChanged();
+    throw e;
+  }
+  clipStarting = false; clipsChanged(); return clipState();
+}
+const errMsgOf = (e) => String((e && e.message) || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+function gsrError(t) {
+  const lines = String(t).split('\n').map((l) => l.trim()).filter((l) => /error|failed|unable|not supported|invalid/i.test(l));
+  const last = lines.pop() || String(t).trim().split('\n').pop() || '';
+  if (/audio|device/i.test(last)) return 'The recorder couldn’t open that microphone or sound device. Pick another one in Options.';
+  if (/window/i.test(last)) return 'The recorder couldn’t capture that window. Try “Whole screen” in Options.';
+  return 'The recorder stopped: ' + last.replace(/^gsr (error|info):\s*/i, '').slice(0, 200);
+}
+async function clipsStop() {
+  const p = clipProc; if (!p) return clipState();
+  p.nexusStop = true; clipKeys(false);
+  try { if (clipPid) process.kill(clipPid, 'SIGINT'); else p.kill('SIGINT'); } catch (_) {}
+  await new Promise((r) => { const t = setTimeout(() => { try { p.kill('SIGKILL'); } catch (_) {} r(); }, 4000); p.once('exit', () => { clearTimeout(t); r(); }); });
+  clipProc = null; clipPid = 0; clipsChanged(); return clipState();
+}
+function clipsSave() {
+  if (!clipProc || !clipPid) throw new Error('Clips isn’t recording. Open Clips and press Start.');
+  if (Date.now() - clipLastSave < 1500) return false;   // key held down / pressed twice
+  clipLastSave = Date.now();
+  const act = lastWinList.find((w) => w.active && !w.own); clipGame = act ? act.title : '';
+  process.kill(clipPid, 'SIGUSR1'); return true;
+}
+function clipKeys(on) {
+  if (clipKeyOn) { try { globalShortcut.unregister(clipKeyOn); } catch (_) {} clipKeyOn = ''; }
+  if (!on) return;
+  const k = clipCfg().key;
+  try { if (globalShortcut.register(k, () => { try { clipsSave(); } catch (_) {} })) clipKeyOn = k; else clipErr = `The key ${k} is taken by something else. Pick another in Options.`; } catch (_) { clipErr = `NexusOS can’t use ${k} as the clip key. Pick another in Options.`; }
+}
+// name new clips after the game, play a sound and show a note
+let clipGame = ''; const clipSeen = new Set();
+const clipSafe = (t) => String(t || '').replace(/[\/\\:*?"<>|\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+function startClipWatch() {
+  if (clipWatch) return;
+  try {
+    clipWatch = fs.watch(clipsDir(), (ev, name) => {
+      if (!name || !/^Replay_.*\.mp4$/.test(name) || clipSeen.has(name)) return;
+      clipSeen.add(name); setTimeout(() => clipSeen.delete(name), 120000);
+      const f = path.join(clipsDir(), name); let last = -1, n = 0;
+      const tick = async () => {
+        let st; try { st = await fs.promises.stat(f); } catch (_) { return; }
+        if (st.size !== last || n < 2) { last = st.size; n++; if (n < 60) setTimeout(tick, 500); return; }
+        const m = /Replay_(\d{4}-\d\d-\d\d)_(\d\d-\d\d-\d\d)/.exec(name);
+        const base = `${clipSafe(clipGame) || 'Clip'} ${m ? m[1] + ' ' + m[2] : new Date().toISOString().slice(0, 19).replace('T', ' ').replace(/:/g, '-')}`;
+        let to = path.join(clipsDir(), base + '.mp4'); for (let i = 2; fs.existsSync(to); i++) to = path.join(clipsDir(), `${base} (${i}).mp4`);
+        try { await fs.promises.rename(f, to); } catch (_) { to = f; }
+        const c = clipCfg();
+        playSound('clip');
+        if (c.notify) toastSend('toast', { t: 'Clip saved', s: `Last ${c.seconds} seconds · ${path.basename(to, '.mp4')}` });
+        broadcast('clips-saved', path.basename(to));
+      };
+      setTimeout(tick, 400);
+    });
+  } catch (_) {}
+}
+handle('clips:state', async () => ({ ...clipState(), installed: await gsrInstalled() }));
+handle('clips:install', async () => {
+  await run('flatpak', ['remote-add', '--user', '--if-not-exists', 'flathub', 'https://dl.flathub.org/repo/flathub.flatpakrepo'], { timeout: 60000 });
+  await streamJob('clips:install', 'flatpak', ['install', '--user', '-y', '--noninteractive', 'flathub', GSR_ID]); return true;
+});
+handle('clips:start', () => clipsStart());
+handle('clips:stop', () => clipsStop());
+handle('clips:save', () => clipsSave());
+handle('clips:setCfg', async (o) => {
+  const c = clipCfg(), n = { ...c }; o = o && typeof o === 'object' ? o : {};
+  if ([15, 30, 60, 120, 300].includes(o.seconds)) n.seconds = o.seconds;
+  if (Object.prototype.hasOwnProperty.call(CLIP_KBPS, o.quality)) n.quality = o.quality;
+  if ([30, 60].includes(o.fps)) n.fps = o.fps;
+  if (o.target === 'focused' || o.target === 'screen' || /^window:\d{1,12}$/.test(String(o.target))) n.target = o.target;
+  if (typeof o.gameAudio === 'boolean') n.gameAudio = o.gameAudio;
+  if (typeof o.mic === 'string' && (o.mic === '' || o.mic === 'default' || /^[\w.:@-]{1,200}$/.test(o.mic))) n.mic = o.mic;
+  if (typeof o.key === 'string' && /^((Ctrl|Control|Alt|Shift|Super)\+){0,3}(F([1-9]|1[0-9]|2[0-4])|[A-Z0-9]|Insert|Home|End|PageUp|PageDown|Pause|ScrollLock|PrintScreen|numadd|numsub|nummult|numdiv|num[0-9])$/.test(o.key)) n.key = o.key;
+  if (o.storage === 'ram' || o.storage === 'disk') n.storage = o.storage;
+  if (typeof o.notify === 'boolean') n.notify = o.notify;
+  if (typeof o.autostart === 'boolean') n.autostart = o.autostart;
+  config.clips = n; saveConfig();
+  const needRestart = ['seconds', 'quality', 'fps', 'target', 'gameAudio', 'mic', 'storage'].some((k) => n[k] !== c[k]);
+  if (clipProc && needRestart) { await clipsStop(); await clipsStart().catch(() => {}); }
+  else if (clipProc && n.key !== c.key) clipKeys(true);
+  clipsChanged(); return clipState();
+});
+handle('clips:list', async () => {
+  let l = []; try { l = await fs.promises.readdir(clipsDir()); } catch (_) { return []; }
+  const out = [];
+  for (const n of l) { if (!/\.mp4$/i.test(n) || /^Replay_/.test(n)) continue; try { const st = await fs.promises.stat(path.join(clipsDir(), n)); if (st.isFile()) out.push({ name: n, path: path.join(clipsDir(), n), size: st.size, time: st.mtimeMs }); } catch (_) {} }
+  return out.sort((a, b) => b.time - a.time).slice(0, 200);
+});
+handle('clips:audio', async () => {
+  const out = await run('flatpak', ['run', '--command=gpu-screen-recorder', GSR_ID, '--list-audio-devices'], { timeout: 20000 }).catch(() => '');
+  return out.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => { const i = l.indexOf('|'); return i > 0 ? { id: l.slice(0, i), name: l.slice(i + 1) } : { id: l, name: l }; })
+    .filter((d) => !/\.monitor$/.test(d.id) && !/^default_(output|input)$/.test(d.id));
+});
+handle('clips:windows', () => lastWinList.filter((w) => !w.own).map((w) => ({ id: String(parseInt(w.id, 16)), title: w.title || w.cls })));
+app.on('will-quit', () => { if (clipProc) { try { if (clipPid) process.kill(clipPid, 'SIGINT'); clipProc.kill('SIGINT'); } catch (_) {} } });

@@ -119,7 +119,7 @@ textarea.note{width:100%;height:100%;border:0;resize:none;padding:16px 20px;back
 .acc.on{border-color:var(--fg)}
 .wp{width:110px;height:68px;border-radius:10px;border:2px solid transparent;cursor:pointer;background-size:cover}
 .wp.on{border-color:var(--accent)}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}#qperf .seg{display:flex}#qperf .seg button{flex:1;padding:8px 4px;font-size:13px}
 .seg button{border:0;background:none;color:var(--fg);padding:8px 16px;font:14px var(--body);cursor:pointer}
 .seg button.on{background:var(--accent);color:var(--accent-fg)}
 .about{padding:28px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
@@ -358,6 +358,20 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 .picrow{display:flex;gap:8px;flex-wrap:wrap} .pic{width:110px;height:68px;border-radius:6px;border:2px solid transparent;background:#000 center/cover no-repeat;cursor:pointer}
 .pic.on{border-color:var(--accent)}
 
+/* ===== 1.5: Clips ===== */
+.clips{display:flex;flex-direction:column;height:100%;overflow:hidden;position:relative}
+.clhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:16px 18px;border-bottom:1px solid var(--line)}
+.clstat{display:flex;flex-direction:column;gap:3px;flex:1;min-width:220px}.clstat b{display:flex;align-items:center;gap:8px;font-size:16px}.clstat span{color:var(--muted);font-size:13px}
+.recdot{width:10px;height:10px;border-radius:50%;background:#ff2e55;box-shadow:0 0 8px #ff2e55;animation:recp 1.6s ease-in-out infinite}@keyframes recp{50%{opacity:.35}}
+.clnote{width:100%;margin:0}.cltabs{margin:12px 18px 0;align-self:flex-start}.clbody{flex:1;overflow:auto;padding:14px 18px 18px}
+.clgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:14px}
+.clcard{display:flex;flex-direction:column;gap:4px;text-align:left;background:rgba(127,127,127,.07);border:1px solid var(--line);border-radius:10px;padding:8px;color:var(--fg);cursor:pointer;font:13px var(--body)}
+.clcard:hover{border-color:var(--accent)}.clcard video{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:#000;pointer-events:none}
+.cln{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.clcard small{color:var(--muted)}
+.clempty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:60px 20px;color:var(--muted)}.clempty b{color:var(--fg);font-size:16px}
+.clplayer{position:absolute;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:20px;z-index:5}
+.clpbox{background:var(--bg,#0b0e14);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;width:min(100%,900px)}.clpbox video{width:100%;max-height:70vh;border-radius:8px;background:#000}
+.clopts .srow select{max-width:300px}.pbtn.kbd{font-family:monospace;min-width:90px}.pbtn.kbd.on{border-color:var(--accent);color:var(--accent)}
 /* ===== 1.4.4: background apps (tray) ===== */
 #trayp{display:none;flex-direction:column;gap:10px;padding:16px}
 .view-popup #trayp.open{display:flex!important}
@@ -393,6 +407,7 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
   </div>
   <div class="slider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><input type="range" id="bright" min="40" max="100" value="100" aria-label="Brightness"></div>
   <div class="slider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg><input type="range" id="vol" min="0" max="100" value="60" aria-label="Volume"></div>
+  <div id="qperf" hidden></div>
   <div class="cal" id="cal"></div>
 </div>
 
@@ -445,6 +460,7 @@ const I={
  store:['#ff4f2e','<path d="M5 8h14l-1.2 11.2A2 2 0 0 1 15.8 21H8.2a2 2 0 0 1-2-1.8z" fill="#fff3ea"/><path d="M9 10V7a3 3 0 0 1 6 0v3" fill="none" stroke="#fff3ea" stroke-width="1.8" stroke-linecap="round"/><path d="m10 14.5 1.6 1.6 3-3.2" fill="none" stroke="#e0703a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'],
  bin:['#2a3444','<path d="M6 7h12l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z" fill="#dfe8f2"/><path d="M4.5 7h15M9.5 4h5" stroke="#dfe8f2" stroke-width="1.8" stroke-linecap="round"/><path d="M10 11v7M14 11v7" stroke="#8796ab" stroke-width="1.5" stroke-linecap="round"/>'],
  binfull:['#2a3444','<path d="M6 7h12l-1 13a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2z" fill="#dfe8f2"/><path d="M4.5 7h15M9.5 4h5" stroke="#dfe8f2" stroke-width="1.8" stroke-linecap="round"/><path d="M8 9.5l3 2.5 4-3 1.5 2" stroke="#00b8d4" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="9" y="13" width="6" height="5" rx="1" fill="#ff2e88" opacity=".85"/>'],
+ clips:['#1b1030','<rect x="3" y="6" width="13" height="12" rx="3" fill="none" stroke="#ff2e88" stroke-width="1.9"/><path d="M16 10.5 21 7.5v9l-5-3z" fill="#ff2e88"/><circle cx="9.5" cy="12" r="2.6" fill="#00e5ff"/>'],
  taskmgr:['#141b28','<rect x="3" y="4" width="18" height="16" rx="3" fill="#0b1018" stroke="#2c3a50"/><path d="M5.5 15.5l3.5-4 3 2.5 3.5-6 3 4" fill="none" stroke="#00e5ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'],
  txt:['','<path d="M6 2h8l4 4v16H6z" fill="#e8eef0"/><path d="M8.5 10h7M8.5 13h7M8.5 16h5" stroke="#6b7b80" stroke-width="1.3" stroke-linecap="round"/>'],
  img:['','<rect x="3" y="4" width="18" height="16" rx="2" fill="#e3f6ff"/><path d="m3 17 5-5 4 4 3-3 6 6" fill="none" stroke="#2fa6d6" stroke-width="1.5"/><circle cx="16" cy="8.5" r="1.6" fill="#f0b451"/>'],
@@ -580,7 +596,7 @@ function sswitch(on,fn,label){const b=h('button',{class:'sw-t'+(on?' on':''),rol
 const busyEl=t=>h('div',{class:'busy'},h('span',{class:'spin'}),t||'Working…');
 const errEl=e=>h('div',{class:'serr'},errMsg(e));
 function settingsPages(){const P=[];
-  if(OSM()){P.push(['wifi','Wi-Fi'],['bluetooth','Bluetooth'],['sound','Sound'],['display','Display'],['power','Power & battery'],['time','Date & time'],['keyboard','Keyboard'])}
+  if(OSM()){P.push(['wifi','Wi-Fi'],['bluetooth','Bluetooth'],['sound','Sound'],['display','Display'],['gaming','Gaming'],['power','Power & battery'],['time','Date & time'],['keyboard','Keyboard'])}
   P.push(['appearance','Appearance']);
   if(HX)P.push(['apps','Apps']);
   if(HX&&!OSM())P.push(['system','NexusOS on Windows'.replace('Windows',SYS&&SYS.isWin?'Windows':'this computer')]);
@@ -640,9 +656,23 @@ const PAGES={
      sel.onchange=async()=>{const prev=o.modes.find(m=>m.current);try{await HX.lx('setMode',o.name,sel.value);const keep=await ask('Keep this resolution?','If the screen looks wrong, choose Cancel to go back.','Keep');if(!keep&&prev)await HX.lx('setMode',o.name,prev.mode);openSettings('display')}catch(e){toast('Couldn’t change resolution',errMsg(e))}};
      d.append(srow(o.name+(o.primary?' (main screen)':''),'Resolution',sel))}
    const z=sec(c,'Size','Makes NexusOS’s text and windows bigger or smaller.');const zs=h('select',{class:'txt','aria-label':'NexusOS size'},[0.75,0.9,1,1.1,1.25,1.5,1.75,2].map(v=>h('option',{value:v,selected:Math.abs(v-(info.zoom||1))<.01},Math.round(v*100)+'%')));zs.onchange=()=>HX.lx('setZoom',+zs.value);z.append(srow('NexusOS size','',zs))},
+ async gaming(c){
+   const pf=await HX.lx('perfProfile').catch(()=>({available:false}));
+   const ps=sec(c,'Performance','Performance makes games run their fastest; Battery saver makes the battery last longer.');if(pf.available)ps.append(perfSeg(pf));else ps.append(h('p',{class:'hint'},'Performance profiles aren’t available on this computer yet. Restart once after the update.'));
+   const os_=sec(c,'Game overlay','Shows FPS, GPU temperature and usage on top of your Steam games. Press Right Shift + F12 in a game to show or hide it.');os_.append(busyEl());
+   const draw=async o=>{os_.querySelectorAll('.srow,.ohint,.busy,.serr').forEach(e=>e.remove());if(!o){try{o=await HX.lx('overlay')}catch(e){os_.append(errEl(e));return}}
+     if(!o.steam){os_.append(h('p',{class:'hint ohint'},'Install Steam from the App Store first.'));return}
+     const busy=async(fn,msg)=>{os_.querySelectorAll('.srow').forEach(r=>r.style.opacity=.5);if(msg)toast(msg,'');try{await draw(await fn())}catch(e){toast('Couldn’t change the overlay',errMsg(e));draw()}};
+     const style=h('select',{class:'txt','aria-label':'Overlay style'},h('option',{value:'full',selected:o.style==='full'},'Full: FPS, GPU, CPU, memory'),h('option',{value:'fps',selected:o.style==='fps'},'Just FPS'));style.onchange=()=>busy(()=>HX.lx('setOverlay',{style:style.value}));
+     const pos=h('select',{class:'txt','aria-label':'Overlay position'},...[['top-left','Top left'],['top-right','Top right'],['bottom-left','Bottom left'],['bottom-right','Bottom right']].map(([v,l])=>h('option',{value:v,selected:o.position===v},l)));pos.onchange=()=>busy(()=>HX.lx('setOverlay',{position:pos.value}));
+     os_.append(srow('Show the overlay in games',o.enabled?'On. It starts with the next game you open from Steam (restart Steam if it’s open).':o.layer?'Off.':'Off. Turning it on downloads the overlay (a few MB).',sswitch(o.enabled,async v=>{await busy(()=>HX.lx('setOverlay',{enabled:v}),v&&!o.layer?'Downloading the overlay…':'');return v},'Game overlay')),srow('Style','',style),srow('Position','',pos))};
+   draw();
+   const cl=sec(c,'Clips','Save the last moments of your game with one key, like Medal or ShadowPlay.');cl.append(h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:()=>openApp('clips')}},'Open Clips')));
+   if(SYS&&SYS.nvidia)sec(c,'Graphics').append(h('p',{class:'hint'},'Games from Steam run on your NVIDIA graphics card automatically.'))},
  async power(c){const s=sec(c,'Battery');let b;try{b=await HX.lx('battery')}catch(e){b={present:false}}
    if(b.present){s.append(srow(`${Math.round(b.percent)}%`,[b.state,b.timeToEmpty&&b.state==='discharging'?b.timeToEmpty+' left':'',b.timeToFull&&b.state==='charging'?b.timeToFull+' until full':''].filter(Boolean).join(' · ')),h('div',{class:'meter'},h('div',{style:`width:${b.percent}%`})));if(b.health)s.append(h('p',{class:'hint'},'Battery health: '+b.health))}else s.append(h('p',{class:'hint'},'No battery. This computer runs on mains power.'));
-   const p=sec(c,'Power','The screen turns off after 10 minutes of no activity.');p.append(h('div',{class:'row2 wrap'},...[['sleep','Sleep'],['restart','Restart'],['shutdown','Shut down'],['logout','Log out']].map(([k,l])=>h('button',{class:'pbtn',on:{click:()=>powerAction(k)}},l))))},
+   const pf=await HX.lx('perfProfile').catch(()=>({available:false}));if(pf.available){const ps=sec(c,'Performance','Performance makes games run their fastest; Battery saver makes the battery last longer. Plugged in for gaming? Pick Performance.');ps.append(perfSeg(pf))}
+   const p=sec(c,'Power','The screen turns off after 10 minutes of no activity.');const prow=h('div',{class:'row2 wrap'},...[['sleep','Sleep'],['restart','Restart'],['shutdown','Shut down'],['logout','Log out']].map(([k,l])=>h('button',{class:'pbtn',on:{click:()=>powerAction(k)}},l)));p.append(prow);canWin().then(w=>{if(w)prow.children[1].after(h('button',{class:'pbtn',on:{click:()=>powerAction('windows')}},'Restart into Windows'))})},
  async time(c){const s=sec(c,'Date & time');s.append(busyEl());let t;try{t=await HX.lx('time')}catch(e){s.lastChild.replaceWith(errEl(e));return}s.lastChild.remove();
    s.append(srow('Set time automatically',t.ntp?'On. The clock syncs over the internet.':'Off. Set the date and time yourself below.',sswitch(t.ntp,async v=>{await HX.lx('setNtp',v);setTimeout(()=>openSettings('time'),400);return v},'Set time automatically')));
    if(!t.ntp){const now=new Date(),pad=n=>String(n).padStart(2,'0');const di=h('input',{class:'txt',type:'date','aria-label':'Date',value:`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`}),ti=h('input',{class:'txt',type:'time','aria-label':'Time',value:`${pad(now.getHours())}:${pad(now.getMinutes())}`});
@@ -715,11 +745,18 @@ const PAGES={
  about(c){const s=sec(c,OSM()?'NexusOS '+(SYS.version||''):'NexusOS '+(SYS?SYS.version:'')); s.append(h('p',{class:'hint'},OSM()?'NexusOS is built on Debian 13. NexusOS is its desktop.':'NexusOS runs on top of '+(SYS&&SYS.isWin?'Windows':'your computer')+'.'),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>openApp('about')}},'More about this computer')))}
 };
 function openSettings(page){if(MW){HX.openWindow('settings',page||null).catch(()=>{});return}if(wins.settings&&wins.settings.api.show){focus('settings');wins.settings.api.show(page)}else openApp('settings',page)}
+function keyAccel(e){const mods=[e.ctrlKey&&'Ctrl',e.altKey&&'Alt',e.shiftKey&&'Shift',e.metaKey&&'Super'].filter(Boolean);let k=e.key;
+  if(/^F([1-9]|1[0-9]|2[0-4])$/.test(k)){}else if(/^[a-z0-9]$/i.test(k)){k=k.toUpperCase();if(!mods.some(m=>m!=='Shift'))return null}
+  else k={Insert:'Insert',Home:'Home',End:'End',PageUp:'PageUp',PageDown:'PageDown',Pause:'Pause',ScrollLock:'ScrollLock',PrintScreen:'PrintScreen'}[k];
+  return k?[...mods,k].join('+'):null}
+const PERF_NAMES={'power-saver':'Battery saver',balanced:'Balanced',performance:'Performance'};
+function perfSeg(pf,onDone){const seg=h('div',{class:'seg perfseg'});const draw=cur=>{seg.innerHTML='';for(const id of ['power-saver','balanced','performance'])if(pf.profiles.includes(id))seg.append(h('button',{class:cur===id?'on':'',title:id==='performance'&&pf.degraded?'Held back right now: '+pf.degraded.replace(/-/g,' '):'',on:{click:async()=>{try{await HX.lx('setPerfProfile',id);pf.current=id;draw(id);if(onDone)onDone(id)}catch(e){toast('Couldn’t change it',errMsg(e))}}}},PERF_NAMES[id]))};draw(pf.current);return seg}
+let winBootP=null;const canWin=()=>winBootP||(winBootP=HX&&OSM()?HX.lx('canBootWindows').catch(()=>false):Promise.resolve(false));
 async function powerAction(k){closePanels();
   if(!OSM()){if(k==='logout'||k==='shutdown')shutDown();return}
-  const labels={sleep:['Sleep now?','Your apps stay open.','Sleep'],restart:['Restart now?','Save your work first. Open apps will close.','Restart'],shutdown:['Shut down now?','Save your work first. Open apps will close.','Shut down'],logout:['Log out?','Open apps will close.','Log out']}[k];
+  const labels={sleep:['Sleep now?','Your apps stay open.','Sleep'],restart:['Restart now?','Save your work first. Open apps will close.','Restart'],windows:['Restart into Windows?','Save your work first. Open apps will close. After Windows, the computer starts NexusOS again as normal.','Restart into Windows'],shutdown:['Shut down now?','Save your work first. Open apps will close.','Shut down'],logout:['Log out?','Open apps will close.','Log out']}[k];
   if(k!=='sleep'&&!(await (MW?HX.confirm(labels[0],labels[1],labels[2]):ask(labels[0],labels[1],labels[2],true))))return;
-  if(k==='shutdown'||k==='restart'||k==='logout'){const bt=$('#boot');if(bt){bt.querySelector('h2').textContent=k==='restart'?'Restarting':k==='logout'?'Logging out':'Shutting down';bt.classList.remove('done')}}
+  if(k==='shutdown'||k==='restart'||k==='logout'||k==='windows'){const bt=$('#boot');if(bt){bt.querySelector('h2').textContent=k==='windows'?'Restarting into Windows':k==='restart'?'Restarting':k==='logout'?'Logging out':'Shutting down';bt.classList.remove('done')}}
   try{await HX.lx('power',k)}catch(e){const b=$('#boot');if(b)b.classList.add('done');toast('That didn’t work',errMsg(e))}}
 /* ---------- quick settings (real on NexusOS) ---------- */
 let quickState={bright:false},qbT=0,qvT=0;
@@ -732,7 +769,8 @@ async function refreshQuick(){const vr=$('#vol').closest('.slider');
   if(n){w.classList.toggle('on',!!(n.wifiConnected||n.ethernet));w.lastChild.textContent=n.wifiConnected||(n.ethernet?'Wired':!n.wifiDevice?'No Wi-Fi':n.wifiEnabled?'Not connected':'Wi-Fi off')}
   if(bt){b.classList.toggle('on',!!(bt.present&&bt.powered));b.lastChild.textContent=!bt.present?'No Bluetooth':bt.powered?'Bluetooth':'Bluetooth off'}
   quickState.bright=!!(br&&br.present);if(quickState.bright){$('#bright').min=5;$('#bright').value=br.percent}
-  const out=au&&(au.outputs.find(x=>x.isDefault)||au.outputs[0]);if(out)syncVol(Math.min(100,out.volume))}
+  const out=au&&(au.outputs.find(x=>x.isDefault)||au.outputs[0]);if(out)syncVol(Math.min(100,out.volume));
+  const qp=$('#qperf'),pf=await HX.lx('perfProfile').catch(()=>({available:false}));qp.hidden=!pf.available;qp.innerHTML='';if(pf.available)qp.append(perfSeg(pf))}
 let CAT=null;
 
 /* ---------- taskbar ---------- */
@@ -762,7 +800,7 @@ $('#tray').onclick=e=>{e.stopPropagation();if(MW){HX.popup('quick');return}$('#s
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('.panel,#bar'))closePanels()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanels();if(e.key==='Meta'||(e.ctrlKey&&e.key==='Escape')){e.preventDefault();$('#startBtn').click()}});
 function renderGrid(q){const g=$('#grid');g.innerHTML='';const ql=q.toLowerCase();
- Object.keys(APPS).filter(k=>APPS[k].name.toLowerCase().includes(ql)&&(OSM()||!['bin','taskmgr'].includes(k))).forEach(k=>g.append(h('button',{class:'icon',on:{click:()=>openApp(k),contextmenu:e=>{e.preventDefault();pinMenu({type:'app',key:k})}}},glyph(k),APPS[k].name)));
+ Object.keys(APPS).filter(k=>APPS[k].name.toLowerCase().includes(ql)&&(OSM()||!['bin','taskmgr','clips'].includes(k))).forEach(k=>g.append(h('button',{class:'icon',on:{click:()=>openApp(k),contextmenu:e=>{e.preventDefault();pinMenu({type:'app',key:k})}}},glyph(k),APPS[k].name)));
  if(OSM()){const extra=[['System terminal',()=>HX.lx('openTerminal')]];if(SYS.live)extra.push(['Install NexusOS',()=>openSettings('install')]);
   extra.filter(([n])=>n.toLowerCase().includes(ql)).forEach(([n,fn])=>g.append(h('button',{class:'icon ext',on:{click:()=>{closePanels();Promise.resolve(fn()).catch(e=>toast('Couldn’t open that',errMsg(e)))}}},letterIcon(n),n)))}
  if(!g.children.length)g.append(h('div',{class:'nomatch',style:'color:var(--muted);padding:8px'},'No apps match “'+q+'”'));
@@ -773,10 +811,11 @@ function renderGrid(q){const g=$('#grid');g.innerHTML='';const ql=q.toLowerCase(
 $('#search').addEventListener('input',e=>renderGrid(e.target.value));
 $('#search').addEventListener('keydown',e=>{if(e.key==='Enter'){const f=$('#grid .icon');f&&f.click()}});
 let pm=null;
-$('#power').onclick=async e=>{e.stopPropagation();if(MW&&OSM()){const k=await menu([{id:'sleep',label:'Sleep'},{id:'restart',label:'Restart'},{id:'shutdown',label:'Shut down'},{type:'separator'},{id:'logout',label:'Log out'}]);if(k)powerAction(k);return}if(pm){pm.remove();pm=null;return}
+$('#power').onclick=async e=>{e.stopPropagation();if(MW&&OSM()){const w=await canWin();const k=await menu([{id:'sleep',label:'Sleep'},{id:'restart',label:'Restart'},...(w?[{id:'windows',label:'Restart into Windows'}]:[]),{id:'shutdown',label:'Shut down'},{type:'separator'},{id:'logout',label:'Log out'}]);if(k)powerAction(k);return}if(pm){pm.remove();pm=null;return}
  const B=(l,fn)=>h('button',{on:{click:fn}},l);
  pm=OSM()?h('div',{class:'pmenu'},B('Sleep',()=>powerAction('sleep')),B('Restart',()=>powerAction('restart')),B('Shut down',()=>powerAction('shutdown')),B('Log out',()=>powerAction('logout')))
   :h('div',{class:'pmenu'},B('Restart NexusOS',()=>{closePanels();Object.keys(wins).forEach(close);boot()}),HX?B('Toggle full screen',()=>{closePanels();HX.toggleFullscreen()}):null,B(HX?'Quit NexusOS':'Shut down (restart)',shutDown));
+ if(OSM()){const pmx=pm;canWin().then(w=>{if(w&&pmx&&pmx.isConnected)pmx.children[1].after(B('Restart into Windows',()=>powerAction('windows')))})}
  $('#start').append(pm)};
 function shutDown(){closePanels();const bt=$('#boot');$('#boot h2').textContent='Shutting down';bt.classList.remove('done');setTimeout(()=>{if(HX)HX.quit();else{$('#boot h2').textContent='NexusOS';Object.keys(wins).forEach(close);boot()}},1200)}
 document.querySelectorAll('.tile').forEach(t=>t.onclick=()=>{const k=t.dataset.t;
@@ -1366,6 +1405,72 @@ const APPS={
   async function end(g,force){if(!g)return;if(!await ask((force?'Force end ':'End ')+g.name+'?',force?'It closes straight away. Anything unsaved in it is lost.':'It’s asked to close. Anything unsaved in it may be lost.',force?'Force end':'End task',true))return;
     try{await HX.lx('endTask',g.pids,force);toast('Ended',g.name);setTimeout(tickTm,600)}catch(e){toast('Couldn’t end it',errMsg(e))}}
   tickTm();timer=setInterval(()=>{if(!document.hidden)tickTm()},1500);api.onClose=()=>clearInterval(timer)}},
+ clips:{name:'Clips',w:960,h:640,mount(b,api){
+  const wrap=h('div',{class:'clips'});b.append(wrap);
+  if(!HX||!OSM()||!HX.clips){wrap.append(h('p',{class:'hint',style:'padding:20px'},'Clips works on NexusOS.'));return}
+  const C=HX.clips;let st=null,tab='clips',offs=[];
+  const head=h('div',{class:'clhead'}),tabs=h('div',{class:'seg cltabs'}),body=h('div',{class:'clbody'});wrap.append(head,tabs,body);
+  const fmtLen=s=>s<60?s+' seconds':s===60?'1 minute':(s/60)+' minutes';
+  const url=p=>'file://'+p.split('/').map(encodeURIComponent).join('/');
+  function drawHead(){head.innerHTML='';if(!st)return;
+    if(!st.installed){head.append(h('div',{class:'clstat'},h('b',{},'Clips needs its recorder'),h('span',{},'GPU Screen Recorder, from Flathub. It records with your graphics card, so games keep their frame rate.')),
+      h('button',{class:'pbtn pri',on:{click:install}},'Download the recorder'));return}
+    const c=st.cfg;
+    if(st.running)head.append(h('div',{class:'clstat'},h('b',{},h('i',{class:'recdot'}),'Clipping'),h('span',{},`Press ${c.key} to save the last ${fmtLen(c.seconds)}.`+(st.memMB?` Uses about ${st.memMB} MB of memory.`:''))),
+      h('button',{class:'pbtn',on:{click:()=>C.save().catch(e=>toast('Couldn’t save a clip',errMsg(e)))}},'Save a clip now'),h('button',{class:'pbtn',on:{click:()=>C.stop()}},'Stop'));
+    else head.append(h('div',{class:'clstat'},h('b',{},st.starting?'Starting…':'Not clipping'),h('span',{},st.error||'Start clipping, then press '+c.key+' in any game to save the last '+fmtLen(c.seconds)+'.')),
+      h('button',{class:'pbtn pri',disabled:st.starting,on:{click:()=>C.start().catch(e=>{if(!st.error)toast('Clips couldn’t start',errMsg(e))})}},'Start clipping'));
+    if(st.running)head.append(h('small',{class:'hint clnote'},'You can close this window: Clips keeps going under the arrow at the bottom right.'))}
+  async function install(){head.innerHTML='';const bar=h('div',{class:'bar2'},h('div',{style:'width:5%'})),line=h('small',{class:'hint'},'Starting the download…');head.append(h('div',{class:'clstat',style:'flex:1'},h('b',{},'Downloading the recorder'),bar,line));
+    const off=HX.onJob&&HX.onJob(d=>{if(d.id!=='clips:install')return;if(d.pct!=null)bar.firstChild.style.width=d.pct+'%';if(d.line)line.textContent=d.line});
+    try{await C.install();toast('Clips is ready','Press '+(st?st.cfg.key:'F8')+' in a game to save a clip.');await refresh();if(st.cfg.autostart)C.start().catch(()=>{})}catch(e){toast('The download didn’t finish',errMsg(e));refresh()}}
+  function drawTabs(){tabs.innerHTML='';[['clips','Your clips'],['opts','Options']].forEach(([k,l])=>tabs.append(h('button',{class:tab===k?'on':'',on:{click:()=>{tab=k;drawTabs();drawBody()}}},l)))}
+  let drawN=0;async function drawBody(){const my=++drawN;body.innerHTML='';if(tab==='opts')return drawOpts();
+    let list=[];try{list=await C.list()}catch(e){}if(my!==drawN)return;body.innerHTML='';
+    if(!list.length){body.append(h('div',{class:'clempty'},h('b',{},'No clips yet'),h('span',{},'Your clips are saved in Videos › Clips, named after the game.')));return}
+    const grid=h('div',{class:'clgrid'});body.append(grid,h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>openApp('files',{dir:st.dir})}},'Open the Clips folder')));
+    for(const f of list.slice(0,60)){const v=h('video',{preload:'metadata',muted:true,src:url(f.path)+'#t=0.5'});
+      const card=h('button',{class:'clcard',title:f.name,on:{click:()=>play(f),contextmenu:async e=>{e.preventDefault();const k=await menu([{id:'play',label:'Play'},{id:'files',label:'Show in Files'},{id:'ren',label:'Rename'},{type:'separator'},{id:'del',label:'Delete'}]);act(k,f)}}},v,h('span',{class:'cln'},f.name.replace(/\.mp4$/i,'')),h('small',{},fmtSize(f.size)+' · '+new Date(f.time).toLocaleString('en-GB',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})));
+      grid.append(card)}}
+  async function act(k,f){if(!k)return;
+    if(k==='play')return play(f);
+    if(k==='files')return openApp('files',{dir:st.dir,select:f.name});
+    if(k==='ren'){const cur=f.name.replace(/\.mp4$/i,'');const v=await askText('Rename clip','New name:',cur,'Rename');if(v&&v.trim()&&v.trim()!==cur){try{await HX.rename(f.path,v.trim().replace(/\.mp4$/i,'')+'.mp4')}catch(e){toast('Couldn’t rename it',errMsg(e))}}closePlayer();return drawBody()}
+    if(k==='del'){if(!await ask('Delete this clip?',f.name+' goes to the Bin.','Delete',true))return;try{await HX.trash(f.path)}catch(e){toast('Couldn’t delete it',errMsg(e))}closePlayer();return drawBody()}}
+  let pl=null;function closePlayer(){if(pl){const v=pl.querySelector('video');if(v){v.pause();v.removeAttribute('src');v.load()}pl.remove();pl=null}}
+  function play(f){closePlayer();const v=h('video',{controls:true,autoplay:true,src:url(f.path)});
+    pl=h('div',{class:'clplayer',on:{click:e=>{if(e.target===pl)closePlayer()}}},h('div',{class:'clpbox'},v,h('div',{class:'row2'},h('b',{style:'flex:1'},f.name.replace(/\.mp4$/i,'')),
+      h('button',{class:'pbtn',on:{click:()=>act('files',f)}},'Show in Files'),h('button',{class:'pbtn',on:{click:()=>act('ren',f)}},'Rename'),h('button',{class:'pbtn danger',on:{click:()=>act('del',f)}},'Delete'),h('button',{class:'pbtn',on:{click:closePlayer}},'Close'))));
+    wrap.append(pl)}
+  async function drawOpts(){const c=st.cfg;const s=h('div',{class:'clopts'});body.append(s);
+    const set=async o=>{try{st={...st,...await C.setCfg(o)};drawHead()}catch(e){toast('Couldn’t change that',errMsg(e))}};
+    const sel=(label,sub,opts,val,fn)=>{const e=h('select',{class:'txt','aria-label':label},...opts.map(([v,l])=>h('option',{value:String(v),selected:String(v)===String(val)},l)));e.onchange=()=>fn(e.value);s.append(srow(label,sub,e));return e};
+    // what to record
+    const tsel=sel('Record','“The game you’re playing” records whichever window you’re in. If that goes wrong, pick the whole screen or one window.',[['focused','The game you’re playing'],['screen','Whole screen'],['pick','A specific window…']],/^window:/.test(c.target)?'pick':c.target,v=>{if(v==='pick')return pickWin();set({target:v})});
+    const wrow=h('div');s.append(wrow);
+    async function pickWin(){wrow.innerHTML='';const l=await C.windows().catch(()=>[]);if(!l.length){wrow.append(h('p',{class:'hint'},'No other windows are open. Open the game first.'));return}
+      const e=h('select',{class:'txt','aria-label':'Window'},h('option',{value:''},'Pick a window'),...l.map(w=>h('option',{value:w.id,selected:c.target==='window:'+w.id},w.title)));e.onchange=()=>{if(e.value)set({target:'window:'+e.value})};wrow.append(srow('Window','Only this window is recorded, even when it’s behind others.',e,h('button',{class:'pbtn',on:{click:pickWin}},'Refresh')))}
+    if(/^window:/.test(c.target))pickWin();
+    sel('Clip length','',[[15,'15 seconds'],[30,'30 seconds'],[60,'1 minute'],[120,'2 minutes'],[300,'5 minutes']],c.seconds,v=>set({seconds:+v}));
+    sel('Quality','Higher quality makes bigger clips and uses more memory.',[['standard','Standard (10 Mbit/s)'],['high','High (20 Mbit/s)'],['ultra','Ultra (40 Mbit/s)']],c.quality,v=>set({quality:v}));
+    sel('Frame rate','',[[60,'60 FPS'],[30,'30 FPS']],c.fps,v=>set({fps:+v}));
+    s.append(srow('Game sound','Everything you hear from the computer.',sswitch(c.gameAudio,async v=>{await set({gameAudio:v});return v},'Game sound')));
+    const mic=sel('Microphone','',[['','Don’t record my microphone'],['default','Default microphone']],c.mic,v=>set({mic:v}));
+    C.audio().then(l=>{for(const d of l)mic.append(h('option',{value:d.id,selected:d.id===c.mic},d.name));if(c.mic&&!['','default'].includes(c.mic)&&!l.some(d=>d.id===c.mic))mic.append(h('option',{value:c.mic,selected:true},c.mic))}).catch(()=>{});
+    const kb=h('button',{class:'pbtn kbd'},c.key);kb.onclick=()=>{kb.textContent='Press a key… (Esc to cancel)';kb.classList.add('on');
+      const on=e=>{e.preventDefault();e.stopPropagation();if(['Control','Alt','Shift','Meta'].includes(e.key))return;removeEventListener('keydown',on,true);kb.classList.remove('on');
+        if(e.key==='Escape'){kb.textContent=st.cfg.key;return}const acc=keyAccel(e);if(!acc){kb.textContent=st.cfg.key;toast('Pick another key','Use a function key (F1–F24), a letter or number with Ctrl/Alt, or keys like Insert or Pause.');return}
+        kb.textContent=acc;set({key:acc})};addEventListener('keydown',on,true)};
+    s.append(srow('Clip key','Press this in a game to save a clip. F8 is Medal’s default.',kb));
+    s.append(srow('Keep the buffer on the disk','Uses almost no memory, but writes to your SSD all the time while Clips is running.',sswitch(c.storage==='disk',async v=>{await set({storage:v?'disk':'ram'});return v},'Buffer on disk')));
+    s.append(srow('Show a note when a clip is saved','A chime always plays.',sswitch(c.notify,async v=>{await set({notify:v});return v},'Note when saved')));
+    s.append(srow('Start clipping when Clips opens','',sswitch(c.autostart,async v=>{await set({autostart:v});return v},'Start when opened')));
+    s.append(srow('Clips are saved in','Videos › Clips',h('button',{class:'pbtn',on:{click:()=>openApp('files',{dir:st.dir})}},'Open folder')))}
+  async function refresh(){try{st=await C.state()}catch(e){st=null}drawHead()}
+  HX.onClips(d=>{st={...(st||{}),...d};drawHead()});
+  HX.onClipSaved(()=>{if(tab==='clips')drawBody()});
+  (async()=>{await refresh();drawTabs();drawBody();if(st&&st.installed&&!st.running&&!st.starting&&st.cfg.autostart)C.start().catch(()=>{})})();
+  api.onClose=()=>closePlayer()}},
  about:{name:'About NexusOS',w:520,h:520,mount(b){
   const dl=h('dl',{});const add=(k,v)=>dl.append(h('dt',{},k),h('dd',{style:'margin:0'},v));
   const mem=h('div',{style:'display:flex;flex-direction:column;gap:4px'});
@@ -1441,7 +1546,7 @@ if(HX){
   if(VIEW==='app')HX.onAppArg(a=>{if(mountAppView.ready)mountAppView.ready(a);else(mountAppView.queued=mountAppView.queued||[]).push(a)});
   HX.onJob(onJob);HX.onPermission(onPermission);HX.catalog().then(c=>{CAT=c}).catch(()=>{});
   if(VIEW==='main'){setInterval(loadSys,15000);HX.onOpenUrl(u=>openApp('web',u));HX.onDownload(onDownload);setInterval(refreshDesktop,4000)}
-  if(VIEW==='toasts'){const tb=h('div',{id:'toastbox'});document.body.append(tb);tb.append(dlBox);HX.onToast(d=>toastView(d.t,d.s));const snd={in:new Audio('sounds/usb-in.wav'),out:new Audio('sounds/usb-out.wav')};HX.onUsb&&HX.onUsb(d=>{const a=snd[d.kind];if(a){a.currentTime=0;a.volume=.8;a.play().catch(()=>{})}});HX.onDownload(onDownload)}
+  if(VIEW==='toasts'){const tb=h('div',{id:'toastbox'});document.body.append(tb);tb.append(dlBox);HX.onToast(d=>toastView(d.t,d.s));HX.onDownload(onDownload)}
   if(HX.onChanged)HX.onChanged(w=>{
     if(w==='files'){Object.values(wins).forEach(x=>{if(x.key==='files'&&x.api.refresh)x.api.refresh()});if(VIEW==='desktop'){buildDesktop.sig=null;buildDesktop()}}
     if(w==='bin'){refreshBinIcon();Object.values(wins).forEach(x=>{if(x.key==='bin'&&x.api.refresh)x.api.refresh()})}

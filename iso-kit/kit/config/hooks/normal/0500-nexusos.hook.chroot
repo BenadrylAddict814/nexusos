@@ -15,7 +15,8 @@ for group in \
   "libpango-1.0-0" "libcairo2" "libexpat1" "libsecret-1-0" "libnotify4" "libuuid1" "libglib2.0-0t64 libglib2.0-0" \
   "libglib2.0-bin" "pkexec policykit-1" "polkitd policykit-1" "lxpolkit mate-polkit policykit-1-gnome" \
   "libspa-0.2-bluetooth" "xss-lock" "steam-devices" "fonts-inter" "firmware-mediatek" "firmware-libertas" \
-  "shim-signed" "grub-efi-amd64-signed" "gnome-themes-extra" "switcheroo-control" ; do
+  "shim-signed" "grub-efi-amd64-signed" "gnome-themes-extra" "switcheroo-control" \
+  "power-profiles-daemon" "zram-tools" ; do
   if p=$(pick $group); then EXTRA="$EXTRA $p"; else say "skipping ($group): not in this Debian release"; fi
 done
 apt-get install -y $EXTRA
@@ -51,6 +52,9 @@ if command -v update-glx >/dev/null 2>&1; then update-glx --auto glx || true; fi
 update-initramfs -u -k all || true
 # don't ship the build machine's driver-signing key: each installed system makes its own
 rm -f /var/lib/dkms/mok.key /var/lib/dkms/mok.pub
+
+# ---- 1.5: compressed swap in memory, so big games don't make the computer crawl
+/usr/lib/nexusos/nexus-setup-zram || true
 
 # ---- firewall on: nothing from the network can connect in
 sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf

@@ -7,3 +7,13 @@ polkit.addRule(function (action, subject) {
   }
   return polkit.Result.NOT_HANDLED;
 });
+
+// NexusOS 1.5: "Restart into Windows" needs no password, just like a normal restart.
+polkit.addRule(function (action, subject) {
+  if (action.id === "org.freedesktop.policykit.exec" && subject.local && subject.active &&
+      action.lookup("program") === "/usr/lib/nexusos/nexus-system" &&
+      action.lookup("command_line") === "/usr/lib/nexusos/nexus-system reboot-windows") {
+    return polkit.Result.YES;
+  }
+  return polkit.Result.NOT_HANDLED;
+});

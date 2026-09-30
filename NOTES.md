@@ -1,8 +1,11 @@
-NexusOS 1.4.5
+NexusOS 1.5.0: the gaming update
 
-- New default background: the NexusOS hoodie girl, in 1920×1080. A second version with a tan skin tone is included too. Switch between them in Settings > Appearance > NexusOS backgrounds; the animated backgrounds and your own pictures are still there.
+- Clips: a new app that saves the last moments of your game with one key, like Medal or ShadowPlay (F8 by default). It records with your graphics card, so games keep their frame rate, and it only runs while you want it: open Clips to start, close the window and it keeps going under the arrow at the bottom right, quit it there. Pick the clip length, quality, frame rate, game sound, microphone, the key, and what to record (the game you're playing, the whole screen or one window). Clips are named after the game and saved in Videos > Clips. The first time, Clips downloads its recorder (GPU Screen Recorder, from Flathub).
+- Game overlay: FPS, GPU temperature and usage, CPU and memory on top of your Steam games. Turn it on in Settings > Gaming; Right Shift + F12 shows or hides it in a game.
+- Performance profiles: Battery saver, Balanced or Performance, in quick settings (bottom right) and Settings > Gaming.
+- Restart into Windows: in the power menu. The computer starts Windows once; after that it starts NexusOS as normal.
+- Steam games always use the NVIDIA graphics card, however Steam was opened.
+- Less memory: the desktop uses about 35 MB less, the notifications window only exists while it's showing something, and NexusOS now watches for window changes instead of checking twice a second. Compressed memory (zram) lets big games, Discord and a browser run together without the computer slowing to a crawl.
+- A crashed part of the desktop (taskbar, notifications) now comes back by itself.
 
-Also includes everything from 1.4.4, if you skipped it:
-- Background apps: the arrow at the bottom right of the taskbar shows apps still running in the background. Click to open one; right-click for its options and "Quit", which really closes it.
-- Taskbar: right-click a Flatpak app for "Quit".
-- USB sounds: a chime when you plug in a USB device and a softer one when you pull it out, plus a note when a USB drive is ready. Turn it off in Settings > Sound.
+The update installs a few system packages (performance profiles and memory compression), so it takes a minute or two longer than usual.

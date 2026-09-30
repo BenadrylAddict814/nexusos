@@ -4,6 +4,7 @@
 #   rollback             go back to the previous NexusOS version
 #   fix-nvidia           make sure the NVIDIA driver (not nouveau) drives the GPU
 #   wifi-powersave on|off
+#   reboot-windows       restart straight into Windows, once (the next start is NexusOS again)
 set -euo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C.UTF-8
 umask 022
@@ -163,10 +164,28 @@ wifi_powersave() {
   say "Wi-Fi power saving is $1."
 }
 
+reboot_windows() {
+  local num="" entry=""
+  if command -v efibootmgr >/dev/null 2>&1 && [ -d /sys/firmware/efi ]; then
+    num=$(efibootmgr 2>/dev/null | sed -n 's/^Boot\([0-9A-Fa-f]\{4\}\)\*\{0,1\} \{1,\}Windows Boot Manager.*/\1/p' | head -n1)
+  fi
+  if [ -n "$num" ]; then
+    efibootmgr -q -n "$num" || die "Couldn't tell the computer to start Windows next."
+  else
+    # no firmware entry: ask GRUB to pick its Windows entry for the next start only
+    entry=$(grep -o "^menuentry '[^']*Windows[^']*'" /boot/grub/grub.cfg 2>/dev/null | head -n1 | sed "s/^menuentry '//; s/'\$//")
+    [ -n "$entry" ] && command -v grub-reboot >/dev/null 2>&1 || die "Windows wasn't found on this computer."
+    grub-reboot "$entry" || die "Couldn't tell the computer to start Windows next."
+  fi
+  sync
+  systemctl reboot
+}
+
 case "${1:-}" in
   apply-update) [ -n "${2:-}" ] || die "Which update?"; apply_update "$2" ;;
   rollback) rollback ;;
   fix-nvidia) fix_nvidia ;;
   wifi-powersave) wifi_powersave "${2:-}" ;;
+  reboot-windows) reboot_windows ;;
   *) die "Unknown command." ;;
 esac
