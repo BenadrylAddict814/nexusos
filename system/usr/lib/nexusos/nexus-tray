@@ -1,0 +1,232 @@
+#!/usr/bin/python3
+"""NexusOS system tray: hosts app tray icons (StatusNotifierItem, used by Discord, Steam, ...)
+and talks to the NexusOS desktop over stdin/stdout as JSON lines.
+
+ out: {"type":"items","items":[...]}  {"type":"menu","req":N,"items":[...]}  {"type":"error","req":N,"message":...}
+ in:  {"cmd":"activate"|"secondary","key":K,"x":X,"y":Y}  {"cmd":"menu","req":N,"key":K}  {"cmd":"event","key":K,"id":I}
+"""
+import base64, json, os, sys, struct, zlib, re
+import gi
+gi.require_version('Gio', '2.0')
+from gi.repository import Gio, GLib
+
+WATCHER_XML = """<node><interface name="org.kde.StatusNotifierWatcher">
+ <method name="RegisterStatusNotifierItem"><arg name="service" type="s" direction="in"/></method>
+ <method name="RegisterStatusNotifierHost"><arg name="service" type="s" direction="in"/></method>
+ <property name="RegisteredStatusNotifierItems" type="as" access="read"/>
+ <property name="IsStatusNotifierHostRegistered" type="b" access="read"/>
+ <property name="ProtocolVersion" type="i" access="read"/>
+ <signal name="StatusNotifierItemRegistered"><arg type="s"/></signal>
+ <signal name="StatusNotifierItemUnregistered"><arg type="s"/></signal>
+ <signal name="StatusNotifierHostRegistered"/>
+ <signal name="StatusNotifierHostUnregistered"/>
+</interface></node>"""
+SNI = 'org.kde.StatusNotifierItem'
+bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+items = {}          # key "bus/path" -> {bus, path, props, icon, pid, appId, subs}
+pending = {'t': 0}
+
+def out(obj):
+    try:
+        sys.stdout.write(json.dumps(obj) + '\n'); sys.stdout.flush()
+    except BrokenPipeError:
+        os._exit(0)
+
+def png(w, h, rgba):
+    raw = b''.join(b'\x00' + rgba[y * w * 4:(y + 1) * w * 4] for y in range(h))
+    chunk = lambda t, d: struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw, 6)) + chunk(b'IEND', b'')
+
+def pixmap_url(pixmaps):
+    if not pixmaps: return None
+    best = None
+    for w, h, data in pixmaps:
+        if w <= 0 or h <= 0 or len(data) < w * h * 4: continue
+        if best is None or abs(w - 32) < abs(best[0] - 32): best = (w, h, bytes(data))
+    if not best: return None
+    w, h, argb = best
+    rgba = bytearray(w * h * 4)
+    for i in range(w * h):   # ARGB32 in network byte order -> RGBA
+        a, r, g, b = argb[i * 4:i * 4 + 4]
+        rgba[i * 4:i * 4 + 4] = bytes((r, g, b, a))
+    return 'data:image/png;base64,' + base64.b64encode(png(w, h, bytes(rgba))).decode()
+
+ICON_DIRS = [os.path.expanduser('~/.local/share/flatpak/exports/share/icons'), '/var/lib/flatpak/exports/share/icons',
+             os.path.expanduser('~/.local/share/icons'), '/usr/share/icons']
+def icon_file(name, theme_path):
+    if not name: return None
+    if name.startswith('/') and os.path.isfile(name): return name
+    if not re.fullmatch(r'[A-Za-z0-9_.+-]{1,200}', name): return None
+    roots = ([theme_path] if theme_path else []) + ICON_DIRS
+    for root in roots:
+        for theme in ('hicolor', 'Adwaita', ''):
+            for size in ('32x32', '48x48', '64x64', '24x24', '22x22', '128x128', '256x256', 'scalable', ''):
+                for sub in ('apps', 'status', ''):
+                    for ext in ('.png', '.svg'):
+                        p = os.path.join(root, theme, size, sub, name + ext)
+                        if os.path.isfile(p): return p
+    for ext in ('.png', '.svg', '.xpm'):
+        p = '/usr/share/pixmaps/' + name + ext
+        if os.path.isfile(p): return p
+    return None
+def file_url(p):
+    try:
+        if os.path.getsize(p) > 2_000_000: return None
+        mime = 'image/svg+xml' if p.endswith('.svg') else 'image/png'
+        return 'data:%s;base64,%s' % (mime, base64.b64encode(open(p, 'rb').read()).decode())
+    except OSError:
+        return None
+
+def call(busname, path, iface, method, args=None, rtype=None, timeout=3000):
+    return bus.call_sync(busname, path, iface, method, args, rtype, Gio.DBusCallFlags.NONE, timeout, None)
+
+def owner_pid(name):
+    try: return call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'GetConnectionUnixProcessID', GLib.Variant('(s)', (name,))).unpack()[0]
+    except Exception: return 0
+def flatpak_id(pid):
+    try:
+        cg = open('/proc/%d/cgroup' % pid).read()
+        m = re.search(r'app-flatpak-([A-Za-z0-9_.-]+?)-\d+\.scope', cg)
+        if m: return m.group(1)
+    except OSError: pass
+    try:
+        m = re.search(r'^name=(.+)$', open('/proc/%d/root/.flatpak-info' % pid).read(), re.M)
+        if m: return m.group(1).strip()
+    except OSError: pass
+    return None
+
+def refresh(key):
+    it = items.get(key)
+    if not it: return
+    try:
+        props = call(it['bus'], it['path'], 'org.freedesktop.DBus.Properties', 'GetAll', GLib.Variant('(s)', (SNI,)), GLib.VariantType('(a{sv})')).unpack()[0]
+    except Exception:
+        props = {}
+    it['props'] = props
+    icon = pixmap_url(props.get('IconPixmap'))
+    if not icon:
+        f = icon_file(props.get('IconName') or '', props.get('IconThemePath') or '')
+        icon = file_url(f) if f else None
+    it['icon'] = icon
+    schedule()
+
+def summary():
+    res = []
+    for key, it in items.items():
+        p = it.get('props') or {}
+        tip = p.get('ToolTip')
+        tip_text = ''
+        if isinstance(tip, tuple) and len(tip) >= 4: tip_text = ' — '.join(x for x in (tip[2], tip[3]) if x)
+        res.append({'key': key, 'id': p.get('Id') or '', 'title': p.get('Title') or p.get('Id') or 'App', 'tooltip': tip_text,
+                    'status': p.get('Status') or 'Active', 'icon': it.get('icon'), 'appId': it.get('appId'), 'pid': it.get('pid') or 0,
+                    'hasMenu': bool(p.get('Menu')) and p.get('Menu') != '/', 'itemIsMenu': bool(p.get('ItemIsMenu'))})
+    res.sort(key=lambda x: x['title'].lower())
+    return res
+
+def schedule():
+    if pending['t']: return
+    def fire():
+        pending['t'] = 0; out({'type': 'items', 'items': summary()}); return False
+    pending['t'] = GLib.timeout_add(120, fire)
+
+def add_item(busname, path):
+    key = busname + path
+    if key in items: return key
+    pid = owner_pid(busname)
+    it = {'bus': busname, 'path': path, 'props': {}, 'icon': None, 'pid': pid, 'appId': flatpak_id(pid) if pid else None, 'subs': []}
+    items[key] = it
+    for sig in ('NewIcon', 'NewTitle', 'NewStatus', 'NewToolTip', 'NewAttentionIcon', 'NewMenu'):
+        it['subs'].append(bus.signal_subscribe(busname, SNI, sig, path, None, Gio.DBusSignalFlags.NONE, lambda *a, k=key: refresh(k)))
+    refresh(key)
+    emit('StatusNotifierItemRegistered', key)
+    return key
+
+def remove_bus(name):
+    for key in [k for k, v in items.items() if v['bus'] == name]:
+        for s in items[key]['subs']: bus.signal_unsubscribe(s)
+        del items[key]
+        emit('StatusNotifierItemUnregistered', key)
+    schedule()
+
+def emit(sig, key):
+    try: bus.emit_signal(None, '/StatusNotifierWatcher', 'org.kde.StatusNotifierWatcher', sig, GLib.Variant('(s)', (key,)))
+    except Exception: pass
+
+def on_method(conn, sender, path, iface, method, params, inv):
+    if method == 'RegisterStatusNotifierItem':
+        service = params.unpack()[0]
+        inv.return_value(None)   # answer first: the app waits for this reply, and we're about to ask it things
+        if service.startswith('/'): GLib.idle_add(lambda: add_item(sender, service) and False)
+        else: GLib.idle_add(lambda: add_item(service, '/StatusNotifierItem') and False)
+    elif method == 'RegisterStatusNotifierHost':
+        inv.return_value(None)
+    else:
+        inv.return_dbus_error('org.freedesktop.DBus.Error.UnknownMethod', 'Unknown method')
+
+def on_get(conn, sender, path, iface, prop):
+    if prop == 'RegisteredStatusNotifierItems': return GLib.Variant('as', list(items.keys()))
+    if prop == 'IsStatusNotifierHostRegistered': return GLib.Variant('b', True)
+    if prop == 'ProtocolVersion': return GLib.Variant('i', 0)
+    return None
+
+node = Gio.DBusNodeInfo.new_for_xml(WATCHER_XML)
+bus.register_object('/StatusNotifierWatcher', node.interfaces[0], on_method, on_get, None)
+def lost(*a):
+    out({'type': 'fatal', 'message': 'Another tray is already running.'}); os._exit(3)
+Gio.bus_own_name_on_connection(bus, 'org.kde.StatusNotifierWatcher', Gio.BusNameOwnerFlags.DO_NOT_QUEUE, None, lost)
+Gio.bus_own_name_on_connection(bus, 'org.kde.StatusNotifierHost-%d' % os.getpid(), Gio.BusNameOwnerFlags.NONE, None, None)
+bus.signal_subscribe('org.freedesktop.DBus', 'org.freedesktop.DBus', 'NameOwnerChanged', '/org/freedesktop/DBus', None, Gio.DBusSignalFlags.NONE,
+                     lambda c, s, p, i, n, params: remove_bus(params.unpack()[0]) if params.unpack()[2] == '' else None)
+
+# ---- menus (com.canonical.dbusmenu)
+def flatten(node, depth=0):
+    _id, props, children = node
+    res = []
+    for ch in children:
+        cid, cp, cc = ch
+        if cp.get('visible', True) is False: continue
+        if cp.get('type') == 'separator': res.append({'type': 'separator'}); continue
+        label = (cp.get('label') or '').replace('_', '')
+        item = {'id': cid, 'label': label[:80], 'enabled': cp.get('enabled', True) is not False}
+        if cp.get('toggle-type') in ('checkmark', 'radio'):
+            item['type'] = 'checkbox'; item['checked'] = cp.get('toggle-state', 0) == 1
+        if cc and depth < 2: item['submenu'] = flatten(ch, depth + 1)
+        res.append(item)
+    return res
+
+def get_menu(key):
+    it = items[key]; mp = it['props'].get('Menu')
+    if not mp or mp == '/': return []
+    try: call(it['bus'], mp, 'com.canonical.dbusmenu', 'AboutToShow', GLib.Variant('(i)', (0,)))
+    except Exception: pass
+    layout = call(it['bus'], mp, 'com.canonical.dbusmenu', 'GetLayout', GLib.Variant('(iias)', (0, -1, [])), GLib.VariantType('(u(ia{sv}av))')).unpack()[1]
+    return flatten(layout)
+
+def on_stdin(chan, cond):
+    line = sys.stdin.readline()
+    if not line: os._exit(0)
+    try:
+        msg = json.loads(line); cmd = msg.get('cmd'); key = msg.get('key'); it = items.get(key)
+        if cmd == 'list': out({'type': 'items', 'items': summary()})
+        elif not it: out({'type': 'error', 'req': msg.get('req'), 'message': 'That app has closed.'})
+        elif cmd in ('activate', 'secondary'):
+            m = 'Activate' if cmd == 'activate' else 'SecondaryActivate'
+            try: call(it['bus'], it['path'], SNI, m, GLib.Variant('(ii)', (int(msg.get('x', 0)), int(msg.get('y', 0)))))
+            except Exception: pass
+        elif cmd == 'menu':
+            try: out({'type': 'menu', 'req': msg.get('req'), 'items': get_menu(key)})
+            except Exception as e: out({'type': 'menu', 'req': msg.get('req'), 'items': [], 'error': str(e)[:200]})
+        elif cmd == 'event':
+            mp = it['props'].get('Menu')
+            if not mp or mp == '/': raise ValueError('This app has no menu.')
+            call(it['bus'], mp, 'com.canonical.dbusmenu', 'Event', GLib.Variant('(isvu)', (int(msg['id']), 'clicked', GLib.Variant('i', 0), 0)))
+        elif cmd == 'contextmenu':
+            try: call(it['bus'], it['path'], SNI, 'ContextMenu', GLib.Variant('(ii)', (int(msg.get('x', 0)), int(msg.get('y', 0)))))
+            except Exception: pass
+    except Exception as e:
+        out({'type': 'error', 'message': str(e)[:200]})
+    return True
+
+GLib.io_add_watch(GLib.IOChannel.unix_new(sys.stdin.fileno()), GLib.PRIORITY_DEFAULT, GLib.IOCondition.IN | GLib.IOCondition.HUP, on_stdin)
+out({'type': 'ready'})
+GLib.MainLoop().run()

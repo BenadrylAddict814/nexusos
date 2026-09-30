@@ -23,4 +23,14 @@ if changed /etc/sysctl.d/90-nexusos.conf; then sysctl --system >/dev/null 2>&1 |
 if ls /etc/NetworkManager/conf.d/*nexusos* >/dev/null 2>&1 && grep -q NetworkManager "${CHANGED_FILES:-/dev/null}" 2>/dev/null; then
   systemctl reload NetworkManager >/dev/null 2>&1 || true
 fi
+# 1.4.4: the background-apps (system tray) helper needs Python's GLib bindings
+if [ -f "$HERE/system/usr/lib/nexusos/nexus-tray" ]; then
+  install -D -o root -g root -m 0755 "$HERE/system/usr/lib/nexusos/nexus-tray" /usr/lib/nexusos/nexus-tray
+fi
+if ! python3 -c 'import gi; gi.require_version("Gio", "2.0"); from gi.repository import Gio' >/dev/null 2>&1; then
+  say "Installing the background-apps helper (python3-gi)..."
+  DEBIAN_FRONTEND=noninteractive timeout 300 apt-get install -y --no-install-recommends python3-gi gir1.2-glib-2.0 >/dev/null 2>&1 \
+    || { DEBIAN_FRONTEND=noninteractive timeout 300 apt-get update >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive timeout 300 apt-get install -y --no-install-recommends python3-gi gir1.2-glib-2.0 >/dev/null 2>&1; } \
+    || say "  (couldn't install python3-gi; the background-apps arrow will stay hidden until it's installed)"
+fi
 exit 0

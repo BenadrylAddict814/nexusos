@@ -668,6 +668,7 @@ function lockDownSession(ses, isWeb) {
  */
 const TRUSTED = new Set();               // webContents of NexusOS's own pages
 const appWins = new Map();               // BrowserWindow.id -> { key, win }
+let menuOpen = false;   // a right-click menu is open (Start mustn't close under it)
 let desktopWin = null, panelWin = null, popupWin = null, toastWin = null, popupWhich = null, popupPrevActive = 0;
 const PANEL_H = 52;
 const INDEX = path.join(__dirname, 'index.html');
@@ -699,7 +700,7 @@ function guard(w) {
   });
   wc.on('did-finish-load', () => { if (config.zoom && config.zoom !== 1) wc.setZoomFactor(config.zoom); });
 }
-const PREFS = () => ({ preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true, webSecurity: true, spellcheck: false, navigateOnDragDrop: false, safeDialogs: true, backgroundThrottling: false });
+const PREFS = () => ({ preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, webviewTag: true, webSecurity: true, spellcheck: false, navigateOnDragDrop: false, safeDialogs: true, backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required' });
 function makeWin(opts, query) {
   const w = new BrowserWindow({ backgroundColor: '#05060a', title: 'NexusOS', icon: path.join(__dirname, 'icon.png'), autoHideMenuBar: true, show: false, ...opts, webPreferences: PREFS() });
   guard(w);
@@ -721,7 +722,7 @@ function createWindow() {
   panelWin = makeWin({ type: 'dock', frame: false, x: b.x, y: b.y + b.height - PANEL_H, width: b.width, height: PANEL_H, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false }, { view: 'panel' });
   panelWin.once('ready-to-show', () => panelWin.showInactive());
   popupWin = makeWin({ frame: false, width: 640, height: 600, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, minimizable: false, maximizable: false, fullscreenable: false }, { view: 'popup' });
-  popupWin.on('blur', () => hidePopup());
+  popupWin.on('blur', () => { if (!menuOpen) hidePopup(); });
   toastWin = makeWin({ type: 'notification', frame: false, width: 380, height: 10, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false, x: b.x + b.width - 396, y: b.y + 16 }, { view: 'toasts' });
   win = desktopWin;   // dialogs belong to the desktop
   const fit = () => {
@@ -732,6 +733,8 @@ function createWindow() {
   };
   screen.on('display-metrics-changed', fit); screen.on('display-added', fit); screen.on('display-removed', fit);
   startWindowWatch();
+  startTray();
+  startUsbWatch();
   run('openbox', ['--reconfigure']).catch(() => {});   // pick up new window-manager settings after an update
   try { globalShortcut.register('Control+Shift+Escape', () => openAppWindow('taskmgr')); } catch (_) {}
 }
@@ -762,12 +765,14 @@ function openAppWindow(key, arg) {
 function openUrl(url) { if (OS_MODE) openAppWindow('web', url); else sendTo(win, 'open-url', url); }
 
 /* Start and quick settings */
-function showPopup(which) {
+function showPopup(which, at) {
   if (!popupWin || popupWin.isDestroyed()) return;
   if (popupWin.isVisible() && popupWhich === which) return hidePopup();
   const d = screen.getPrimaryDisplay().bounds;
-  const [w, h] = which === 'quick' ? [380, 600] : [660, 620];
-  const x = which === 'quick' ? d.x + d.width - w - 12 : Math.round(d.x + (d.width - w) / 2);
+  const n = trayItems.length, rows = Math.max(1, Math.ceil(n / 4));
+  const [w, h] = which === 'quick' ? [380, 600] : which === 'tray' ? [320, Math.min(540, 132 + rows * 88)] : [660, 620];
+  const ax = Number(at) || 0;
+  const x = which === 'quick' ? d.x + d.width - w - 12 : which === 'tray' ? Math.max(d.x + 8, Math.min(d.x + d.width - w - 8, d.x + Math.round(ax - w / 2))) : Math.round(d.x + (d.width - w) / 2);
   popupWin.setBounds({ x, y: d.y + d.height - PANEL_H - h - 8, width: w, height: h });
   popupWhich = which; popupPrevActive = activeX;
   sendTo(popupWin, 'popup', which);
@@ -833,7 +838,7 @@ async function pushWindows(force) {
   if (force || sig !== lastWinSig) { lastWinSig = sig; sendTo(panelWin, 'windows', list); sendTo(desktopWin, 'windows', list); }
   // hide Start if the person clicked into another window
   // (only when a different window than before Start opened becomes active, so a slow focus change can't close it)
-  if (popupWin && popupWin.isVisible() && activeX && activeX !== xid(popupWin) && activeX !== popupPrevActive) hidePopup();
+  if (!menuOpen && popupWin && popupWin.isVisible() && activeX && activeX !== xid(popupWin) && activeX !== popupPrevActive) hidePopup();
 }
 function startWindowWatch() { clearInterval(watchTimer); watchTimer = setInterval(() => pushWindows(false).catch(() => {}), 900); }
 async function windowAction(id, action) {
@@ -1078,7 +1083,7 @@ app.on('before-quit', () => { if (agentProc) try { agentProc.kill(); } catch (_)
 
 /* ---------------------------------------------------------------- 1.4.3: windows, menus, pins, Bin, wallpaper */
 handle('win:open', (key, arg) => { if (!OS_MODE) throw new Error('Only on NexusOS'); return openAppWindow(key, arg); });
-handle('win:popup', (which) => { if (!['start', 'quick'].includes(which)) throw new Error('Unknown panel'); showPopup(which); return true; });
+handle('win:popup', (which, at) => { if (!['start', 'quick', 'tray'].includes(which)) throw new Error('Unknown panel'); showPopup(which, at); return true; });
 handle('win:popupHide', () => { hidePopup(); return true; });
 handle('win:list', () => listWindows());
 handle('win:act', (id, action) => { if (!['activate', 'minimize', 'close', 'toggle'].includes(action)) throw new Error('Unknown action'); return windowAction(id, action); });
@@ -1105,7 +1110,8 @@ ipcMain.handle('menu', (e, items) => {
       return o;
     });
     const menu = Menu.buildFromTemplate(build(items, 0));
-    menu.popup({ window: w || undefined, callback: () => setTimeout(() => resolve(picked), 0) });
+    menuOpen = true;
+    menu.popup({ window: w || undefined, callback: () => setTimeout(() => { menuOpen = false; resolve(picked); }, 0) });
   });
 });
 
@@ -1198,3 +1204,82 @@ handle('wall:get', async () => {
   try { return `data:${mime};base64,` + (await fs.promises.readFile(p)).toString('base64'); } catch (_) { return null; }
 });
 handle('wall:clear', async () => { if (config.wallpaper) await fs.promises.rm(path.join(WALL_DIR(), path.basename(config.wallpaper)), { force: true }); config.wallpaper = null; saveConfig(); broadcast('sys-changed', 'wallpaper'); return true; });
+
+/* ---------------------------------------------------------------- 1.4.4: the system tray (apps running in the background) */
+let trayProc = null, trayItems = [], trayReq = 0, trayRestarts = 0; const trayWait = new Map();
+function startTray() {
+  if (!OS_MODE || trayProc) return;
+  const bin = '/usr/lib/nexusos/nexus-tray'; if (!fs.existsSync(bin)) return;
+  try { trayProc = cp.spawn(bin, [], { stdio: ['pipe', 'pipe', 'ignore'] }); } catch (_) { trayProc = null; return; }
+  let buf = '';
+  trayProc.stdout.on('data', (d) => {
+    buf += String(d); let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch (_) { continue; }
+      if (m.type === 'items') { trayItems = Array.isArray(m.items) ? m.items.slice(0, 64) : []; sendTo(panelWin, 'tray', trayItems); sendTo(popupWin, 'tray', trayItems); }
+      else if ((m.type === 'menu' || m.type === 'error') && trayWait.has(m.req)) { const r = trayWait.get(m.req); trayWait.delete(m.req); r(m.type === 'menu' ? (m.items || []) : []); }
+      else if (m.type === 'ready') trayRestarts = 0;
+    }
+  });
+  trayProc.on('exit', () => { trayProc = null; trayItems = []; sendTo(panelWin, 'tray', []); if (trayRestarts++ < 5) setTimeout(startTray, 3000); });
+  trayProc.on('error', () => { trayProc = null; });
+}
+function traySend(obj) { if (trayProc && trayProc.stdin.writable) trayProc.stdin.write(JSON.stringify(obj) + '\n'); }
+const trayItem = (key) => trayItems.find((t) => t.key === key);
+handle('tray:list', () => trayItems);
+handle('tray:act', (key, action) => {
+  if (!trayItem(key)) throw new Error('That app has closed.');
+  if (!['activate', 'secondary', 'contextmenu'].includes(action)) throw new Error('Unknown action');
+  const d = screen.getPrimaryDisplay().bounds; hidePopup();
+  traySend({ cmd: action, key, x: d.x + d.width - 200, y: d.y + d.height - PANEL_H }); return true;
+});
+handle('tray:menu', (key) => new Promise((resolve) => {
+  if (!trayItem(key) || !trayProc) return resolve([]);
+  const req = ++trayReq; trayWait.set(req, resolve); traySend({ cmd: 'menu', req, key });
+  setTimeout(() => { if (trayWait.has(req)) { trayWait.delete(req); resolve([]); } }, 4000);
+}));
+handle('tray:event', (key, id) => { if (!trayItem(key) || !Number.isInteger(id)) throw new Error('That app has closed.'); traySend({ cmd: 'event', key, id }); return true; });
+// Quit an app completely (not just close its window): Flatpak apps with "flatpak kill", others by process
+async function quitApp(appId, pid) {
+  if (appId) {
+    if (!/^[A-Za-z0-9_.-]{3,120}$/.test(String(appId))) throw new Error('Unknown app');
+    await run('flatpak', ['kill', String(appId)], { timeout: 15000 }); return true;
+  }
+  if (Number.isInteger(pid) && pid > 1) return LX.endTask([pid], false);
+  throw new Error('NexusOS couldn’t tell which program that is.');
+}
+handle('tray:quit', (key) => { const t = trayItem(key); if (!t) throw new Error('That app has closed.'); return quitApp(t.appId, t.pid); });
+handle('app:quitFlatpak', (appId) => quitApp(appId, 0));
+
+/* ---------------------------------------------------------------- 1.4.4: a chime when a USB device is plugged in or pulled out */
+let usbProc = null, usbTimer = null, usbPending = null, usbKnown = null;
+const removableSet = async () => { try { return new Set((await LX.drives()).filter((d) => d.removable).map((d) => d.path)); } catch (_) { return new Set(); } };
+function startUsbWatch() {
+  if (!OS_MODE || usbProc) return;
+  removableSet().then((s) => { usbKnown = s; });
+  try { usbProc = cp.spawn('udevadm', ['monitor', '--udev', '--subsystem-match=usb/usb_device'], { stdio: ['ignore', 'pipe', 'ignore'] }); } catch (_) { usbProc = null; return; }
+  let buf = '';
+  usbProc.stdout.on('data', (d) => {
+    buf += String(d); let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i); buf = buf.slice(i + 1);
+      const m = /^UDEV\s+\[[^\]]*\]\s+(add|remove)\s/.exec(line); if (!m) continue;
+      // a hub or a composite device fires several events at once: chime once, for the last one
+      usbPending = m[1] === 'add' ? 'in' : 'out'; clearTimeout(usbTimer); usbTimer = setTimeout(usbFire, 350);
+    }
+  });
+  usbProc.on('exit', () => { usbProc = null; setTimeout(startUsbWatch, 10000); });
+}
+async function usbFire() {
+  const kind = usbPending; usbPending = null;
+  if (config.usbSound !== false) sendTo(toastWin, 'usb', { kind });
+  // a USB stick takes a moment to show up as a drive: offer to open it
+  if (kind === 'in') await new Promise((r) => setTimeout(r, 2500));
+  const now = await removableSet(); const before = usbKnown || new Set(); usbKnown = now;
+  const added = [...now].filter((p) => !before.has(p));
+  if (kind === 'in' && added.length) {
+    const d = (await LX.drives().catch(() => [])).find((x) => x.path === added[0]);
+    sendTo(toastWin, 'toast', { t: 'USB drive connected', s: `${(d && d.label) || 'USB drive'} is ready. Open it from Files.` });
+  }
+}
+handle('app:usbSound', (v) => { if (v !== undefined) { config.usbSound = !!v; saveConfig(); } return config.usbSound !== false; });

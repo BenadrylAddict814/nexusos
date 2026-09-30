@@ -1,3 +1,4 @@
 dist/
 *.pem
 !system/usr/share/nexusos/update-key.pem
+__pycache__/

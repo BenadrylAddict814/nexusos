@@ -89,6 +89,8 @@ ca-certificates
 curl
 unzip
 python3
+python3-gi
+gir1.2-glib-2.0
 fonts-noto-core
 fonts-noto-color-emoji
 fonts-dejavu-core
