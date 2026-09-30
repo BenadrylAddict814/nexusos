@@ -693,9 +693,12 @@ function askPermission(info, wc) {
     setTimeout(() => { if (permWaiting.has(id)) { permWaiting.delete(id); resolve(false); } }, 60000);
   });
 }
+// only NexusOS's own Nexa window may use the microphone (for talking to her)
+const isNexaPage = (wc) => { try { return !!wc && TRUSTED.has(wc) && /^file:\/\/.*[?&]app=nexa(&|$)/.test(wc.getURL()); } catch (_) { return false; } };
 function lockDownSession(ses, isWeb) {
   ses.setPermissionRequestHandler((wc, perm, cb, details) => {
     if (PERM_ALWAYS.has(perm)) return cb(true);
+    if (!isWeb && perm === 'media' && isNexaPage(wc) && (details.mediaTypes || []).length && details.mediaTypes.every((t) => t === 'audio')) return cb(true);
     if (!isWeb || !PERM_ASK.has(perm)) return cb(false);
     let origin = ''; try { origin = new URL(details.requestingUrl || wc.getURL()).origin; } catch (_) { return cb(false); }
     if (!/^https:/.test(origin)) return cb(false); // only secure sites may even ask
@@ -706,6 +709,7 @@ function lockDownSession(ses, isWeb) {
   });
   ses.setPermissionCheckHandler((wc, perm, origin) => {
     if (PERM_ALWAYS.has(perm)) return true;
+    if (!isWeb && perm === 'media' && isNexaPage(wc)) return true;
     if (!isWeb) return false;
     for (const [k, v] of permMemo) if (v && k.startsWith(`${origin}|${perm === 'media' ? 'media' : perm}|`)) return true;
     return false;
@@ -731,9 +735,9 @@ let menuOpen = false;   // a right-click menu is open (Start mustn't close under
 let desktopWin = null, panelWin = null, popupWin = null, toastWin = null, popupWhich = null, popupPrevActive = 0;
 const PANEL_H = 52;
 const INDEX = path.join(__dirname, 'index.html');
-const APP_SIZES = { clips: [960, 640], files: [880, 560], notes: [640, 520], web: [1180, 760], calc: [320, 480], term: [700, 440], paint: [760, 560], mines: [340, 440], settings: [900, 620], about: [560, 600], store: [940, 640], bin: [760, 500], taskmgr: [900, 620] };
+const APP_SIZES = { nexa: [1000, 680], clips: [960, 640], files: [880, 560], notes: [640, 520], web: [1180, 760], calc: [320, 480], term: [700, 440], paint: [760, 560], mines: [340, 440], settings: [900, 620], about: [560, 600], store: [940, 640], bin: [760, 500], taskmgr: [900, 620] };
 const APP_MULTI = new Set(['notes']);
-const APP_TITLES = { files: 'Files', notes: 'Notes', web: 'Browser', calc: 'Calculator', term: 'Terminal', paint: 'Paint', mines: 'Mines', settings: 'Settings', about: 'About NexusOS', store: 'App Store', bin: 'Bin', taskmgr: 'Task Manager', clips: 'Clips' };
+const APP_TITLES = { files: 'Files', notes: 'Notes', web: 'Browser', calc: 'Calculator', term: 'Terminal', paint: 'Paint', mines: 'Mines', settings: 'Settings', about: 'About NexusOS', store: 'App Store', bin: 'Bin', taskmgr: 'Task Manager', clips: 'Clips', nexa: 'Nexa' };
 
 function sendTo(w, ch, data) { if (w && !w.isDestroyed()) w.webContents.send(ch, data); }
 function broadcast(ch, data) { for (const wc of TRUSTED) if (!wc.isDestroyed()) wc.send(ch, data); }
@@ -796,6 +800,7 @@ function createWindow() {
   startWindowWatch();
   startTray();
   startUsbWatch();
+  sweepLeftovers();
   setTimeout(() => steamPreferNvidia().catch(() => {}).then(() => ensureNvidiaFlatpakGL()).catch(() => {}), 20000);
   run('openbox', ['--reconfigure']).catch(() => {});   // pick up new window-manager settings after an update
   try { globalShortcut.register('Control+Shift+Escape', () => openAppWindow('taskmgr')); } catch (_) {}
@@ -820,7 +825,7 @@ function openAppWindow(key, arg) {
     { view: 'app', app: key, arg: arg == null ? '' : JSON.stringify(arg) });
   appWins.set(w.id, { key, win: w });
   const id = w.id;
-  w.on('closed', () => { appWins.delete(id); pushWindows(true); });
+  w.on('closed', () => { appWins.delete(id); pushWindows(true); if (key === 'nexa' && ![...appWins.values()].some((a) => a.key === 'nexa')) nexaStop(); });
   w.once('ready-to-show', () => { w.show(); w.focus(); });
   return true;
 }
@@ -1616,3 +1621,336 @@ handle('clips:audio', async () => {
 });
 handle('clips:windows', () => lastWinList.filter((w) => !w.own).map((w) => ({ id: String(parseInt(w.id, 16)), title: w.title || w.cls })));
 app.on('will-quit', () => { if (clipProc) { try { if (clipPid) process.kill(clipPid, 'SIGINT'); clipProc.kill('SIGINT'); } catch (_) {} } });
+
+
+/* ---------------------------------------------------------------- 1.6: Nexa, the NexusOS assistant
+ * Everything runs on this computer: llama.cpp (Vulkan, so the NVIDIA card does the work) with a small Qwen model
+ * for her brain, and sherpa-onnx for her voice (Kokoro) and ears (Whisper). Nothing runs until her window opens,
+ * and closing it stops all of it, which gives the memory and graphics card back to your games. */
+const NEXA_DIR = () => path.join(os.homedir(), '.local/share/nexusos/nexa');
+const NEXA_MODEL_REV = '1e1094e82febb22ad75c2802fc1cbc94c74f8481';
+const NEXA_PARTS = [
+  { key: 'engine', name: 'Her brain: the engine', size: 33256546, dir: 'engine', check: 'llama-server', sha256: '856fcfe9b273e6e813c8d5745396693080ce1cca8134b1180f0e8e2f22b21772',
+    url: 'https://github.com/ggml-org/llama.cpp/releases/download/b10456/llama-b10456-bin-ubuntu-vulkan-x64.tar.gz' },
+  { key: 'model', name: 'Her brain: the AI model (Qwen3 4B)', size: 2500000000, file: 'model.gguf', sha256: 'etag',
+    url: `https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/${NEXA_MODEL_REV}/Qwen3-4B-Instruct-2507-Q4_K_M.gguf` },
+  { key: 'speech', name: 'Voice and hearing: the engine', size: 28156791, dir: 'sherpa', check: 'bin/sherpa-onnx-offline-tts', sha256: 'c0bdb7907d3a74bba1d55d22bf4d9fa75586cf1530614ebe88a27b9118e015c4',
+    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-v1.13.8-linux-x64-shared.tar.bz2' },
+  { key: 'voice', name: 'Her voice (Kokoro)', size: 103248205, dir: 'voice', check: 'model.int8.onnx', sha256: 'c9f0dd393615805b0bab050c340834d5e684e732aec91c0e860cd30e982c08bd',
+    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-int8-en-v0_19.tar.bz2' },
+  { key: 'ears', name: 'Her hearing (Whisper)', size: 208576005, dir: 'ears', check: 'base.en-encoder.int8.onnx', sha256: '475bc7052ce299c007f6d5d5407ba8601f819a2867f6eecee510ed17df581542',
+    url: 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-base.en.tar.bz2' },
+];
+const NEXA_VOICES = { af_bella: [1, 'Bella (warm)'], af_sky: [4, 'Sky (bright)'], af_sarah: [3, 'Sarah (calm)'], af_nicole: [2, 'Nicole (soft, whispery)'], bf_emma: [7, 'Emma (British)'], bf_isabella: [8, 'Isabella (British)'] };
+const NEXA_DEFAULTS = { name: 'Nexa', skin: 'light', voice: 'af_bella', speak: true, control: true,
+  personality: 'Cheerful, playful and a little teasing, like a gamer best friend. Genuinely helpful and honest; gets excited about games; keeps things short and sweet.' };
+const nexaCfg = () => ({ ...NEXA_DEFAULTS, ...(config.nexa || {}) });
+const nexaPartDone = (p) => p.file ? fs.existsSync(path.join(NEXA_DIR(), p.file)) : fs.existsSync(path.join(NEXA_DIR(), p.dir, p.check));
+let nexaInstalling = false;
+function sha256File(f) {
+  return new Promise((resolve, reject) => { const h = require('crypto').createHash('sha256'); fs.createReadStream(f).on('data', (d) => h.update(d)).on('error', reject).on('end', () => resolve(h.digest('hex'))); });
+}
+async function nexaInstall() {
+  if (nexaInstalling) throw new Error('Nexa is already downloading.');
+  nexaInstalling = true;
+  try {
+    const dir = NEXA_DIR(); await fs.promises.mkdir(dir, { recursive: true });
+    for (const p of NEXA_PARTS) {
+      if (nexaPartDone(p)) continue;
+      broadcast('nexa-setup', { key: p.key, name: p.name, state: 'start' });
+      let want = p.sha256;
+      if (want === 'etag') {   // Hugging Face publishes each file's SHA-256 as its "linked etag"
+        const head = await run('curl', ['-sIL', '--max-time', '30', p.url], { timeout: 40000 }).catch(() => '');
+        const m = /^x-linked-etag:\s*"?([0-9a-f]{64})"?/im.exec(head); want = m ? m[1] : null;
+        if (!want) throw new Error('Couldn’t reach Hugging Face to check the AI model. Check your internet connection and try again.');
+      }
+      const tmp = path.join(dir, `.${p.key}.download`);
+      await streamJob('nexa:' + p.key, 'curl', ['-L', '--fail', '--retry', '3', '-C', '-', '-#', '-o', tmp, p.url]).catch((e) => { throw new Error(`Couldn’t download ${p.name}: ${errMsgOf(e)}`); });
+      broadcast('nexa-setup', { key: p.key, name: p.name, state: 'checking' });
+      if ((await sha256File(tmp)) !== want) { await fs.promises.rm(tmp, { force: true }); throw new Error(`${p.name} didn’t download correctly (it doesn’t match its fingerprint). Try again.`); }
+      if (p.file) await fs.promises.rename(tmp, path.join(dir, p.file));
+      else {
+        const to = path.join(dir, p.dir); await fs.promises.rm(to, { recursive: true, force: true }); await fs.promises.mkdir(to, { recursive: true });
+        await run('tar', [p.url.endsWith('.bz2') ? '-xjf' : '-xzf', tmp, '-C', to, '--strip-components=1', '--no-same-owner'], { timeout: 600000 });
+        await fs.promises.rm(tmp, { force: true });
+        if (!nexaPartDone(p)) throw new Error(`${p.name} is missing files after unpacking.`);
+      }
+      broadcast('nexa-setup', { key: p.key, name: p.name, state: 'done' });
+    }
+    return true;
+  } finally { nexaInstalling = false; }
+}
+async function nexaRemove() {
+  await nexaStop();
+  for (const d of ['engine', 'sherpa', 'voice', 'ears', 'model.gguf', 'tmp']) await fs.promises.rm(path.join(NEXA_DIR(), d), { recursive: true, force: true });
+  return true;
+}
+// ---- her brain: llama-server, only while her window is open
+const nexaKids = new Set(); let nexaAbort = null;
+let nexaSrv = null, nexaPort = 0, nexaKey = '', nexaReady = null, nexaErr = '', nexaDevice = '';
+const freePort = () => new Promise((resolve, reject) => { const srv = require('net').createServer(); srv.listen(0, '127.0.0.1', () => { const p = srv.address().port; srv.close(() => resolve(p)); }); srv.on('error', reject); });
+function nexaStart() {
+  if (nexaReady) return nexaReady;
+  nexaReady = (async () => {
+    const eng = path.join(NEXA_DIR(), 'engine'), model = path.join(NEXA_DIR(), 'model.gguf');
+    if (!fs.existsSync(path.join(eng, 'llama-server')) || !fs.existsSync(model)) throw new Error('NOT_INSTALLED');
+    nexaPort = await freePort(); nexaKey = require('crypto').randomBytes(24).toString('hex'); nexaErr = '';
+    // use the NVIDIA card; never the software renderer, and don't split her across the laptop's built-in graphics too
+    const envE = { ...process.env, LD_LIBRARY_PATH: eng };
+    const devs = [...(await new Promise((res) => cp.execFile(path.join(eng, 'llama-server'), ['--list-devices'], { cwd: eng, env: envE, timeout: 30000 }, (_e, o, er) => res(String(o) + '\n' + String(er)))))
+      .matchAll(/^\s*(Vulkan\d+):\s*(.+?)\s*\((\d+) MiB/gm)].map((m) => ({ id: m[1], name: m[2], mem: +m[3] }));
+    const real = devs.filter((d) => !/llvmpipe|lavapipe|swiftshader|software/i.test(d.name));
+    const dev = real.find((d) => /nvidia|geforce|rtx|gtx/i.test(d.name)) || real.filter((d) => d.mem >= 3000).sort((a, b) => b.mem - a.mem)[0];
+    nexaDevice = dev ? dev.name : 'processor';
+    let tail = '';
+    const p = cp.spawn(path.join(eng, 'llama-server'), ['-m', model, '--host', '127.0.0.1', '--port', String(nexaPort), '--api-key', nexaKey,
+      ...(dev ? ['--device', dev.id, '-ngl', '999'] : ['--device', 'none', '-ngl', '0', '-t', String(Math.max(2, os.cpus().length - 2))]), '-c', '8192', '-np', '1', '--jinja', '--no-webui'],
+      { cwd: eng, env: envE, stdio: ['ignore', 'ignore', 'pipe'] });
+    nexaSrv = p;
+    p.stderr.on('data', (d) => { tail = (tail + String(d)).slice(-3000); });
+    p.on('exit', (code) => { if (nexaSrv === p) { nexaSrv = null; nexaReady = null; if (code) nexaErr = tail.trim().split('\n').slice(-2).join(' '); broadcast('nexa-state', { up: false, error: nexaErr }); } });
+    for (let i = 0; i < 480; i++) {   // loading the model takes a few seconds (longer the first time)
+      if (nexaSrv !== p) {
+        if (/model loading error|failed to load model|invalid magic|gguf/i.test(nexaErr)) throw new Error('Her AI model file is damaged. Open her settings, choose “Remove downloads”, then download her again.');
+        if (/out of memory|ErrorOutOfDeviceMemory|failed to allocate/i.test(nexaErr)) throw new Error('Not enough graphics memory right now. Close a game or other heavy app and open her again.');
+        throw new Error('Her brain stopped while starting: ' + (nexaErr || 'unknown error'));
+      }
+      try { const r = await fetch(`http://127.0.0.1:${nexaPort}/health`); if (r.ok) { broadcast('nexa-state', { up: true }); return true; } } catch (_) {}
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    throw new Error('Her brain took too long to start.');
+  })();
+  nexaReady.catch(() => { nexaReady = null; });
+  return nexaReady;
+}
+async function nexaStop() {
+  for (const c of nexaKids) { try { c.kill('SIGKILL'); } catch (_) {} } nexaKids.clear();
+  const p = nexaSrv; nexaSrv = null; nexaReady = null;
+  if (p) { try { p.kill('SIGTERM'); } catch (_) {} setTimeout(() => { try { p.kill('SIGKILL'); } catch (_) {} }, 5000); }
+  fs.promises.rm(path.join(NEXA_DIR(), 'tmp'), { recursive: true, force: true }).catch(() => {});
+  return true;
+}
+app.on('will-quit', () => { nexaStop(); });
+// ---- what she can do on the computer
+function steamGames() {
+  const root = path.join(os.homedir(), '.var/app', STEAM_ID, '.local/share/Steam');
+  const libs = new Set([path.join(root, 'steamapps')]);
+  try { for (const m of fs.readFileSync(path.join(root, 'steamapps/libraryfolders.vdf'), 'utf8').matchAll(/"path"\s+"([^"]+)"/g)) libs.add(path.join(m[1], 'steamapps')); } catch (_) {}
+  const out = [];
+  for (const lib of libs) { let l = []; try { l = fs.readdirSync(lib); } catch (_) { continue; }
+    for (const f of l) { if (!/^appmanifest_\d+\.acf$/.test(f)) continue; try { const t = fs.readFileSync(path.join(lib, f), 'utf8'); const id = /"appid"\s+"(\d+)"/.exec(t), nm = /"name"\s+"([^"]+)"/.exec(t);
+      if (id && nm && !/^(Steamworks Common Redistributables|Proton|Steam Linux Runtime)/i.test(nm[1])) out.push({ id: id[1], name: nm[1] }); } catch (_) {} } }
+  return out;
+}
+const NEXA_APPS = { files: 'Files', browser: 'web', settings: 'settings', 'app store': 'store', terminal: 'term', 'task manager': 'taskmgr', clips: 'clips', notes: 'notes', calculator: 'calc', paint: 'paint', bin: 'bin' };
+const NEXA_TOOLS = [
+  { name: 'open_app', description: 'Open an app. NexusOS apps: Files, Browser, Settings, App Store, Terminal, Task Manager, Clips, Notes, Calculator, Paint, Bin. Also installed apps like Steam, Discord, Firefox.', parameters: { type: 'object', properties: { app: { type: 'string' } }, required: ['app'] } },
+  { name: 'list_steam_games', description: 'List the games installed in Steam.', parameters: { type: 'object', properties: {} } },
+  { name: 'launch_steam_game', description: 'Start an installed Steam game by (part of) its name.', parameters: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] } },
+  { name: 'set_volume', description: 'Set the speaker volume, 0-100.', parameters: { type: 'object', properties: { percent: { type: 'integer' } }, required: ['percent'] } },
+  { name: 'set_brightness', description: 'Set the screen brightness, 5-100.', parameters: { type: 'object', properties: { percent: { type: 'integer' } }, required: ['percent'] } },
+  { name: 'set_performance_mode', description: 'Switch the performance profile.', parameters: { type: 'object', properties: { mode: { type: 'string', enum: ['battery_saver', 'balanced', 'performance'] } }, required: ['mode'] } },
+  { name: 'save_clip', description: 'Save a clip of the last moments of gameplay (Clips must be running).', parameters: { type: 'object', properties: {} } },
+  { name: 'set_wallpaper', description: 'Change the desktop background.', parameters: { type: 'object', properties: { which: { type: 'string', enum: ['hoodie', 'hoodie_tan', 'animated'] } }, required: ['which'] } },
+  { name: 'system_status', description: 'Battery, memory, CPU/GPU load and temperature, performance mode.', parameters: { type: 'object', properties: {} } },
+  { name: 'power', description: 'Sleep, restart, shut down, or restart into Windows. The user is always asked to confirm.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['sleep', 'restart', 'shutdown', 'restart_windows'] } }, required: ['action'] } },
+];
+async function nexaTool(name, a, wc) {
+  a = a && typeof a === 'object' ? a : {};
+  const win = BrowserWindow.fromWebContents(wc);
+  switch (name) {
+    case 'open_app': {
+      const q = String(a.app || '').toLowerCase().trim(); if (!q) return 'Which app?';
+      const own = NEXA_APPS[q] || Object.keys(APP_TITLES).find((k) => k === q || APP_TITLES[k].toLowerCase() === q);
+      if (own) { openAppWindow(own); return `Opened ${APP_TITLES[own]}.`; }
+      const inst = await STORE.installed().catch(() => []);
+      const hit = inst.find((x) => String(x.name || '').toLowerCase() === q) || inst.find((x) => String(x.name || '').toLowerCase().includes(q)) || inst.find((x) => x.id.toLowerCase().includes(q));
+      if (!hit) return `No app called “${a.app}” is installed.`;
+      await STORE.launch(hit.key || hit.id); return `Opened ${hit.name}.`;
+    }
+    case 'list_steam_games': { const g = steamGames(); return g.length ? 'Installed Steam games: ' + g.map((x) => x.name).join(', ') : 'No Steam games are installed (or Steam isn’t installed).'; }
+    case 'launch_steam_game': {
+      const q = String(a.name || '').toLowerCase(); const g = steamGames();
+      const hit = g.find((x) => x.name.toLowerCase() === q) || g.find((x) => x.name.toLowerCase().includes(q)) || g.find((x) => q.split(/\s+/).every((w) => x.name.toLowerCase().includes(w)));
+      if (!hit) return `No installed Steam game matches “${a.name}”. Installed: ${g.map((x) => x.name).join(', ') || 'none'}.`;
+      const args = ['run']; if (nvidiaPresent()) args.push('--env=__NV_PRIME_RENDER_OFFLOAD=1', '--env=__GLX_VENDOR_LIBRARY_NAME=nvidia', '--env=__VK_LAYER_NV_optimus=NVIDIA_only');
+      cp.spawn('flatpak', [...args, STEAM_ID, '-cef-disable-gpu', 'steam://rungameid/' + hit.id], { detached: true, stdio: 'ignore' }).unref();
+      return `Starting ${hit.name} through Steam.`;
+    }
+    case 'set_volume': { const v = Math.max(0, Math.min(100, Math.round(+a.percent || 0))); await LX.setVolume(v); broadcast('sys-changed', 'volume'); return `Volume is now ${v}%.`; }
+    case 'set_brightness': { const v = Math.max(5, Math.min(100, Math.round(+a.percent || 0))); await LX.setBrightness(v); return `Brightness is now ${v}%.`; }
+    case 'set_performance_mode': { const m = { battery_saver: 'power-saver', balanced: 'balanced', performance: 'performance' }[a.mode]; if (!m) return 'Unknown mode.'; await LX.setPerfProfile(m); return `Performance mode is now ${a.mode.replace('_', ' ')}.`; }
+    case 'save_clip': { try { clipsSave(); return 'Saved a clip.'; } catch (e) { return errMsgOf(e); } }
+    case 'set_wallpaper': {
+      if (a.which === 'animated') { config.wallpaper = null; saveConfig(); broadcast('sys-changed', 'wallpaper'); return 'Switched to the animated background.'; }
+      const id = a.which === 'hoodie_tan' ? 'nexus-hoodie-tan' : 'nexus-hoodie'; config.wallpaper = 'builtin:' + id; saveConfig(); broadcast('sys-changed', 'wallpaper'); return 'Background changed.';
+    }
+    case 'system_status': {
+      const [b, g, pf] = await Promise.all([LX.battery().catch(() => null), readGpu().catch(() => null), LX.perfProfile().catch(() => null)]);
+      const parts = [];
+      if (b && b.present) parts.push(`battery ${Math.round(b.percent)}% (${b.state}${b.health ? ', health ' + b.health : ''})`);
+      parts.push(`memory ${Math.round((os.totalmem() - os.freemem()) / 1073741824 * 10) / 10} of ${Math.round(os.totalmem() / 1073741824)} GB used`);
+      parts.push(`CPU load ${os.loadavg()[0].toFixed(1)} on ${os.cpus().length} threads`);
+      if (g) parts.push(`GPU ${g.name}: ${g.util}% busy, ${g.temp}°C`);
+      if (pf && pf.available) parts.push(`performance mode ${pf.current}`);
+      return parts.join('; ') + '.';
+    }
+    case 'power': {
+      const act = { sleep: 'sleep', restart: 'restart', shutdown: 'shutdown', restart_windows: 'windows' }[a.action]; if (!act) return 'Unknown action.';
+      const label = { sleep: 'put the computer to sleep', restart: 'restart the computer', shutdown: 'shut down the computer', windows: 'restart into Windows' }[act];
+      const r = await dialog.showMessageBox(win || undefined, { type: 'question', buttons: ['Cancel', 'Yes, do it'], defaultId: 0, cancelId: 0, title: nexaCfg().name, message: `${nexaCfg().name} wants to ${label}.`, detail: act === 'sleep' ? '' : 'Save your work first. Open apps will close.' });
+      if (r.response !== 1) return 'The user said no, so nothing happened.';
+      setTimeout(() => LX.power(act).catch(() => {}), 1500); return 'Okay, doing it now.';
+    }
+  }
+  return 'Unknown tool.';
+}
+function nexaSystemPrompt() {
+  const c = nexaCfg(); const now = new Date();
+  return [`You are ${c.name}, the anime-girl assistant built into NexusOS, a gaming operating system (Debian-based) on ${os.userInfo().username}'s gaming laptop with an NVIDIA RTX 4050.`,
+    `Your personality: ${c.personality}`,
+    'You appear in NexusOS as a girl in a white NexusOS hoodie with cat ears.',
+    'Keep replies short and natural, usually one to three sentences, because they may be read aloud. No emoji, no markdown, no lists unless asked.',
+    c.control ? 'You can control the computer with your tools. Use them when asked to do something, then say briefly what happened. Never claim you did something unless a tool result says so.' : 'You cannot control the computer; if asked, say they can turn that on in your settings.',
+    'Stay friendly and family-friendly: playful teasing is fine, nothing sexual. If you don’t know something (like live news), say so.',
+    `It is ${now.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}.`].join('\n');
+}
+// ---- chatting (streams words to her window as they arrive)
+function handleS(channel, fn) {   // like handle(), but also tells the handler which window asked
+  ipcMain.handle(channel, async (e, ...args) => {
+    if (!TRUSTED.has(e.sender) || !e.senderFrame || !String(e.senderFrame.url).startsWith('file://')) throw new Error('Not allowed.');
+    return fn(e.sender, ...args);
+  });
+}
+const cleanMsgs = (h) => (Array.isArray(h) ? h : []).filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+  .slice(-24).map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+handleS('nexa:chat', async (wc, history, reqId) => {
+  if (!isNexaPage(wc)) throw new Error('Not allowed.');
+  await nexaStart();
+  const c = nexaCfg();
+  const msgs = [{ role: 'system', content: nexaSystemPrompt() }, ...cleanMsgs(history)];
+  const tools = c.control ? NEXA_TOOLS.map((t) => ({ type: 'function', function: t })) : undefined;
+  if (nexaAbort) nexaAbort.abort();
+  const ac = new AbortController(); nexaAbort = ac;
+  const send = (m) => { if (!wc.isDestroyed()) wc.send('nexa-stream', { id: reqId, ...m }); };
+  let finalText = '';
+  try {
+    for (let round = 0; round < 5; round++) {
+      const res = await fetch(`http://127.0.0.1:${nexaPort}/v1/chat/completions`, { method: 'POST', signal: ac.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + nexaKey },
+        body: JSON.stringify({ messages: msgs, tools, stream: true, temperature: 0.7, top_p: 0.8, max_tokens: 700 }) });
+      if (!res.ok) throw new Error('Her brain answered with an error (' + res.status + ').');
+      let text = '', buf = ''; const calls = [];
+      const dec = new TextDecoder();
+      for await (const chunk of res.body) {
+        buf += dec.decode(chunk, { stream: true }); let i;
+        while ((i = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+          if (!line.startsWith('data:')) continue; const data = line.slice(5).trim(); if (data === '[DONE]') continue;
+          let j; try { j = JSON.parse(data); } catch (_) { continue; }
+          const d = j.choices && j.choices[0] && j.choices[0].delta; if (!d) continue;
+          if (d.content) { text += d.content; send({ delta: d.content }); }
+          for (const tc of d.tool_calls || []) {
+            const k = tc.index || 0; calls[k] = calls[k] || { id: tc.id || 'call' + k, name: '', args: '' };
+            if (tc.id) calls[k].id = tc.id; if (tc.function && tc.function.name) calls[k].name += tc.function.name; if (tc.function && tc.function.arguments) calls[k].args += tc.function.arguments;
+          }
+        }
+      }
+      finalText += text;
+      const todo = calls.filter((x) => x && x.name);
+      if (!todo.length) break;
+      msgs.push({ role: 'assistant', content: text || null, tool_calls: todo.map((x) => ({ id: x.id, type: 'function', function: { name: x.name, arguments: x.args || '{}' } })) });
+      for (const x of todo) {
+        let a = {}; try { a = JSON.parse(x.args || '{}'); } catch (_) {}
+        send({ tool: x.name, args: a });
+        let out; try { out = c.control ? await nexaTool(x.name, a, wc) : 'Not allowed.'; } catch (e) { out = 'That failed: ' + errMsgOf(e); }
+        send({ toolDone: x.name, result: String(out).slice(0, 300) });
+        msgs.push({ role: 'tool', tool_call_id: x.id, content: String(out) });
+      }
+      if (text) { send({ delta: '\n' }); finalText += '\n'; }
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') return { text: finalText, stopped: true };
+    throw e;
+  } finally { if (nexaAbort === ac) nexaAbort = null; }
+  return { text: finalText.trim() };
+});
+handle('nexa:stopTalking', () => { if (nexaAbort) nexaAbort.abort(); for (const c of nexaKids) { try { c.kill('SIGKILL'); } catch (_) {} } nexaKids.clear(); return true; });
+// ---- her voice: one sentence at a time, so she starts talking before the whole reply is ready
+const nexaTmp = async () => { const d = path.join(NEXA_DIR(), 'tmp'); await fs.promises.mkdir(d, { recursive: true }); return d; };
+let nexaSeq = 0;
+function nexaRun(bin, args, timeout) {
+  const sh = path.join(NEXA_DIR(), 'sherpa');
+  return new Promise((resolve, reject) => {
+    const p = cp.spawn(path.join(sh, 'bin', bin), args, { env: { ...process.env, LD_LIBRARY_PATH: path.join(sh, 'lib') }, stdio: ['ignore', 'pipe', 'pipe'] });
+    nexaKids.add(p); let out = '', err = '';
+    const t = setTimeout(() => { try { p.kill('SIGKILL'); } catch (_) {} }, timeout);
+    p.stdout.on('data', (d) => { out += d; }); p.stderr.on('data', (d) => { err = (err + d).slice(-4000); });
+    p.on('error', (e) => { clearTimeout(t); nexaKids.delete(p); reject(e); });
+    p.on('close', (code) => { clearTimeout(t); nexaKids.delete(p); code === 0 ? resolve(out + '\n' + err) : reject(new Error(err.trim().split('\n').pop() || 'failed')); });
+  });
+}
+handleS('nexa:speak', async (wc, text, voice) => {
+  if (!isNexaPage(wc)) throw new Error('Not allowed.');
+  const t = String(text || '').replace(/[*_`#>~]/g, '').replace(/\p{Extended_Pictographic}/gu, '').replace(/\s+/g, ' ').trim().slice(0, 600);
+  if (!t || !/[\p{L}\p{N}]/u.test(t)) return null;
+  const v = NEXA_VOICES[voice] || NEXA_VOICES[nexaCfg().voice] || NEXA_VOICES.af_bella;
+  const vd = path.join(NEXA_DIR(), 'voice'); if (!fs.existsSync(path.join(vd, 'model.int8.onnx'))) throw new Error('Her voice isn’t downloaded.');
+  const out = path.join(await nexaTmp(), `say-${process.pid}-${++nexaSeq}.wav`);
+  await nexaRun('sherpa-onnx-offline-tts', [`--kokoro-model=${vd}/model.int8.onnx`, `--kokoro-voices=${vd}/voices.bin`, `--kokoro-tokens=${vd}/tokens.txt`, `--kokoro-data-dir=${vd}/espeak-ng-data`,
+    `--sid=${v[0]}`, `--num-threads=${Math.max(2, Math.min(8, os.cpus().length - 2))}`, `--output-filename=${out}`, t], 120000);
+  setTimeout(() => fs.promises.rm(out, { force: true }).catch(() => {}), 120000);
+  return out;
+});
+// ---- her ears: a short recording from the microphone (16 kHz WAV made in her window) turned into text
+handleS('nexa:hear', async (wc, bytes) => {
+  if (!isNexaPage(wc)) throw new Error('Not allowed.');
+  const buf = Buffer.from(bytes || []); if (buf.length < 1000 || buf.length > 4 * 1024 * 1024 || buf.toString('ascii', 0, 4) !== 'RIFF') throw new Error('That recording didn’t work.');
+  const ed = path.join(NEXA_DIR(), 'ears'); if (!fs.existsSync(path.join(ed, 'base.en-encoder.int8.onnx'))) throw new Error('Her hearing isn’t downloaded.');
+  const f = path.join(await nexaTmp(), `hear-${++nexaSeq}.wav`); await fs.promises.writeFile(f, buf);
+  try {
+    const out = await nexaRun('sherpa-onnx-offline', [`--whisper-encoder=${ed}/base.en-encoder.int8.onnx`, `--whisper-decoder=${ed}/base.en-decoder.int8.onnx`, `--tokens=${ed}/base.en-tokens.txt`,
+      `--num-threads=${Math.max(2, Math.min(8, os.cpus().length - 2))}`, f], 60000);
+    const line = out.split('\n').reverse().find((l) => l.trim().startsWith('{') && l.includes('"text"'));
+    let text = ''; try { text = JSON.parse(line).text; } catch (_) {}
+    return String(text || '').trim().replace(/^\[.*?\]\s*$/, '');   // "[BLANK_AUDIO]" and the like mean nothing was said
+  } finally { fs.promises.rm(f, { force: true }).catch(() => {}); }
+});
+// ---- setup and settings
+handle('nexa:state', () => ({ parts: NEXA_PARTS.map((p) => ({ key: p.key, name: p.name, size: p.size, done: nexaPartDone(p) })), installing: nexaInstalling, up: !!nexaSrv && !!nexaReady, error: nexaErr, device: nexaDevice, cfg: nexaCfg(),
+  voices: Object.entries(NEXA_VOICES).map(([id, [, name]]) => ({ id, name })) }));
+handle('nexa:install', () => nexaInstall());
+handle('nexa:start', () => nexaStart().then(() => true, (e) => { throw new Error(e.message === 'NOT_INSTALLED' ? 'Nexa isn’t downloaded yet.' : e.message); }));
+handle('nexa:remove', () => nexaRemove());
+handle('nexa:setCfg', (o) => {
+  const c = nexaCfg(); o = o && typeof o === 'object' ? o : {};
+  if (typeof o.name === 'string' && o.name.trim()) c.name = o.name.trim().slice(0, 30);
+  if (typeof o.personality === 'string') c.personality = o.personality.trim().slice(0, 800) || NEXA_DEFAULTS.personality;
+  if (o.skin === 'light' || o.skin === 'tan') c.skin = o.skin;
+  if (Object.prototype.hasOwnProperty.call(NEXA_VOICES, o.voice)) c.voice = o.voice;
+  for (const k of ['speak', 'control']) if (typeof o[k] === 'boolean') c[k] = o[k];
+  config.nexa = c; saveConfig(); return c;
+});
+// her memory of the conversation, so she remembers you next time
+const nexaHistFile = () => path.join(NEXA_DIR(), 'chat.json');
+handle('nexa:history', async (h) => {
+  if (h === undefined) { try { return JSON.parse(await fs.promises.readFile(nexaHistFile(), 'utf8')); } catch (_) { return []; } }
+  await fs.promises.mkdir(NEXA_DIR(), { recursive: true });
+  await fs.promises.writeFile(nexaHistFile(), JSON.stringify(cleanMsgs(h).slice(-60))); return true;
+});
+
+// if the desktop ever crashed, Nexa's brain or the Clips recorder could still be running without anything to stop them
+function sweepLeftovers() {
+  if (!OS_MODE) return;
+  const eng = path.join(NEXA_DIR(), 'engine', 'llama-server'), me = process.getuid && process.getuid();
+  for (const d of fs.readdirSync('/proc')) {
+    if (!/^\d+$/.test(d) || +d === process.pid) continue;
+    try {
+      if (me != null && fs.statSync('/proc/' + d).uid !== me) continue;
+      const cmd = fs.readFileSync(`/proc/${d}/cmdline`, 'utf8').split('\0');
+      const nexa = cmd.includes(eng) || cmd[0] === eng;
+      const clip = cmd.some((a) => /gpu-screen-recorder$/.test(a)) && cmd.includes(clipsDir());
+      if (nexa || clip) process.kill(+d, 'SIGTERM');
+    } catch (_) {}
+  }
+}

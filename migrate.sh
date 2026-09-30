@@ -38,8 +38,13 @@ need=""
 command -v powerprofilesctl >/dev/null 2>&1 || need="$need power-profiles-daemon"
 command -v zramctl >/dev/null 2>&1 && [ -e /lib/systemd/system/zramswap.service -o -e /usr/lib/systemd/system/zramswap.service ] || need="$need zram-tools"
 [ -d /sys/firmware/efi ] && ! command -v efibootmgr >/dev/null 2>&1 && need="$need efibootmgr"
-if [ -n "$need" ] && ! dpkg -l tlp 2>/dev/null | grep -q '^ii'; then
-  say "Installing:$need (performance profiles and memory compression)..."
+# 1.6: Nexa needs the Vulkan loader (her brain runs on the NVIDIA card through Vulkan) and bzip2 to unpack her voice
+dpkg -s libvulkan1 >/dev/null 2>&1 || need="$need libvulkan1"
+command -v bzip2 >/dev/null 2>&1 || need="$need bzip2"
+if dpkg -s nvidia-driver >/dev/null 2>&1 && ! dpkg -s nvidia-vulkan-icd >/dev/null 2>&1; then need="$need nvidia-vulkan-icd"; fi
+if dpkg -l tlp 2>/dev/null | grep -q '^ii'; then need=$(echo "$need" | sed 's/ power-profiles-daemon//'); fi   # TLP and power-profiles-daemon don't mix
+if [ -n "$need" ]; then
+  say "Installing:$need..."
   DEBIAN_FRONTEND=noninteractive timeout 600 apt-get install -y --no-install-recommends $need >/dev/null 2>&1 \
     || { DEBIAN_FRONTEND=noninteractive timeout 300 apt-get update >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive timeout 600 apt-get install -y --no-install-recommends $need >/dev/null 2>&1; } \
     || say "  (couldn't install$need; you can try again later from Settings > Updates)"

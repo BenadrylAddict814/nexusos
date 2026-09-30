@@ -16,7 +16,7 @@ for group in \
   "libglib2.0-bin" "pkexec policykit-1" "polkitd policykit-1" "lxpolkit mate-polkit policykit-1-gnome" \
   "libspa-0.2-bluetooth" "xss-lock" "steam-devices" "fonts-inter" "firmware-mediatek" "firmware-libertas" \
   "shim-signed" "grub-efi-amd64-signed" "gnome-themes-extra" "switcheroo-control" \
-  "power-profiles-daemon" "zram-tools" ; do
+  "power-profiles-daemon" "zram-tools" "nvidia-vulkan-icd" ; do
   if p=$(pick $group); then EXTRA="$EXTRA $p"; else say "skipping ($group): not in this Debian release"; fi
 done
 apt-get install -y $EXTRA

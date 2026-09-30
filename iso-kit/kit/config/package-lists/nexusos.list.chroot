@@ -88,6 +88,8 @@ keyboard-configuration
 ca-certificates
 curl
 unzip
+bzip2
+libvulkan1
 python3
 python3-gi
 gir1.2-glib-2.0
