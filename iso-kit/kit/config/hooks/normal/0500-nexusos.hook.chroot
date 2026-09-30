@@ -1,0 +1,97 @@
+#!/bin/sh
+# NexusOS build hook: runs inside the new system while the ISO is being built.
+set -e
+export DEBIAN_FRONTEND=noninteractive
+say() { echo "NexusOS hook: $*"; }
+
+# ---- packages whose names differ between Debian releases: install the first one that exists
+exists() { apt-cache show "$1" 2>/dev/null | grep -q '^Package:'; }
+pick() { for p in "$@"; do if exists "$p"; then echo "$p"; return 0; fi; done; return 1; }
+EXTRA=""
+for group in \
+  "libgtk-3-0t64 libgtk-3-0" "libnss3" "libasound2t64 libasound2" "libgbm1" "libxss1" "libxtst6" \
+  "libatk-bridge2.0-0t64 libatk-bridge2.0-0" "libatk1.0-0t64 libatk1.0-0" "libatspi2.0-0t64 libatspi2.0-0" \
+  "libcups2t64 libcups2" "libdrm2" "libxkbcommon0" "libxrandr2" "libxcomposite1" "libxdamage1" "libxfixes3" \
+  "libpango-1.0-0" "libcairo2" "libexpat1" "libsecret-1-0" "libnotify4" "libuuid1" "libglib2.0-0t64 libglib2.0-0" \
+  "libglib2.0-bin" "pkexec policykit-1" "polkitd policykit-1" "lxpolkit mate-polkit policykit-1-gnome" \
+  "libspa-0.2-bluetooth" "xss-lock" "steam-devices" "fonts-inter" "firmware-mediatek" "firmware-libertas" \
+  "shim-signed" "grub-efi-amd64-signed" "gnome-themes-extra" "switcheroo-control" ; do
+  if p=$(pick $group); then EXTRA="$EXTRA $p"; else say "skipping ($group): not in this Debian release"; fi
+done
+apt-get install -y $EXTRA
+
+# ---- the NexusOS desktop (Electron)
+APP=/opt/nexusos
+chown -R root:root "$APP"
+chmod -R u=rwX,go=rX "$APP"
+chmod 4755 "$APP/chrome-sandbox"      # Chromium's sandbox helper must be setuid root
+chmod 0755 "$APP/nexusos" "$APP/chrome_crashpad_handler"
+if ldd "$APP/nexusos" | grep -q 'not found'; then
+  ldd "$APP/nexusos" | grep 'not found' >&2
+  echo "NexusOS hook: the desktop is missing libraries (above). Stopping the build." >&2
+  exit 1
+fi
+chmod 0755 /usr/bin/nexusos-session /usr/lib/nexusos/*
+
+# ---- NVIDIA driver: make sure the kernel module was built for the ISO's kernel
+for k in /lib/modules/*; do
+  kv=$(basename "$k")
+  [ -d "/usr/src/linux-headers-$kv" ] && dkms autoinstall -k "$kv" || true
+done
+mkdir -p /etc/nexusos
+if find /lib/modules -name 'nvidia*.ko*' | grep -q .; then
+  say "NVIDIA driver module built"; echo "nvidia=built" > /etc/nexusos/build-info
+else
+  say "WARNING: the NVIDIA driver module did NOT build. NexusOS will still work on Intel/AMD graphics."
+  echo "nvidia=missing" > /etc/nexusos/build-info
+fi
+# NVIDIA's driver, not nouveau, must get the graphics card (nexusos-no-nouveau.conf), and the
+# system's graphics libraries must point at NVIDIA
+if command -v update-glx >/dev/null 2>&1; then update-glx --auto glx || true; fi
+update-initramfs -u -k all || true
+# don't ship the build machine's driver-signing key: each installed system makes its own
+rm -f /var/lib/dkms/mok.key /var/lib/dkms/mok.pub
+
+# ---- firewall on: nothing from the network can connect in
+sed -i 's/^ENABLED=.*/ENABLED=yes/' /etc/ufw/ufw.conf
+sed -i 's/^DEFAULT_INPUT_POLICY=.*/DEFAULT_INPUT_POLICY="DROP"/; s/^DEFAULT_FORWARD_POLICY=.*/DEFAULT_FORWARD_POLICY="DROP"/; s/^DEFAULT_OUTPUT_POLICY=.*/DEFAULT_OUTPUT_POLICY="ACCEPT"/' /etc/default/ufw
+systemctl enable ufw.service
+systemctl enable apparmor.service || true
+systemctl enable unattended-upgrades.service || true
+
+# ---- nothing listening on the network
+for u in ssh.service ssh.socket avahi-daemon.service avahi-daemon.socket cups-browsed.service; do
+  systemctl mask "$u" 2>/dev/null || true
+done
+
+# ---- Flathub for apps like Discord and Steam
+flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo || say "couldn't add Flathub now; the App Store adds it on first use"
+
+# ---- installed systems: new accounts can use Wi-Fi, Bluetooth, sound, brightness and admin tasks
+UC=/etc/calamares/modules/users.conf
+if [ -f "$UC" ]; then
+  python3 - "$UC" <<'PY'
+import re, sys
+p = sys.argv[1]; lines = open(p).read().split('\n')
+try:
+    i = next(n for n, l in enumerate(lines) if re.match(r'^defaultGroups:\s*$', l))
+except StopIteration:
+    sys.exit(0)
+items, j, indent = [], i + 1, None
+while j < len(lines) and re.match(r'^\s+-\s*\S', lines[j]):
+    m = re.match(r'^(\s+)-\s*(.*)$', lines[j]); indent = indent or m.group(1); items.append(m.group(2).strip()); j += 1
+if indent is None or any(':' in x for x in items):
+    sys.exit(0)   # unknown layout: leave Debian's defaults alone
+for g in ['audio', 'video', 'netdev', 'bluetooth', 'plugdev', 'sudo']:
+    if g not in items:
+        lines.insert(j, f'{indent}- {g}'); j += 1
+open(p, 'w').write('\n'.join(lines))
+print('NexusOS hook: new accounts join', ', '.join(items + ['...']))
+PY
+fi
+
+# ---- default desktop session, icons and fonts
+update-alternatives --install /usr/bin/x-session-manager x-session-manager /usr/bin/nexusos-session 90 || true
+fc-cache -f >/dev/null 2>&1 || true
+update-desktop-database -q /usr/share/applications 2>/dev/null || true
+say "done"

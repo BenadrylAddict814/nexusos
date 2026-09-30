@@ -1,0 +1,25 @@
+{
+  "name": "nexusos",
+  "productName": "NexusOS",
+  "version": "1.4.0",
+  "description": "NexusOS: a gaming desktop that runs on Windows, or as its own OS.",
+  "main": "main.js",
+  "author": "Xiaoming",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^44.5.0"
+  },
+  "build": {
+    "appId": "os.nexusos.desktop",
+    "productName": "NexusOS",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "icon.png"
+    ]
+  }
+}

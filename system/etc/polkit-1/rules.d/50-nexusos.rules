@@ -1,0 +1,9 @@
+// NexusOS: the person signed in at this computer can join Wi-Fi networks without typing a password.
+// Everything else (updates, time zone, installing) still asks for it.
+polkit.addRule(function (action, subject) {
+  if (subject.local && subject.active && subject.isInGroup("netdev") &&
+      action.id.indexOf("org.freedesktop.NetworkManager.") === 0) {
+    return polkit.Result.YES;
+  }
+  return polkit.Result.NOT_HANDLED;
+});

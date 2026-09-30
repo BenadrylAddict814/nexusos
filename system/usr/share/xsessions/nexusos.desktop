@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=NexusOS
+Comment=The NexusOS gaming desktop
+Exec=/usr/bin/nexusos-session
+TryExec=/usr/bin/nexusos-session
+Type=Application
+DesktopNames=NexusOS

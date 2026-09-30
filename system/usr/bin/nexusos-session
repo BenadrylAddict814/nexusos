@@ -1,0 +1,57 @@
+#!/bin/sh
+# NexusOS desktop session: Openbox manages other apps' windows, NexusOS draws the desktop.
+export XDG_CURRENT_DESKTOP=NexusOS
+export XDG_SESSION_DESKTOP=nexusos
+export GTK_THEME=Adwaita:dark
+
+xsetroot -solid '#05060a' 2>/dev/null
+# screen off after 10 minutes of no activity
+xset s 600 600 2>/dev/null; xset +dpms 2>/dev/null; xset dpms 600 900 1200 2>/dev/null
+
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+  dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP GTK_THEME
+fi
+
+[ -x /usr/lib/nexusos/nexus-user-defaults ] && /usr/lib/nexusos/nexus-user-defaults 2>/dev/null
+
+openbox --config-file /etc/nexusos/openbox-rc.xml &
+
+# password prompts for updates and settings changes
+for agent in /usr/bin/lxpolkit \
+             /usr/libexec/polkit-mate-authentication-agent-1 \
+             /usr/lib/x86_64-linux-gnu/polkit-mate/polkit-mate-authentication-agent-1 \
+             /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1; do
+  if [ -x "$agent" ]; then "$agent" & break; fi
+done
+
+# lock the screen when you're away and before sleep (installed systems only, not the live USB)
+if [ ! -d /run/live/medium ] && command -v xss-lock >/dev/null 2>&1; then
+  xss-lock -- dm-tool lock &
+fi
+
+# run the desktop; if it ever crashes, start it again.
+# If a new version keeps failing to start, fall back to the previous version by itself.
+BIN=/opt/nexusos/nexusos
+fails=0; since=$(date +%s)
+while :; do
+  "$BIN" --session
+  code=$?
+  [ "$code" -eq 0 ] && break          # 0 means "Log out"
+  [ "$code" -eq 3 ] && continue       # 3 means "restart the desktop" (after an update)
+  now=$(date +%s)
+  if [ $((now - since)) -lt 30 ]; then fails=$((fails + 1)); else fails=1; since=$now; fi
+  if [ "$fails" -ge 3 ] && [ -z "${NEXUS_ROLLED_BACK:-}" ] && [ -r /var/lib/nexusos/previous ]; then
+    prev=$(cat /var/lib/nexusos/previous)
+    if [ -x "$prev/nexusos" ] && [ "$(readlink -f "$prev")" != "$(readlink -f /opt/nexusos)" ]; then
+      BIN="$prev/nexusos"; export NEXUS_ROLLED_BACK=1; fails=0; since=$now
+      continue
+    fi
+  fi
+  if [ "$fails" -ge 4 ]; then
+    lxterminal --title="NexusOS" -e sh -c 'echo "The NexusOS desktop keeps closing unexpectedly."; echo "Type exit to log out."; exec bash'
+    break
+  fi
+  sleep 1
+done
+kill $(jobs -p) 2>/dev/null
+exit 0

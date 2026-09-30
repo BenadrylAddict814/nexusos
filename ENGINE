@@ -1,0 +1,3 @@
+# Electron build NexusOS runs on (Linux x64). The updater downloads it only when this changes.
+version=44.5.0
+sha256=ee42d6f20b82f87b43bca7d5fec93557f93f2aecc47ae69f0e506503f8ea723c

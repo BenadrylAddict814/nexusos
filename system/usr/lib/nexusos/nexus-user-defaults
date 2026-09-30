@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""NexusOS per-person defaults, applied once per version at sign-in (you can change them afterwards)."""
+import configparser, os
+home = os.path.expanduser('~')
+mark = os.path.join(home, '.config', 'nexusos', 'defaults-1.4')
+if os.path.exists(mark):
+    raise SystemExit(0)
+# Terminal: Ctrl+V pastes (Ctrl+C still stops a running command), dark NexusOS colours
+p = os.path.join(home, '.config', 'lxterminal', 'lxterminal.conf')
+c = configparser.RawConfigParser(); c.optionxform = str
+try:
+    c.read(p)
+except configparser.Error:
+    c = configparser.RawConfigParser(); c.optionxform = str
+for s in ('general', 'shortcut'):
+    if not c.has_section(s):
+        c.add_section(s)
+c.set('shortcut', 'paste_accel', '<Primary>v')
+c.set('shortcut', 'copy_accel', '<Primary><Shift>c')
+g = c['general']
+g.setdefault('fontname', 'Monospace 11')
+g.setdefault('bgcolor', 'rgb(8,10,16)')
+g.setdefault('fgcolor', 'rgb(230,241,255)')
+g.setdefault('cursorblinks', 'true')
+os.makedirs(os.path.dirname(p), exist_ok=True)
+with open(p, 'w') as f:
+    c.write(f, space_around_delimiters=False)
+os.makedirs(os.path.dirname(mark), exist_ok=True)
+open(mark, 'w').close()

@@ -1,0 +1,14 @@
+#!/bin/sh
+# Changes the calling person's own password (run through pkexec by Settings > Security).
+# The new password arrives on standard input, never on the command line.
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+[ -n "${PKEXEC_UID:-}" ] || { echo "This only runs through pkexec." >&2; exit 1; }
+[ "$PKEXEC_UID" -ge 1000 ] 2>/dev/null || { echo "Only personal accounts can use this." >&2; exit 1; }
+user=$(getent passwd "$PKEXEC_UID" | cut -d: -f1)
+[ -n "$user" ] || { echo "Unknown account." >&2; exit 1; }
+IFS= read -r pw || true
+case "$pw" in *:*|'') echo "That password can't be used." >&2; exit 1 ;; esac
+[ "$(printf %s "$pw" | wc -m)" -ge 8 ] || { echo "Use at least 8 characters." >&2; exit 1; }
+printf '%s:%s\n' "$user" "$pw" | chpasswd
+echo "Password changed."

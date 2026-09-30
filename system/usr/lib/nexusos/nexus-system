@@ -1,0 +1,172 @@
+#!/bin/bash
+# NexusOS system helper. Runs as root through pkexec (Settings asks for your password).
+#   apply-update DIR     install a signed NexusOS update (manifest.json, manifest.json.sig, nexusos-update.tar.gz in DIR)
+#   rollback             go back to the previous NexusOS version
+#   fix-nvidia           make sure the NVIDIA driver (not nouveau) drives the GPU
+#   wifi-powersave on|off
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C.UTF-8
+umask 022
+KEY=/usr/share/nexusos/update-key.pem
+VERS=/opt/nexusos-versions
+STATE=/var/lib/nexusos
+say() { echo "$*"; }
+die() { echo "$*" >&2; exit 1; }
+[ "$(id -u)" = 0 ] || die "This needs to run as root."
+mkdir -p "$STATE" "$VERS"; chmod 755 "$STATE" "$VERS"
+
+current_dir() { readlink -f /opt/nexusos; }
+app_version() { python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["version"])' "$1/resources/app/package.json" 2>/dev/null || echo 0; }
+newer() { python3 - "$1" "$2" <<'PY'
+import sys
+v = lambda s: [int(x) for x in s.split('.')] + [0] * (3 - len(s.split('.')))
+sys.exit(0 if v(sys.argv[1]) > v(sys.argv[2]) else 1)
+PY
+}
+
+# ---- one-off: turn the original /opt/nexusos folder into a version folder + link
+adopt_layout() {
+  if [ -d /opt/nexusos ] && [ ! -L /opt/nexusos ]; then
+    local v; v=$(app_version /opt/nexusos)
+    say "Moving NexusOS $v into the versions folder..."
+    mv /opt/nexusos "$VERS/$v"
+    ln -s "$VERS/$v" /opt/nexusos
+  fi
+}
+switch_to() {   # atomically point /opt/nexusos at a version folder
+  ln -sfn "$1" /opt/nexusos.switch
+  mv -T /opt/nexusos.switch /opt/nexusos
+}
+
+install_system_files() {   # copy the update's system files into place (only NexusOS's own paths)
+  local src=$1 rel dst mode changed=0
+  while IFS= read -r -d '' f; do
+    rel=${f#"$src"}
+    case "$rel" in
+      /usr/bin/nexusos-session|/usr/lib/nexusos/*|/usr/share/nexusos/*|/etc/nexusos/*|/etc/modprobe.d/nexusos-*|\
+      /etc/NetworkManager/conf.d/*nexusos*|/etc/sysctl.d/*nexusos*|/etc/polkit-1/rules.d/*nexusos*|\
+      /usr/share/polkit-1/actions/os.nexusos.*|/usr/share/lightdm/*nexusos*|/usr/share/xsessions/nexusos*|\
+      /usr/share/applications/nexusos*|/usr/share/xdg-desktop-portal/nexusos*|/usr/share/pixmaps/nexusos*|\
+      /etc/apt/apt.conf.d/20auto-upgrades|/etc/default/grub.d/nexusos*|/etc/systemd/journald.conf.d/nexusos*|\
+      /etc/xdg/mimeapps.list|/etc/skel/*) ;;
+      *) say "  skipping $rel (not a NexusOS file)"; continue ;;
+    esac
+    case "$rel" in /usr/bin/*|/usr/lib/nexusos/nexus-*|/usr/lib/nexusos/*.py) mode=0755 ;; *) mode=0644 ;; esac
+    dst=$rel
+    if [ ! -f "$dst" ] || ! cmp -s "$f" "$dst"; then
+      # write beside it, then swap in one step (running scripts keep their old copy)
+      install -D -o root -g root -m "$mode" "$f" "$dst.nexus-new" && mv -f "$dst.nexus-new" "$dst"; say "  updated $rel"; changed=1
+      echo "$rel" >> "$STAGE/changed"
+    fi
+  done < <(find "$src" -type f -print0)
+}
+
+apply_update() {
+  local in=$1
+  [ -f "$KEY" ] || die "This computer has no NexusOS update key, so it can't check updates."
+  STAGE=$(mktemp -d /var/tmp/nexusos-update.XXXXXX); chmod 700 "$STAGE"
+  trap 'rm -rf "$STAGE"; rm -rf "$VERS"/*.new 2>/dev/null || true' EXIT
+  for f in manifest.json manifest.json.sig nexusos-update.tar.gz; do
+    [ -f "$in/$f" ] && [ ! -L "$in/$f" ] || die "The update is incomplete ($f is missing)."
+    cp -- "$in/$f" "$STAGE/$f"
+  done
+  say "Checking the update's signature..."
+  openssl pkeyutl -verify -pubin -inkey "$KEY" -rawin -in "$STAGE/manifest.json" -sigfile "$STAGE/manifest.json.sig" >/dev/null 2>&1 \
+    || die "This update isn't signed with your NexusOS key. Nothing was changed."
+  eval "$(python3 - "$STAGE/manifest.json" <<'PY'
+import json, re, sys, shlex
+m = json.load(open(sys.argv[1]))
+v = str(m['version']); assert re.fullmatch(r'\d+\.\d+(\.\d+)?', v)
+sha = str(m['sha256']); assert re.fullmatch(r'[0-9a-f]{64}', sha)
+e = m.get('engine') or {}
+ev = str(e.get('version', '')); es = str(e.get('sha256', ''))
+assert ev == '' or re.fullmatch(r'\d+\.\d+\.\d+', ev)
+assert es == '' or re.fullmatch(r'[0-9a-f]{64}', es)
+print('NEWV=%s SHA=%s EV=%s ES=%s' % (shlex.quote(v), sha, shlex.quote(ev), es))
+PY
+)" || die "The update's details don't make sense. Nothing was changed."
+  echo "$SHA  $STAGE/nexusos-update.tar.gz" | sha256sum -c --status || die "The update file is damaged (fingerprint doesn't match). Nothing was changed."
+
+  adopt_layout
+  local cur curv; cur=$(current_dir); curv=$(app_version "$cur")
+  newer "$NEWV" "$curv" || die "NexusOS $curv is already up to date (the update is $NEWV)."
+  say "Installing NexusOS $NEWV (you have $curv)..."
+
+  mkdir "$STAGE/x"
+  tar -xzf "$STAGE/nexusos-update.tar.gz" -C "$STAGE/x" --no-same-owner --no-same-permissions
+  [ -f "$STAGE/x/app/package.json" ] || die "The update has no desktop in it. Nothing was changed."
+
+  local new="$VERS/$NEWV" tmp="$VERS/$NEWV.new"
+  rm -rf "$tmp"; mkdir -p "$tmp"
+  local curE; curE=$(tr -d '[:space:]' < "$cur/version" 2>/dev/null || echo)
+  if [ -n "$EV" ] && [ "$EV" != "$curE" ]; then
+    say "Downloading the desktop engine (Electron $EV)..."
+    curl -fsSL --retry 4 -o "$STAGE/engine.zip" "https://github.com/electron/electron/releases/download/v$EV/electron-v$EV-linux-x64.zip" \
+      || die "Couldn't download the engine. Check your internet connection. Nothing was changed."
+    echo "$ES  $STAGE/engine.zip" | sha256sum -c --status || die "The engine download doesn't match its fingerprint. Nothing was changed."
+    unzip -q "$STAGE/engine.zip" -d "$tmp"; mv "$tmp/electron" "$tmp/nexusos"; rm -f "$tmp/resources/default_app.asar"
+    python3 "$STAGE/x/system/usr/lib/nexusos/flip-fuses.py" "$tmp/nexusos"
+  else
+    say "Copying the desktop engine..."
+    cp -a "$cur/." "$tmp/"; rm -rf "$tmp/resources/app"
+  fi
+  mkdir -p "$tmp/resources/app"; cp -a "$STAGE/x/app/." "$tmp/resources/app/"
+  chown -R root:root "$tmp"; chmod -R u=rwX,go=rX "$tmp"
+  chmod 4755 "$tmp/chrome-sandbox"; chmod 0755 "$tmp/nexusos" "$tmp/chrome_crashpad_handler"
+
+  : > "$STAGE/changed"
+  if [ -d "$STAGE/x/system" ]; then say "Updating system files..."; install_system_files "$STAGE/x/system"; fi
+  if [ -f "$STAGE/x/migrate.sh" ]; then say "Running one-time fixes..."; CHANGED_FILES="$STAGE/changed" bash "$STAGE/x/migrate.sh"; fi
+
+  rm -rf "$new"; mv "$tmp" "$new"
+  echo "$cur" > "$STATE/previous"
+  switch_to "$new"
+  # keep only the current and previous versions
+  for d in "$VERS"/*; do [ "$d" = "$new" ] || [ "$d" = "$cur" ] || rm -rf "$d"; done
+  say "NexusOS $NEWV is installed. Restart the desktop to start using it."
+}
+
+rollback() {
+  [ -f "$STATE/previous" ] || die "There's no earlier version to go back to."
+  local prev cur; prev=$(cat "$STATE/previous"); cur=$(current_dir)
+  case "$prev" in "$VERS"/*) ;; *) die "The earlier version isn't where it should be." ;; esac
+  [ -x "$prev/nexusos" ] || die "The earlier version isn't there any more."
+  switch_to "$prev"; echo "$cur" > "$STATE/previous"
+  say "Back on NexusOS $(app_version "$prev"). Restart the desktop to use it."
+}
+
+fix_nvidia() {
+  say "Making sure NVIDIA's driver runs your graphics card..."
+  install -D -m 0644 /dev/stdin /etc/modprobe.d/nexusos-no-nouveau.conf <<'CONF'
+# NexusOS uses NVIDIA's driver: keep the open-source nouveau driver from taking the GPU first
+blacklist nouveau
+options nouveau modeset=0
+CONF
+  if command -v update-glx >/dev/null 2>&1; then update-glx --auto glx >/dev/null 2>&1 || true; fi
+  for k in /lib/modules/*; do kv=$(basename "$k"); [ -d "/usr/src/linux-headers-$kv" ] && dkms autoinstall -k "$kv" >/dev/null 2>&1 || true; done
+  say "Updating the startup files (about a minute)..."
+  update-initramfs -u -k all >/dev/null
+  say "Done. Restart the computer to finish."
+}
+
+wifi_powersave() {
+  local f=/etc/NetworkManager/conf.d/nexusos-wifi-performance.conf
+  case "${1:-}" in
+    off) printf '# NexusOS: Wi-Fi power saving off for steadier speeds\n[connection]\nwifi.powersave = 2\n' > "$f"; chmod 644 "$f" ;;
+    on)  rm -f "$f" ;;
+    *) die "Use on or off." ;;
+  esac
+  systemctl reload NetworkManager 2>/dev/null || systemctl restart NetworkManager
+  # apply to the current Wi-Fi connection straight away
+  dev=$(nmcli -t -f DEVICE,TYPE device | awk -F: '$2=="wifi"{print $1; exit}')
+  [ -n "$dev" ] && nmcli device reapply "$dev" >/dev/null 2>&1 || true
+  say "Wi-Fi power saving is $1."
+}
+
+case "${1:-}" in
+  apply-update) [ -n "${2:-}" ] || die "Which update?"; apply_update "$2" ;;
+  rollback) rollback ;;
+  fix-nvidia) fix_nvidia ;;
+  wifi-powersave) wifi_powersave "${2:-}" ;;
+  *) die "Unknown command." ;;
+esac

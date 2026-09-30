@@ -1,0 +1,34 @@
+#!/bin/bash
+# Keep Secure Boot ON and still use the NVIDIA driver:
+# makes a signing key that belongs only to this computer, signs the driver with it,
+# and asks the firmware to trust it.
+set -euo pipefail
+[ "$(id -u)" = 0 ] || exec sudo "$0" "$@"
+KEY=/var/lib/dkms/mok.key; PUB=/var/lib/dkms/mok.pub; MARK=/var/lib/dkms/.nexusos-own-key
+echo; echo "  NexusOS: Secure Boot with the NVIDIA driver"; echo
+if [ -d /run/live/medium ]; then echo "  Install NexusOS first. This can't be set up on the live USB."; exit 1; fi
+if [ ! -f "$MARK" ]; then
+  echo "  Making a new signing key for this computer..."
+  mkdir -p /var/lib/dkms
+  openssl req -new -x509 -nodes -days 36500 -subj "/CN=NexusOS driver key for $(hostname)/" \
+    -newkey rsa:2048 -keyout "$KEY" -outform DER -out "$PUB" 2>/dev/null
+  chmod 600 "$KEY"; touch "$MARK"
+fi
+echo "  Signing the NVIDIA driver (this takes a few minutes)..."
+dkms status | awk -F'[,:/ ]+' '/installed|built/ {print $1" "$2}' | sort -u | while read -r mod ver; do
+  for k in /lib/modules/*; do kv=$(basename "$k"); [ -d "/usr/src/linux-headers-$kv" ] || continue
+    dkms build -m "$mod" -v "$ver" -k "$kv" --force && dkms install -m "$mod" -v "$ver" -k "$kv" --force
+  done
+done
+update-initramfs -u -k all >/dev/null 2>&1 || true
+echo
+echo "  Now choose a one-time password (you'll type it once after restarting):"
+mokutil --import "$PUB"
+cat <<'MSG'
+
+  Almost done:
+   1. Restart. A blue "MOK management" screen appears.
+   2. Choose "Enroll MOK", then "Continue", then "Yes", type the one-time password, then "Reboot".
+   3. In your laptop's firmware settings (usually F2 while it starts), turn Secure Boot on.
+  NexusOS will then only run signed startup code, and the NVIDIA driver still works.
+MSG

@@ -1,0 +1,9 @@
+#!/bin/sh
+# NexusOS updates (run through pkexec by Settings > Updates)
+set -e
+export DEBIAN_FRONTEND=noninteractive LC_ALL=C PATH=/usr/sbin:/usr/bin:/sbin:/bin
+echo "Checking for updates..."
+apt-get update
+apt-get -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade --with-new-pkgs
+apt-get -y autoremove --purge
+echo "System updates done."

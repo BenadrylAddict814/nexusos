@@ -1,0 +1,4 @@
+[Default Applications]
+x-scheme-handler/http=nexusos-url.desktop
+x-scheme-handler/https=nexusos-url.desktop
+text/html=nexusos-url.desktop

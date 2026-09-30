@@ -1,0 +1,35 @@
+# Publishes a signed NexusOS update whenever a version tag (v1.4.0, v1.5.0, ...) is pushed.
+name: Release NexusOS
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag matches VERSION
+        run: test "v$(tr -d '[:space:]' < VERSION)" = "${GITHUB_REF_NAME}"
+      - name: Check scripts and code
+        run: |
+          for f in system/usr/bin/nexusos-session system/usr/lib/nexusos/nexus-* migrate.sh iso-kit/kit/build.sh; do
+            head -1 "$f" | grep -q python && python3 -m py_compile "$f" || bash -n "$f"
+          done
+          node --check app/main.js && node --check app/preload.js
+      - name: Build the update
+        env:
+          NEXUS_SIGNING_KEY: ${{ secrets.NEXUS_SIGNING_KEY }}
+        run: |
+          test -n "$NEXUS_SIGNING_KEY" || { echo "::error::The NEXUS_SIGNING_KEY secret is missing"; exit 1; }
+          umask 077; printf '%s\n' "$NEXUS_SIGNING_KEY" > "$RUNNER_TEMP/key.pem"
+          tools/make-update.sh "$RUNNER_TEMP/key.pem"
+          rm -f "$RUNNER_TEMP/key.pem"
+          tools/make-kit.sh
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "NexusOS ${GITHUB_REF_NAME#v}" --notes-file NOTES.md \
+            dist/manifest.json dist/manifest.json.sig dist/nexusos-update.tar.gz dist/NexusOS-ISO-Kit.zip

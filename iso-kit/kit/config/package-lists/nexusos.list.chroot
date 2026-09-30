@@ -1,0 +1,94 @@
+# NexusOS 1.3 — packages on top of Debian 13 "trixie".
+# Anything whose name differs between Debian releases is installed by the hook instead,
+# so one renamed package can't stop the whole build.
+
+# desktop session (X11 + Openbox window manager; the NexusOS desktop draws everything else)
+xserver-xorg
+xinit
+x11-xserver-utils
+x11-xkb-utils
+x11-utils
+xdotool
+wmctrl
+openbox
+lightdm
+lightdm-gtk-greeter
+lxterminal
+dbus-x11
+
+# NVIDIA graphics (RTX 40 series), plus Intel/AMD graphics for hybrid laptops
+nvidia-driver
+firmware-misc-nonfree
+firmware-amd-graphics
+libgl1-mesa-dri
+mesa-vulkan-drivers
+intel-microcode
+amd64-microcode
+
+# sound: speakers, headphones, microphones, Bluetooth headsets
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+pulseaudio-utils
+alsa-utils
+alsa-ucm-conf
+firmware-sof-signed
+firmware-intel-sound
+
+# Wi-Fi, Ethernet and Bluetooth
+network-manager
+wpasupplicant
+iw
+rfkill
+bluez
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-brcm80211
+
+# other drives: your Windows partition (read-only), USB sticks, SD cards
+udisks2
+ntfs-3g
+exfatprogs
+dosfstools
+
+# power and screen
+upower
+brightnessctl
+
+# security
+ufw
+apparmor
+apparmor-utils
+unattended-upgrades
+mokutil
+openssl
+sudo
+
+# apps (Flathub) and links between apps
+flatpak
+xdg-desktop-portal
+xdg-desktop-portal-gtk
+xdg-utils
+
+# installer (with an "Encrypt system" option)
+calamares
+calamares-settings-debian
+cryptsetup
+cryptsetup-initramfs
+keyutils
+efibootmgr
+
+# basics
+locales
+tzdata
+console-setup
+keyboard-configuration
+ca-certificates
+curl
+unzip
+python3
+fonts-noto-core
+fonts-noto-color-emoji
+fonts-dejavu-core

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=NexusOS Browser
+Comment=Open links in the NexusOS browser
+Exec=/opt/nexusos/nexusos %u
+Icon=nexusos
+NoDisplay=true
+MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;

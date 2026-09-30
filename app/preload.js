@@ -1,0 +1,38 @@
+// The only functions Halcyon's own page can use. Web pages in the Browser never see this.
+const { contextBridge, ipcRenderer } = require('electron');
+
+const call = (ch) => (...a) => ipcRenderer.invoke(ch, ...a);
+contextBridge.exposeInMainWorld('halcyon', {
+  sysInfo: call('sys:info'),
+  driveUsage: call('drive:usage'),
+  list: call('fs:list'),
+  readText: call('fs:readText'),
+  writeText: call('fs:writeText'),
+  writeBinary: call('fs:writeBinary'),
+  readDataUrl: call('fs:readDataUrl'),
+  unique: call('fs:unique'),
+  mkdir: call('fs:mkdir'),
+  rename: call('fs:rename'),
+  trash: call('fs:trash'),
+  addFromPC: call('fs:addFromPC'),
+  copyToPC: call('fs:copyToPC'),
+  copyIn: call('fs:copyIn'),
+  open: call('shell:open'),
+  reveal: call('shell:reveal'),
+  external: call('shell:external'),
+  winSettings: call('win:settings'),
+  quit: call('app:quit'),
+  isFullscreen: call('app:isFullscreen'),
+  toggleFullscreen: call('app:fullscreen'),
+  getLogin: call('app:getLogin'),
+  setLogin: call('app:setLogin'),
+  clock24: call('app:clock24'),
+  lx: (name, ...args) => ipcRenderer.invoke('lx', String(name), ...args),
+  store: (name, ...args) => ipcRenderer.invoke('store', String(name), ...args),
+  catalog: call('store:catalog'),
+  answerPermission: (id, ok) => ipcRenderer.send('perm-answer', Number(id), !!ok),
+  onOpenUrl: (fn) => ipcRenderer.on('open-url', (_e, url) => fn(String(url))),
+  onDownload: (fn) => ipcRenderer.on('download', (_e, d) => fn(d)),
+  onJob: (fn) => ipcRenderer.on('job', (_e, d) => fn(d)),
+  onPermission: (fn) => ipcRenderer.on('perm-ask', (_e, d) => fn(d)),
+});

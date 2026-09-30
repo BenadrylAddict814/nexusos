@@ -1,0 +1,8 @@
+# Put on the ISO itself so the installer can set up the bootloader and disk encryption offline
+grub-efi-amd64
+grub-efi-amd64-signed
+shim-signed
+cryptsetup
+cryptsetup-initramfs
+keyutils
+efibootmgr

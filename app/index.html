@@ -1,0 +1,1091 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:">
+<title>NexusOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: full-screen desktop, floating glass taskbar centred at the bottom, windows float above a generative wallpaper */
+:root{
+  --bg:#0c1417; --surface:rgba(22,32,36,.82); --surface-solid:#162024; --raised:rgba(255,255,255,.06);
+  --line:rgba(190,225,220,.14); --fg:#e8f1ef; --muted:#93a8a4; --accent:#3fd0b4; --accent-fg:#06221c;
+  --danger:#ff6b5e; --shadow:0 24px 60px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.3);
+  --display:"Sora",system-ui,sans-serif; --body:"Figtree",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+:root.light{
+  --bg:#e6eeec; --surface:rgba(250,253,252,.84); --surface-solid:#f7fbfa; --raised:rgba(10,40,36,.05);
+  --line:rgba(20,60,55,.14); --fg:#12211f; --muted:#56706b; --accent-fg:#ffffff; color-scheme:light;
+  --shadow:0 24px 60px rgba(20,50,45,.22),0 2px 8px rgba(20,50,45,.12);
+}
+*{box-sizing:border-box}
+html,body{height:100%;overflow:hidden;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px;user-select:none;-webkit-user-select:none}
+#wall{position:fixed;inset:0;width:100%;height:100%;display:block}
+#desk{position:fixed;inset:0;padding:16px;display:grid;grid-template-rows:repeat(auto-fill,92px);grid-auto-flow:column;grid-auto-columns:88px;gap:6px;align-content:start;bottom:72px}
+.icon{display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:10px;border:1px solid transparent;background:none;color:#fff;font:500 12px var(--body);text-shadow:0 1px 3px rgba(0,0,0,.7);cursor:default}
+.icon:hover{background:rgba(255,255,255,.1)} .icon:focus-visible{outline:2px solid var(--accent);background:rgba(255,255,255,.14)}
+.glyph{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;flex:none}
+.glyph svg{width:26px;height:26px}
+/* taskbar */
+#bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:4px;padding:6px;border-radius:18px;background:var(--surface);backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);border:1px solid var(--line);box-shadow:var(--shadow);z-index:9000;max-width:calc(100% - 20px)}
+#apps{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
+.tb{position:relative;width:44px;height:44px;border-radius:12px;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;flex:none}
+.tb:hover,.tb.on{background:var(--raised)} .tb:focus-visible{outline:2px solid var(--accent)}
+.tb .glyph{width:32px;height:32px;border-radius:9px} .tb .glyph svg{width:19px;height:19px}
+.tb.run::after{content:"";position:absolute;bottom:2px;width:5px;height:3px;border-radius:2px;background:var(--muted);transition:width .2s}
+.tb.run.on::after{width:16px;background:var(--accent)}
+#startBtn .mark{width:30px;height:30px}
+.sep{width:1px;height:28px;background:var(--line);margin:0 4px;flex:none}
+#tray{display:flex;align-items:center;gap:10px;padding:0 10px 0 6px;font-variant-numeric:tabular-nums;color:var(--fg);flex:none;cursor:pointer;border-radius:12px;height:44px;border:0;background:none;font-family:var(--body)}
+#tray:hover{background:var(--raised)}
+#clock{display:flex;flex-direction:column;align-items:flex-end;line-height:1.25}
+#clock b{font:600 13px var(--body)} #clock span{font-size:11px;color:var(--muted)}
+/* panels */
+.panel{position:fixed;left:50%;transform:translateX(-50%) translateY(12px);bottom:calc(76px + env(safe-area-inset-bottom,0px));background:var(--surface);backdrop-filter:blur(28px) saturate(1.5);-webkit-backdrop-filter:blur(28px) saturate(1.5);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);z-index:9001;opacity:0;pointer-events:none;transition:opacity .18s,transform .22s cubic-bezier(.2,.9,.3,1.2)}
+.panel.open{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+#start{width:min(560px,calc(100vw - 20px));padding:20px;display:flex;flex-direction:column;gap:16px}
+#search{width:100%;padding:11px 14px 11px 38px;border-radius:12px;border:1px solid var(--line);background:var(--raised);color:var(--fg);font:15px var(--body);outline:none}
+#search:focus{border-color:var(--accent)}
+.sw{position:relative} .sw svg{position:absolute;left:12px;top:50%;translate:0 -50%;width:16px;height:16px;color:var(--muted)}
+.h{font:600 12px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:4px}
+#grid .icon{color:var(--fg);text-shadow:none}
+#grid .icon:hover{background:var(--raised)}
+.foot{position:relative;display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:14px}
+.me{display:flex;align-items:center;gap:10px;font-weight:600}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);color:var(--accent-fg);display:grid;place-items:center;font:700 13px var(--display)}
+.ibtn{border:0;background:none;color:var(--fg);width:36px;height:36px;border-radius:10px;display:grid;place-items:center;cursor:pointer}
+.ibtn:hover{background:var(--raised)} .ibtn svg{width:18px;height:18px}
+#quick{left:auto;right:10px;transform:translateY(12px);width:min(340px,calc(100vw - 20px));padding:18px;display:flex;flex-direction:column;gap:14px}
+#quick.open{transform:none}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{border:1px solid var(--line);background:var(--raised);color:var(--fg);border-radius:12px;padding:12px 8px;font:500 12px var(--body);display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
+.tile svg{width:18px;height:18px} .tile{overflow-wrap:anywhere;text-align:center} .tile.on{background:var(--accent);color:var(--accent-fg);border-color:transparent}
+.slider{display:flex;align-items:center;gap:10px} .slider svg{width:18px;height:18px;color:var(--muted);flex:none}
+input[type=range]{flex:1;accent-color:var(--accent)}
+.cal{font-variant-numeric:tabular-nums}
+.cal .ch{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px} .cal .ch b{font:600 15px var(--display)}
+.cal table{width:100%;border-collapse:collapse;text-align:center;font-size:12px}
+.cal th{color:var(--muted);font-weight:500;padding:4px 0} .cal td{padding:5px 0;border-radius:8px}
+.cal td.t{background:var(--accent);color:var(--accent-fg);font-weight:600} .cal td.x{color:var(--muted);opacity:.5}
+/* windows */
+.win{position:fixed;min-width:280px;min-height:180px;background:var(--surface-solid);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;animation:pop .22s cubic-bezier(.2,.9,.3,1.15)}
+@keyframes pop{from{opacity:0;transform:scale(.94)}}
+.win.min{display:none} .win.max{inset:0 0 72px 0!important;width:auto!important;height:auto!important;border-radius:0}
+.win.blur .tbar{opacity:.72}
+.tbar{display:flex;align-items:center;gap:10px;height:40px;padding-left:12px;flex:none;cursor:default;touch-action:none}
+.tbar .glyph{width:20px;height:20px;border-radius:6px} .tbar .glyph svg{width:13px;height:13px}
+.tbar .t{flex:1;font:600 13px var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctl{display:flex;height:100%}
+.ctl button{width:44px;height:100%;border:0;background:none;color:var(--fg);display:grid;place-items:center;cursor:pointer}
+.ctl button:hover{background:var(--raised)} .ctl button.x:hover{background:var(--danger);color:#fff}
+.ctl svg{width:12px;height:12px}
+.body{flex:1;min-height:0;overflow:auto;position:relative;user-select:text;-webkit-user-select:text}
+.rs{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;touch-action:none}
+/* app styles */
+textarea.note{width:100%;height:100%;border:0;resize:none;padding:16px 20px;background:transparent;color:var(--fg);font:15px/1.6 var(--body);outline:none}
+.calc{display:flex;flex-direction:column;height:100%;padding:12px;gap:8px;user-select:none}
+.calc .disp{text-align:right;padding:8px 6px;font-variant-numeric:tabular-nums}
+.calc .disp small{display:block;color:var(--muted);min-height:18px;font-size:13px}
+.calc .disp div{font:600 36px var(--display);overflow:hidden;text-overflow:ellipsis}
+.keys{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.keys button{border:0;border-radius:10px;background:var(--raised);color:var(--fg);font:500 17px var(--body);cursor:pointer;min-height:40px}
+.keys button:hover{filter:brightness(1.25)} .keys .op{color:var(--accent)} .keys .eq{background:var(--accent);color:var(--accent-fg)}
+.files{display:grid;grid-template-columns:160px 1fr;height:100%}
+.files nav{border-right:1px solid var(--line);padding:10px;display:flex;flex-direction:column;gap:2px}
+.devs{display:contents} .files nav button small{color:var(--muted);font-size:11px} .files nav button{text-align:left;border:0;background:none;color:var(--fg);padding:8px 10px;border-radius:8px;font:14px var(--body);cursor:pointer}
+.files nav button.on,.files nav button:hover{background:var(--raised)}
+.files ul{list-style:none;margin:0;padding:8px}
+.files li{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:default}
+.files li:hover{background:var(--raised)} .files li small{color:var(--muted);font-variant-numeric:tabular-nums}
+.files .fi{width:24px;height:24px}
+.term{background:#071012;color:#bdf3e6;font:13px/1.55 var(--mono);padding:12px 14px;min-height:100%;white-space:pre-wrap;word-break:break-word}
+.term input{background:none;border:0;outline:none;color:inherit;font:inherit;width:70%}
+.term .p{color:var(--accent)}
+.paint{display:flex;flex-direction:column;height:100%}
+.ptools{display:flex;gap:6px;padding:8px;border-bottom:1px solid var(--line);align-items:center;flex-wrap:wrap}
+.sw8{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+.sw8.on{border-color:var(--fg)}
+.paint canvas{flex:1;min-height:0;background:#fff;touch-action:none;cursor:crosshair}
+.pbtn{border:1px solid var(--line);background:var(--raised);color:var(--fg);border-radius:8px;padding:5px 10px;font:13px var(--body);cursor:pointer}
+.set{padding:20px;display:flex;flex-direction:column;gap:22px}
+.set .row{display:flex;gap:10px;flex-wrap:wrap}
+.acc{width:34px;height:34px;border-radius:50%;border:3px solid transparent;cursor:pointer}
+.acc.on{border-color:var(--fg)}
+.wp{width:110px;height:68px;border-radius:10px;border:2px solid transparent;cursor:pointer;background-size:cover}
+.wp.on{border-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:none;color:var(--fg);padding:8px 16px;font:14px var(--body);cursor:pointer}
+.seg button.on{background:var(--accent);color:var(--accent-fg)}
+.about{padding:28px;display:flex;flex-direction:column;gap:12px;align-items:flex-start}
+.about h1{font:700 30px var(--display);margin:0;letter-spacing:-.02em}
+.about p{margin:0;color:var(--muted);line-height:1.55;max-width:48ch}
+.about dl{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;margin:8px 0 0;font-variant-numeric:tabular-nums}
+.about dt{color:var(--muted)}
+.mine{display:flex;flex-direction:column;align-items:center;gap:10px;padding:14px;user-select:none}
+.mine .st{display:flex;gap:16px;align-items:center;font:600 14px var(--mono)}
+.mgrid{display:grid;grid-template-columns:repeat(9,28px);gap:2px}
+.mgrid button{width:28px;height:28px;border:0;border-radius:5px;background:var(--raised);color:var(--fg);font:700 13px var(--mono);cursor:pointer;padding:0}
+.mgrid button.o{background:transparent;cursor:default}
+.mgrid button.b{background:var(--danger);color:#fff}
+/* browser */
+.brw{display:flex;flex-direction:column;height:100%}
+.tabs{display:flex;gap:4px;padding:6px 8px 0;overflow-x:auto;scrollbar-width:none;flex:none}
+.tab{display:flex;align-items:center;gap:6px;max-width:200px;min-width:0;padding:7px 8px 7px 12px;border-radius:9px 9px 0 0;background:transparent;border:0;color:var(--muted);font:13px var(--body);cursor:pointer;flex:none}
+.tab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+.tab.on{background:var(--raised);color:var(--fg)}
+.tab i{font-style:normal;width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:14px;line-height:1}
+.tab i:hover{background:var(--line)}
+.navr{display:flex;gap:4px;align-items:center;padding:6px 8px;background:var(--raised);flex:none}
+.navr .ibtn{width:32px;height:32px}
+.navr input{flex:1;min-width:0;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface-solid);color:var(--fg);font:14px var(--body);outline:none}
+.navr input:focus{border-color:var(--accent)}
+.views{flex:1;position:relative;min-height:0;background:#fff}
+.views webview{position:absolute;inset:0;width:100%;height:100%}
+.views webview.hide{visibility:hidden}
+.prog{height:2px;background:var(--accent);width:0;transition:width .3s;flex:none}
+.pathbar{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted);overflow-x:auto;white-space:nowrap}
+.pathbar b{color:var(--fg);font-weight:500}
+.files .main{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:auto}
+.files nav .h{padding:10px 10px 4px}
+.notebar{display:flex;gap:8px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.meter{height:8px;border-radius:4px;background:var(--raised);overflow:hidden;margin-top:4px;width:220px;max-width:100%}
+.meter div{height:100%;background:var(--accent)}
+.toggle{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px}
+.toggle small{display:block;color:var(--muted);margin-top:2px}
+.sw-t{width:42px;height:24px;border-radius:12px;background:var(--line);border:0;position:relative;cursor:pointer;flex:none}
+.sw-t::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.sw-t.on{background:var(--accent)} .sw-t.on::after{left:21px}
+.pmenu{position:absolute;right:20px;bottom:64px;background:var(--surface-solid);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:var(--shadow);display:flex;flex-direction:column;min-width:170px}
+.pmenu button{border:0;background:none;color:var(--fg);text-align:left;padding:9px 12px;border-radius:8px;font:14px var(--body);cursor:pointer}
+.pmenu button:hover{background:var(--raised)}
+body.dragging webview{pointer-events:none}
+.fileacts{display:flex;gap:6px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--line);flex-wrap:wrap;min-height:41px}
+.files li{outline:none}
+.files li.sel{background:var(--raise);box-shadow:inset 0 0 0 1px var(--accent)}
+.files li.empty{color:var(--muted);cursor:default;display:block}
+.files li input.ren{background:var(--surface-solid);border:1px solid var(--accent);border-radius:6px;color:var(--fg);font:14px var(--body);padding:3px 6px;min-width:0}
+.pbtn.danger{color:var(--danger)}
+.pbtn:disabled{opacity:.45;cursor:default}
+.nstat{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nname{background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:4px 8px;color:var(--fg);font:13px var(--body);width:190px;min-width:0}
+.nname:focus{border-color:var(--accent);outline:none}
+.icon .fglyph{background:rgba(255,255,255,.16);backdrop-filter:blur(6px)}
+.icon .fglyph .fi{width:30px;height:30px}.icon .fglyph .fi svg{width:30px;height:30px}
+.icon .dname{max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dls{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;z-index:9500;width:min(340px,calc(100vw - 32px))}
+.dlcard{background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:7px;transition:opacity .3s,transform .3s}
+.dlcard.out{opacity:0;transform:translateX(20px)}
+.dlcard b{font:600 13px var(--display);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dlcard small{color:var(--muted);font-size:12px}
+.dlcard .bar2{height:5px;border-radius:3px;background:var(--raise);overflow:hidden}.dlcard .bar2 div{height:100%;background:var(--accent);transition:width .2s}
+.dlcard .row2{display:flex;gap:6px}
+/* boot */
+#boot{position:fixed;inset:0;background:#070d0f;z-index:99999;display:grid;place-items:center;transition:opacity .6s}
+#boot.done{opacity:0;pointer-events:none}
+#boot .in{display:flex;flex-direction:column;align-items:center;gap:22px;color:#e8f1ef}
+#boot .mark{width:72px;height:72px}
+#boot h2{font:600 22px var(--display);margin:0;letter-spacing:.02em}
+.ring{width:26px;height:26px;border:3px solid rgba(255,255,255,.15);border-top-color:#3fd0b4;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;right:16px;top:calc(16px + env(safe-area-inset-top,0px));background:var(--surface);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--line);border-radius:14px;padding:12px 16px;box-shadow:var(--shadow);z-index:9999;max-width:300px;transition:opacity .3s,transform .3s}
+.toast b{font-family:var(--display);display:block;margin-bottom:2px} .toast span{color:var(--muted);font-size:13px}
+.toast.out{opacity:0;transform:translateX(20px)}
+@media (max-width:640px){
+  .win{inset:0 0 72px 0!important;width:auto!important;height:auto!important;border-radius:0}
+  .rs{display:none}
+  .files{grid-template-columns:1fr} .files nav{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto}
+  #tray #clock span{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* 1.3: dialogs, settings, app store */
+.ask{position:fixed;inset:0;z-index:2000000000;background:rgba(0,0,0,.35);display:grid;place-items:center;padding:16px}
+.askbox{background:var(--surface-solid);color:var(--fg);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px 18px 14px;width:min(420px,100%);display:flex;flex-direction:column;gap:8px}
+.askbox b{font-size:16px} .askbox p{margin:0 0 6px;color:var(--muted);line-height:1.45;user-select:text}
+.askbox .row2{display:flex;gap:8px;justify-content:flex-end}
+.pbtn.pri{background:var(--accent);color:var(--accent-fg);border-color:transparent}
+.pbtn.danger-fill{background:var(--danger);color:#fff;border-color:transparent}
+.row2{display:flex;gap:6px;align-items:center} .row2.wrap{flex-wrap:wrap}
+.settings{display:grid;grid-template-columns:190px 1fr;height:100%;min-height:0}
+.snav{display:flex;flex-direction:column;gap:2px;padding:10px;border-right:1px solid var(--line);overflow-y:auto}
+.snav button{border:0;background:none;color:var(--fg);text-align:left;padding:8px 10px;border-radius:8px;font:14px var(--body);cursor:pointer}
+.snav button:hover{background:var(--raised)} .snav button.on{background:var(--raised);box-shadow:inset 3px 0 0 var(--accent);font-weight:600}
+.spane{overflow-y:auto;min-width:0}
+.spage{padding:18px 20px 28px;display:flex;flex-direction:column;gap:22px;max-width:640px}
+.spage .row{display:flex;gap:10px;flex-wrap:wrap}
+.sset{display:flex;flex-direction:column;gap:8px}
+.sset h3{margin:0;font:600 15px var(--body);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.hint{margin:0;color:var(--muted);font-size:13px;line-height:1.45}
+.srow{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;flex-wrap:wrap}
+.srow .sl{flex:1;min-width:140px;display:flex;flex-direction:column;gap:2px} .srow .sl small{color:var(--muted);overflow-wrap:anywhere}
+.srow input[type=range]{width:180px;accent-color:var(--accent)}
+.txt{border:1px solid var(--line);background:var(--raised);color:var(--fg);border-radius:8px;padding:7px 10px;font:14px var(--body);min-width:0;user-select:text}
+select.txt{max-width:100%} select.txt option{background:var(--surface-solid);color:var(--fg)}
+.txt:focus{outline:2px solid var(--accent);outline-offset:-1px}
+.slist{display:flex;flex-direction:column;gap:6px}
+.sitem{border:1px solid var(--line);border-radius:10px;overflow:hidden} .sitem.act{border-color:var(--accent)}
+.shead{width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px;border:0;background:none;color:var(--fg);font:14px var(--body);cursor:pointer;text-align:left}
+.shead:hover{background:var(--raised)} .sname{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sig{display:inline-flex;color:var(--fg)} .lock{display:inline-flex;color:var(--muted)}
+.tag{font-size:12px;color:var(--accent)} .tag.dim{color:var(--muted)}
+.sbody{padding:4px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.busy{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:6px 0}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.serr{color:var(--danger);font-size:13px;overflow-wrap:anywhere}
+.joblog{font:12px ui-monospace,Consolas,monospace;color:var(--muted);min-height:1.4em;overflow-wrap:anywhere}
+.secitem{display:flex;gap:10px;align-items:flex-start;padding:8px 2px}
+.secitem .dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:none;background:var(--muted)}
+.secitem.ok .dot{background:#3fbf7f} .secitem.warn .dot{background:#f0b451} .secitem small{display:block;color:var(--muted);margin-top:2px}
+.letter{color:#fff;font:700 18px var(--body)} .tb .letter{font-size:14px}
+.appstore{display:flex;flex-direction:column;height:100%;min-height:0}
+.ashead{display:flex;gap:16px;align-items:flex-end;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ashead h2{margin:0 0 2px;font:600 20px var(--body)} .ashead small{color:var(--muted)} .ashead .txt{width:220px}
+.asgrid{flex:1;overflow-y:auto;padding:14px 18px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;align-content:start}
+.ascard{display:flex;gap:12px;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--raised)}
+.asbody{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1} .asbody small{color:var(--muted)} .asbody p{margin:2px 0 6px;font-size:13px;line-height:1.4}
+.asstat{font:12px ui-monospace,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.asbody .meter{width:100%}
+.dlwarn{color:var(--danger)}
+.notes{white-space:pre-wrap;font-size:13px;line-height:1.5;color:var(--fg);background:var(--raised);border:1px solid var(--line);border-radius:7px;padding:10px 12px;max-height:220px;overflow:auto;user-select:text}
+.qfoot{display:flex;justify-content:flex-end;gap:6px}
+#grid .ext .glyph{border-radius:12px}
+@media (max-width:640px){.settings{grid-template-columns:1fr;grid-template-rows:auto 1fr}.snav{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto}.snav button{white-space:nowrap}}
+/* ===== NexusOS look: dark, sharp, neon ===== */
+:root{--bg:#06080c;--surface:rgba(10,13,19,.88);--surface-solid:#0c1017;--raised:rgba(140,200,255,.06);--line:rgba(120,200,255,.15);--fg:#e8f3ff;--muted:#8796ab;--accent:#00e5ff;--accent-fg:#00161b;--danger:#ff3b5c;
+  --shadow:0 24px 60px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4);--display:"Rajdhani","Segoe UI",system-ui,sans-serif;--body:"Inter","Segoe UI",system-ui,sans-serif;
+  --glow:0 0 0 1px color-mix(in srgb,var(--accent) 45%,transparent),0 0 26px color-mix(in srgb,var(--accent) 20%,transparent)}
+::selection{background:color-mix(in srgb,var(--accent) 45%,transparent)}
+::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(120,200,255,.18);border-radius:5px;border:2px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--accent) 55%,transparent);background-clip:padding-box;border:2px solid transparent}
+.win{border-radius:8px}
+.win::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 0%,transparent) 75%);z-index:2;pointer-events:none}
+.win:not(.blur){box-shadow:var(--shadow),var(--glow)}
+.win.blur::before{opacity:.25}
+.tbar .t{font:600 15px var(--display);letter-spacing:.04em}
+#bar{border-radius:10px;box-shadow:var(--shadow),inset 0 -2px 0 color-mix(in srgb,var(--accent) 60%,transparent)}
+.tb{border-radius:7px} .tb .glyph{border-radius:7px}
+.tb.run.on::after{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.glyph{border-radius:10px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),inset 0 -10px 18px rgba(0,0,0,.18)}
+.panel{border-radius:10px}
+.panel .h{font:600 13px var(--display);letter-spacing:.14em;text-transform:uppercase}
+#search{border-radius:6px} #search:focus{border-color:var(--accent);box-shadow:var(--glow)}
+.tile{border-radius:7px} .tile.on{box-shadow:0 0 18px color-mix(in srgb,var(--accent) 45%,transparent)}
+#clock b{font:700 16px var(--display);letter-spacing:.05em}
+.pbtn,.txt{border-radius:6px} .pbtn:hover{border-color:color-mix(in srgb,var(--accent) 55%,transparent)}
+.pbtn.pri{box-shadow:0 0 14px color-mix(in srgb,var(--accent) 35%,transparent);font-weight:600}
+.pbtn.pri:hover{filter:brightness(1.1)}
+.sw-t.on{box-shadow:0 0 10px color-mix(in srgb,var(--accent) 55%,transparent)}
+.meter div{background:linear-gradient(90deg,var(--accent),#ff2e88)}
+.sset h3,.ashead h2,.about h1{font-family:var(--display);letter-spacing:.06em;text-transform:uppercase}
+.sset h3{font-size:16px}
+.srow,.sitem,.ascard,.toggle{border-radius:7px}
+.ascard:hover{border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.snav button{border-radius:6px} .snav button.on{box-shadow:inset 3px 0 0 var(--accent),0 0 18px color-mix(in srgb,var(--accent) 12%,transparent)}
+.toast,.dlcard{border-radius:8px;border-left:3px solid var(--accent)}
+.askbox{border-radius:10px;box-shadow:var(--shadow),var(--glow)} .askbox b{font:700 19px var(--display);letter-spacing:.04em}
+#boot{background:#05060a} #boot h2{font:700 30px var(--display);letter-spacing:.3em;text-transform:uppercase;padding-left:.3em;background:linear-gradient(90deg,#00e5ff,#ff2e88);-webkit-background-clip:text;background-clip:text;color:transparent}
+#boot .mark{filter:drop-shadow(0 0 18px rgba(0,229,255,.55))}
+.mark{filter:drop-shadow(0 0 6px rgba(0,229,255,.35))}
+.acc{border-radius:6px}
+.wp{border-radius:6px}
+:root.light{--accent:#0095b3}
+</style>
+</head>
+<body>
+
+<canvas id="wall"></canvas>
+<div id="desk"></div>
+
+<div id="start" class="panel" role="dialog" aria-label="Start">
+  <div class="sw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="search" placeholder="Search apps" autocomplete="off"></div>
+  <div class="h">Apps</div>
+  <div id="grid"></div>
+  <div class="foot">
+    <div class="me"><div class="avatar">XM</div>Xiaoming</div>
+    <button class="ibtn" id="power" title="Power" aria-label="Power"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg></button>
+  </div>
+</div>
+
+<div id="quick" class="panel" role="dialog" aria-label="Quick settings">
+  <div class="tiles">
+    <button class="tile on" data-t="wifi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/></svg>Wi-Fi</button>
+    <button class="tile on" data-t="bt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg>Bluetooth</button>
+    <button class="tile" data-t="focus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Focus</button>
+  </div>
+  <div class="slider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><input type="range" id="bright" min="40" max="100" value="100" aria-label="Brightness"></div>
+  <div class="slider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg><input type="range" id="vol" min="0" max="100" value="60" aria-label="Volume"></div>
+  <div class="cal" id="cal"></div>
+</div>
+
+<div id="bar">
+  <button class="tb" id="startBtn" title="Start"><svg class="mark" viewBox="0 0 40 40"><defs><linearGradient id="ng" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00e5ff"/><stop offset="1" stop-color="#ff2e88"/></linearGradient></defs><path d="M20 3 35 11.5v17L20 37 5 28.5v-17z" fill="none" stroke="url(#ng)" stroke-width="2.6" stroke-linejoin="round"/><path d="M13.5 26V14l13 12V14" fill="none" stroke="url(#ng)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="14" r="2.3" fill="#00e5ff"/><circle cx="26.5" cy="26" r="2.3" fill="#ff2e88"/></svg></button>
+  <div class="sep"></div>
+  <div id="apps"></div>
+  <div class="sep"></div>
+  <button id="tray" title="Quick settings">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/></svg>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2"/><rect x="4" y="9" width="11" height="6" rx="1" fill="currentColor"/></svg>
+    <div id="clock"><b>--:--</b><span>--</span></div>
+  </button>
+</div>
+
+<div id="boot"><div class="in">
+  <svg class="mark" viewBox="0 0 40 40"><defs><linearGradient id="ng2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00e5ff"/><stop offset="1" stop-color="#ff2e88"/></linearGradient></defs><path d="M20 3 35 11.5v17L20 37 5 28.5v-17z" fill="none" stroke="url(#ng2)" stroke-width="2.6" stroke-linejoin="round"/><path d="M13.5 26V14l13 12V14" fill="none" stroke="url(#ng2)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="14" r="2.3" fill="#00e5ff"/><circle cx="26.5" cy="26" r="2.3" fill="#ff2e88"/></svg>
+  <h2>NexusOS</h2><div class="ring"></div>
+</div></div>
+
+<script>
+(function(){
+const $=(s,r=document)=>r.querySelector(s), h=(t,a={},...c)=>{const e=document.createElement(t);for(const k in a){if(k==='on')for(const ev in a.on)e.addEventListener(ev,a.on[ev]);else if(k==='html')e.innerHTML=a[k];else if(k in e&&k!=='style')e[k]=a[k];else e.setAttribute(k,a[k])}c.flat().forEach(x=>x!=null&&e.append(x));return e};
+const store={get(k,d){try{const v=localStorage.getItem('hx.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('hx.'+k,JSON.stringify(v))}catch(e){}}};
+/* real-PC bridge: present only when running as the desktop app */
+const HX=window.halcyon||null;let SYS=null;
+const TEXT_RE=/\.(txt|md|markdown|json|csv|log|ini|cfg|conf|yaml|yml|xml|html?|css|js|ts|py|bat|ps1|sh)$/i;
+const fmtSize=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':n<1073741824?(n/1048576).toFixed(1)+' MB':(n/1073741824).toFixed(2)+' GB';
+const fmtUp=s=>{const d=Math.floor(s/86400),hh=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return (d?d+'d ':'')+hh+'h '+m+'m'};
+
+/* ---------- icons ---------- */
+const I={
+ web:['#0a6cff','<circle cx="12" cy="12" r="8.5" fill="#e6fbf5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.8 5.2 3.8 8.5s-1.2 6.1-3.8 8.5c-2.6-2.4-3.8-5.2-3.8-8.5s1.2-6.1 3.8-8.5z" fill="none" stroke="#1f8a6f" stroke-width="1.5"/>'],
+ notes:['#ff8a00','<path d="M7 3h7l4 4v14H7z" fill="#fff8e6"/><path d="M14 3v4h4" fill="#f5d9a0"/><path d="M9.5 11h6M9.5 14h6M9.5 17h4" stroke="#b07a1c" stroke-width="1.4" stroke-linecap="round"/>'],
+ calc:['#7a3cff','<rect x="5" y="3" width="14" height="18" rx="3" fill="#eef1ff"/><rect x="7.5" y="5.5" width="9" height="4" rx="1" fill="#5b7cfa"/><g fill="#5b7cfa"><circle cx="9" cy="13" r="1.1"/><circle cx="12" cy="13" r="1.1"/><circle cx="15" cy="13" r="1.1"/><circle cx="9" cy="17" r="1.1"/><circle cx="12" cy="17" r="1.1"/><circle cx="15" cy="17" r="1.1"/></g>'],
+ files:['#00a3d9','<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#e3f6ff"/><path d="M3 10h18" stroke="#2fa6d6" stroke-width="1.4"/>'],
+ term:['#11161f','<rect x="3" y="4" width="18" height="16" rx="3" fill="#0b1416"/><path d="m7 9 3 3-3 3" stroke="#3fd0b4" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 15h5" stroke="#3fd0b4" stroke-width="1.8" stroke-linecap="round"/>'],
+ paint:['#ff2e88','<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-1-1.6-1-2.6S14 15 15 15h2a4 4 0 0 0 4-4c0-4.4-4-8-9-8z" fill="#fff0f5"/><circle cx="7.5" cy="11" r="1.5" fill="#e85d8a"/><circle cx="10.5" cy="7" r="1.5" fill="#f0b451"/><circle cx="15" cy="7.5" r="1.5" fill="#3fd0b4"/><circle cx="17.5" cy="11" r="1.5" fill="#5b7cfa"/>'],
+ mines:['#2fbf5b','<rect x="3" y="3" width="18" height="18" rx="3" fill="#f2f6e4"/><circle cx="12" cy="13" r="4.5" fill="#1f2a2d"/><path d="M12 6.5v2M12 17.5v2M5.5 13h2M16.5 13h2" stroke="#1f2a2d" stroke-width="1.6" stroke-linecap="round"/><circle cx="10.5" cy="11.5" r="1.1" fill="#fff"/>'],
+ settings:['#3a4556','<circle cx="12" cy="12" r="8.5" fill="#eef2f3"/><circle cx="12" cy="12" r="3" fill="none" stroke="#6b7b80" stroke-width="1.8"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6 6l2.1 2.1M15.9 15.9 18 18M6 18l2.1-2.1M15.9 8.1 18 6" stroke="#6b7b80" stroke-width="1.8" stroke-linecap="round"/>'],
+ about:['#0c1017','<path d="M12 2.5 20.3 7.2v9.6L12 21.5 3.7 16.8V7.2z" fill="none" stroke="#00e5ff" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.6 15.4V8.6l6.8 6.8V8.6" fill="none" stroke="#ff2e88" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>'],
+ store:['#ff4f2e','<path d="M5 8h14l-1.2 11.2A2 2 0 0 1 15.8 21H8.2a2 2 0 0 1-2-1.8z" fill="#fff3ea"/><path d="M9 10V7a3 3 0 0 1 6 0v3" fill="none" stroke="#fff3ea" stroke-width="1.8" stroke-linecap="round"/><path d="m10 14.5 1.6 1.6 3-3.2" fill="none" stroke="#e0703a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'],
+ txt:['','<path d="M6 2h8l4 4v16H6z" fill="#e8eef0"/><path d="M8.5 10h7M8.5 13h7M8.5 16h5" stroke="#6b7b80" stroke-width="1.3" stroke-linecap="round"/>'],
+ img:['','<rect x="3" y="4" width="18" height="16" rx="2" fill="#e3f6ff"/><path d="m3 17 5-5 4 4 3-3 6 6" fill="none" stroke="#2fa6d6" stroke-width="1.5"/><circle cx="16" cy="8.5" r="1.6" fill="#f0b451"/>'],
+ dir:['','<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="#9fd8ee"/>']
+};
+const glyph=k=>h('div',{class:'glyph',style:I[k][0]?'background:'+I[k][0]:'',html:'<svg viewBox="0 0 24 24">'+I[k][1]+'</svg>'});
+const fileIcon=k=>h('span',{class:'fi',html:'<svg viewBox="0 0 24 24" width="24" height="24">'+I[k][1]+'</svg>'});
+
+/* ---------- window manager ---------- */
+let z=10, wins={}, nextPos=0;
+function focus(id){for(const k in wins){wins[k].el.classList.toggle('blur',k!==id)}if(wins[id]){wins[id].el.style.zIndex=++z;wins[id].el.classList.remove('min')}active=id;renderBar()}
+let active=null;
+function openApp(key,arg){
+  closePanels();
+  const A=APPS[key];
+  if(wins[key]&&!A.multi){focus(key);if(A.onArg&&arg)A.onArg(wins[key],arg);return}
+  const id=A.multi?key+Date.now():key;
+  const vw=innerWidth,vh=innerHeight-72;
+  const w=Math.min(A.w||640,vw-24),hh=Math.min(A.h||440,vh-24);
+  const off=(nextPos++%6)*28;
+  const x=Math.max(12,Math.round((vw-w)/2-80+off)),y=Math.max(12,Math.round((vh-hh)/2-50+off));
+  const body=h('div',{class:'body'});
+  const title=h('div',{class:'t'},A.name);
+  const el=h('div',{class:'win',style:`left:${x}px;top:${y}px;width:${w}px;height:${hh}px`,role:'dialog','aria-label':A.name},
+    h('div',{class:'tbar'},glyph(key),title,h('div',{class:'ctl'},
+      h('button',{title:'Minimise','aria-label':'Minimise',html:'<svg viewBox="0 0 12 12"><path d="M1 6h10" stroke="currentColor" stroke-width="1.3"/></svg>',on:{click:e=>{e.stopPropagation();minimise(id)}}}),
+      h('button',{title:'Maximise','aria-label':'Maximise',html:'<svg viewBox="0 0 12 12"><rect x="1.5" y="1.5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>',on:{click:e=>{e.stopPropagation();el.classList.toggle('max')}}}),
+      h('button',{class:'x',title:'Close','aria-label':'Close',html:'<svg viewBox="0 0 12 12"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.3"/></svg>',on:{click:e=>{e.stopPropagation();close(id)}}}))),
+    body,h('div',{class:'rs'}));
+  el.addEventListener('pointerdown',()=>{if(active!==id)focus(id)});
+  drag(el,$('.tbar',el));resize(el,$('.rs',el));
+  $('.tbar',el).addEventListener('dblclick',e=>{if(!e.target.closest('.ctl'))el.classList.toggle('max')});
+  document.body.append(el);
+  wins[id]={el,key,title,body};
+  const api={el,body,setTitle:t=>title.textContent=t,close:()=>close(id)};
+  wins[id].api=api;
+  A.mount(body,api,arg);
+  focus(id);
+}
+function close(id){const w=wins[id];if(!w)return;w.api.onClose&&w.api.onClose();w.el.remove();delete wins[id];if(active===id)active=null;const rest=Object.keys(wins).filter(k=>!wins[k].el.classList.contains('min'));if(rest.length)focus(rest[rest.length-1]);else renderBar()}
+function minimise(id){wins[id].el.classList.add('min');active=null;renderBar()}
+function drag(el,handle){
+  handle.addEventListener('pointerdown',e=>{
+    if(e.target.closest('.ctl')||innerWidth<=640)return;
+    const r=el.getBoundingClientRect();
+    if(el.classList.contains('max')){el.classList.remove('max');el.style.left=(e.clientX-r.width/2)+'px';}
+    const sx=e.clientX-parseFloat(el.style.left),sy=e.clientY-parseFloat(el.style.top);
+    handle.setPointerCapture(e.pointerId);document.body.classList.add('dragging');
+    const mv=ev=>{el.style.left=Math.min(innerWidth-80,Math.max(-el.offsetWidth+80,ev.clientX-sx))+'px';el.style.top=Math.min(innerHeight-120,Math.max(0,ev.clientY-sy))+'px'};
+    const up=ev=>{document.body.classList.remove('dragging');handle.removeEventListener('pointermove',mv);handle.removeEventListener('pointerup',up);if(ev.clientY<6)el.classList.add('max')};
+    handle.addEventListener('pointermove',mv);handle.addEventListener('pointerup',up);
+  });
+}
+function resize(el,g){
+  g.addEventListener('pointerdown',e=>{e.stopPropagation();const sw=el.offsetWidth,sh=el.offsetHeight,sx=e.clientX,sy=e.clientY;g.setPointerCapture(e.pointerId);document.body.classList.add('dragging');
+    const mv=ev=>{el.style.width=Math.max(280,sw+ev.clientX-sx)+'px';el.style.height=Math.max(180,sh+ev.clientY-sy)+'px';el.dispatchEvent(new Event('winresize'))};
+    const up=()=>{document.body.classList.remove('dragging');g.removeEventListener('pointermove',mv);g.removeEventListener('pointerup',up)};
+    g.addEventListener('pointermove',mv);g.addEventListener('pointerup',up)});
+}
+
+/* ---------- dialogs, permissions and background jobs ---------- */
+function ask(title,text,okLabel,danger){return new Promise(res=>{const wrap=h('div',{class:'ask'});const done=v=>{wrap.remove();document.removeEventListener('keydown',key,true);res(v)};
+  const key=e=>{if(e.key==='Escape'){e.stopPropagation();done(false)}};document.addEventListener('keydown',key,true);
+  const ok=h('button',{class:'pbtn '+(danger?'danger-fill':'pri'),on:{click:()=>done(true)}},okLabel||'OK');
+  wrap.append(h('div',{class:'askbox',role:'alertdialog','aria-label':title},h('b',{},title),h('p',{},text),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>done(false)}},'Cancel'),ok)));document.body.append(wrap);setTimeout(()=>ok.focus(),30)})}
+function askText(title,text,ph,okLabel){return new Promise(res=>{const wrap=h('div',{class:'ask'});const inp=h('input',{class:'txt',placeholder:ph||'','aria-label':ph||title,autocomplete:'off',spellcheck:false});
+  const done=v=>{wrap.remove();document.removeEventListener('keydown',key,true);res(v)};const key=e=>{if(e.key==='Escape'){e.stopPropagation();done(null)}};document.addEventListener('keydown',key,true);
+  inp.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter')done(inp.value)});
+  wrap.append(h('div',{class:'askbox',role:'dialog','aria-label':title},h('b',{},title),h('p',{},text),inp,h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>done(null)}},'Cancel'),h('button',{class:'pbtn pri',on:{click:()=>done(inp.value)}},okLabel||'OK'))));
+  document.body.append(wrap);setTimeout(()=>inp.focus(),30)})}
+const PERM_TEXT={geolocation:'know your location',notifications:'show notifications',media:'use your camera or microphone'};
+function permText(d){if(d.perm==='media'){const m=d.media||'';return m.includes('video')&&m.includes('audio')?'use your camera and microphone':m.includes('video')?'use your camera':'use your microphone'}return PERM_TEXT[d.perm]||d.perm}
+let permChain=Promise.resolve();
+function onPermission(d){permChain=permChain.then(async()=>{let host=d.origin;try{host=new URL(d.origin).host}catch(e){}
+  const ok=await ask('Allow this site?',`${host} wants to ${permText(d)}. Allow it only if you trust the site. NexusOS remembers your answer until you restart.`,'Allow');HX.answerPermission(d.id,ok)})}
+const jobListeners=new Map();
+function onJob(d){const fn=jobListeners.get(d.id);if(fn)fn(d)}
+async function openPathSafe(p,name){try{const r=await HX.open(p,false);if(r&&r.needsConfirm){const ok=await ask('Run this program?',`“${r.name}” is a program${r.fromInternet?' you downloaded from the internet':''}. Programs can change your computer. Only run it if you trust where it came from.`,'Run it',true);if(ok)await HX.open(p,true)}}catch(e){toast('Couldn’t open that',errMsg(e))}}
+
+/* ---------- a safe calculator (no eval) ---------- */
+function calcEval(src){const s=src.replace(/\s+/g,'');let i=0;
+  const peek=()=>s[i];const eat=c=>{if(s[i]===c){i++;return true}return false};
+  function primary(){if(eat('(')){const v=expr();if(!eat(')'))throw new Error('bracket');return v}const m=/^(\d+\.?\d*|\.\d+)/.exec(s.slice(i));if(!m)throw new Error('number');i+=m[0].length;return parseFloat(m[0])}
+  function factor(){if(eat('-'))return -factor();if(eat('+'))return factor();let v=primary();while(eat('%'))v/=100;return v}
+  function term(){let v=factor();for(;;){if(eat('*'))v*=factor();else if(eat('/'))v/=factor();else return v}}
+  function expr(){let v=term();for(;;){if(eat('+'))v+=term();else if(eat('-'))v-=term();else return v}}
+  const v=expr();if(i!==s.length||!isFinite(v))throw new Error('bad');return +v.toPrecision(12)}
+
+/* ---------- system state shown in the taskbar and quick settings ---------- */
+const OSM=()=>!!(HX&&SYS&&SYS.osMode);
+let clock24=true;
+const STORE_CACHE={t:0,list:[]};
+async function installedApps(force){if(!HX)return[];if(!force&&Date.now()-STORE_CACHE.t<10000)return STORE_CACHE.list;try{STORE_CACHE.list=await HX.store('installed');STORE_CACHE.t=Date.now()}catch(e){STORE_CACHE.list=[]}return STORE_CACHE.list}
+const ICON_CACHE=new Map();
+async function appIcon(id){if(!OSM())return null;if(ICON_CACHE.has(id))return ICON_CACHE.get(id);let u=null;try{u=await HX.store('icon',id)}catch(e){}ICON_CACHE.set(id,u);return u}
+function letterIcon(name,src){const hue=[...String(name)].reduce((a,c)=>a+c.charCodeAt(0),0)%360;const g=h('div',{class:'glyph',style:`background:hsl(${hue} 45% 42%)`});
+  if(src)g.append(h('img',{src,alt:'',style:'width:78%;height:78%;object-fit:contain'}));else g.append(h('span',{class:'letter'},String(name).trim().charAt(0).toUpperCase()||'?'));return g}
+// other programs' windows (NexusOS)
+let extWins=[];
+async function pollWindows(){if(!OSM())return;try{const w=await HX.lx('windows');const sig=JSON.stringify(w.map(x=>[x.id,x.title]));if(sig!==pollWindows.sig){pollWindows.sig=sig;extWins=w;renderBar()}}catch(e){}}
+
+/* ---------- NexusOS's own updates ---------- */
+async function nexusUpdatesSection(c){const s=sec(c,'NexusOS');let st;try{st=await HX.lx('nexusUpdateState')}catch(e){st={version:SYS.version,canUpdate:false}}
+  s.append(srow('You have NexusOS '+st.version,st.rolledBack?'The last update didn’t start properly, so NexusOS went back to this version by itself.':'Checks for new versions every few hours.'));
+  if(!st.canUpdate){s.append(h('p',{class:'hint'},'This computer doesn’t have the NexusOS updater yet.'));return}
+  const box=h('div',{class:'sset'}),log=h('div',{class:'joblog'}),bar=h('div',{class:'meter'},h('div',{style:'width:0'}));s.append(box);
+  const busy=on=>box.querySelectorAll('button').forEach(b=>b.disabled=on);
+  const restartBtn=()=>h('button',{class:'pbtn pri',on:{click:()=>HX.lx('restartDesktop')}},'Restart the desktop now');
+  const job=d=>{if(d.line)log.textContent=d.line;if(d.pct!=null)bar.firstChild.style.width=d.pct+'%'};
+  async function check(){box.innerHTML='';box.append(busyEl('Checking for NexusOS updates…'));let r;
+    try{r=await HX.lx('nexusUpdateCheck')}catch(e){box.innerHTML='';box.append(errEl(e),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:check}},'Try again')));return}
+    box.innerHTML='';
+    if(!r.available){box.append(h('p',{class:'hint'},'You have the newest version.'),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:check}},'Check again')));return}
+    const go=h('button',{class:'pbtn pri'},'Install NexusOS '+r.version);
+    box.append(srow('NexusOS '+r.version+' is ready',(r.size?fmtSize(r.size)+' · ':'')+'Your files, apps and games stay as they are.'),r.notes?h('div',{class:'notes'},r.notes):null,h('div',{class:'row2'},go),bar,log);
+    go.onclick=async()=>{busy(true);jobListeners.set('nexus-update',job);
+      try{const v=await HX.lx('nexusUpdateInstall');go.remove();log.textContent='NexusOS '+v+' is installed.';bar.firstChild.style.width='100%';box.append(h('div',{class:'row2'},restartBtn()));toast('NexusOS '+v+' is installed','Restart the desktop to start using it. Other open apps keep running.')}
+      catch(e){log.textContent=errMsg(e);busy(false)}}}
+  box.append(h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:check}},'Check for NexusOS updates')));
+  if(st.rolledBack&&st.previous===st.version){s.append(srow('Keep using NexusOS '+st.version,'Sets the update that didn’t start aside, so this version starts normally next time.',h('button',{class:'pbtn pri',on:{click:async e=>{e.target.disabled=true;jobListeners.set('nexus-update',job);try{await HX.lx('nexusRollback');toast('Done','NexusOS '+st.version+' will start normally from now on.')}catch(err){toast('That didn’t work',errMsg(err));e.target.disabled=false}}}},'Keep this version')),log)}
+  else if(st.previous&&st.previous!==st.version){s.append(srow('Go back to NexusOS '+st.previous,'If something in this version isn’t working for you.',h('button',{class:'pbtn',on:{click:async e=>{if(!await ask('Go back to NexusOS '+st.previous+'?','Your files, apps and games stay as they are. You can update again any time.','Go back'))return;e.target.disabled=true;jobListeners.set('nexus-update',job);
+    try{await HX.lx('nexusRollback');s.append(h('div',{class:'row2'},restartBtn()));toast('Back on NexusOS '+st.previous,'Restart the desktop to use it.')}catch(err){toast('Couldn’t go back',errMsg(err));e.target.disabled=false}}}},'Go back')),log,bar)}}
+async function autoCheckUpdates(){if(!OSM())return;try{const st=await HX.lx('nexusUpdateState');if(st.rolledBack)toast('Update undone','The new version didn’t start properly, so NexusOS went back to '+st.version+'.');if(!st.canUpdate)return;
+  const r=await HX.lx('nexusUpdateCheck');if(r.available&&store.get('nx-told',null)!==r.version){store.set('nx-told',r.version);toast('NexusOS '+r.version+' is ready','Install it from Settings › Updates.')}}catch(e){}}
+
+/* ---------- Settings ---------- */
+const KB_LAYOUTS=[['gb','English (UK)'],['us','English (US)'],['ie','Irish'],['us(intl)','English (US, international)'],['fr','French'],['de','German'],['es','Spanish'],['latam','Spanish (Latin America)'],['it','Italian'],['pt','Portuguese'],['br','Portuguese (Brazil)'],['nl','Dutch'],['be','Belgian'],['ch','Swiss'],['se','Swedish'],['no','Norwegian'],['dk','Danish'],['fi','Finnish'],['pl','Polish'],['cz','Czech'],['hu','Hungarian'],['ro','Romanian'],['gr','Greek'],['tr','Turkish'],['ru','Russian'],['ua','Ukrainian'],['il','Hebrew'],['ara','Arabic'],['in','Indian'],['jp','Japanese'],['kr','Korean'],['cn','Chinese'],['ca','Canadian French']];
+const SIG=n=>{const bars=n>70?4:n>50?3:n>30?2:1;return`<svg viewBox="0 0 20 16" width="20" height="16" aria-label="Signal ${n}%">${[0,1,2,3].map(k=>`<rect x="${k*5}" y="${12-k*4}" width="3.5" height="${4+k*4}" rx="1" fill="currentColor" opacity="${k<bars?1:.25}"/>`).join('')}</svg>`};
+function sec(c,title,sub){const s=h('section',{class:'sset'},h('h3',{},title));if(sub)s.append(h('p',{class:'hint'},sub));c.append(s);return s}
+function srow(label,sub,...ctrl){return h('div',{class:'srow'},h('div',{class:'sl'},h('span',{},label),sub?h('small',{},sub):null),...ctrl)}
+function sswitch(on,fn,label){const b=h('button',{class:'sw-t'+(on?' on':''),role:'switch','aria-checked':!!on,'aria-label':label||'Switch'});b.onclick=async()=>{const want=!b.classList.contains('on');b.disabled=true;try{const r=await fn(want);const v=r===undefined?want:!!r;b.classList.toggle('on',v);b.setAttribute('aria-checked',v)}catch(e){toast('That didn’t work',errMsg(e))}b.disabled=false};return b}
+const busyEl=t=>h('div',{class:'busy'},h('span',{class:'spin'}),t||'Working…');
+const errEl=e=>h('div',{class:'serr'},errMsg(e));
+function settingsPages(){const P=[];
+  if(OSM()){P.push(['wifi','Wi-Fi'],['bluetooth','Bluetooth'],['sound','Sound'],['display','Display'],['power','Power & battery'],['time','Date & time'],['keyboard','Keyboard'])}
+  P.push(['appearance','Appearance']);
+  if(HX)P.push(['apps','Apps']);
+  if(HX&&!OSM())P.push(['system','NexusOS on Windows'.replace('Windows',SYS&&SYS.isWin?'Windows':'this computer')]);
+  if(OSM())P.push(['updates','Updates']);
+  if(HX)P.push(['security','Security & privacy'],['storage','Storage']);
+  if(HX&&SYS&&SYS.isWin)P.push(['winset','Windows settings']);
+  if(OSM()&&SYS.live)P.push(['install','Install NexusOS']);
+  P.push(['about','About']);return P}
+const PAGES={
+ async wifi(c){const top=sec(c,'Wi-Fi');top.append(busyEl('Checking Wi-Fi…'));let st;try{st=await HX.lx('netStatus')}catch(e){top.lastChild.replaceWith(errEl(e));return}top.lastChild.remove();
+   if(!st.wifiDevice){top.append(h('p',{class:'hint'},st.ethernet?`No Wi-Fi adapter. You’re connected by cable (${st.ethernet}).`:'No Wi-Fi adapter was found. If your laptop has Wi-Fi, it may need firmware NexusOS doesn’t include.'));return}
+   top.append(srow('Wi-Fi',st.wifiConnected?`Connected to ${st.wifiConnected}`:st.wifiEnabled?'Not connected':'Off',sswitch(st.wifiEnabled,async v=>{await HX.lx('wifiRadio',v);setTimeout(()=>openSettings('wifi'),1200);return v},'Wi-Fi')));
+   if(st.ethernet)top.append(h('p',{class:'hint'},`Also connected by cable: ${st.ethernet}`));
+   HX.lx('wifiPowersave').then(ps=>{top.append(srow('Wi-Fi power saving','Off gives steadier download speeds and uses a little more battery. Asks for your password.',sswitch(ps,async v=>HX.lx('setWifiPowersave',v),'Wi-Fi power saving')))}).catch(()=>{});
+   if(!st.wifiEnabled)return;
+   const nets=sec(c,'Networks');const refresh=h('button',{class:'pbtn',on:{click:()=>load(true)}},'Refresh');nets.querySelector('h3').append(refresh);const box=h('div',{class:'slist'});nets.append(box);
+   async function load(rescan){box.innerHTML='';box.append(busyEl(rescan?'Looking for networks…':'Loading…'));let list;try{list=await HX.lx('wifiList',rescan)}catch(e){box.innerHTML='';box.append(errEl(e));return}box.innerHTML='';
+     if(!list.length)box.append(h('p',{class:'hint'},'No networks found. Press Refresh to look again.'));
+     for(const n of list){const item=h('div',{class:'sitem'+(n.active?' act':'')});const head=h('button',{class:'shead'},h('span',{class:'sig',html:SIG(n.signal)}),h('span',{class:'sname'},n.ssid),n.secure?h('span',{class:'lock',title:'Needs a password',html:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'}):null,n.active?h('small',{class:'tag'},'Connected'):n.saved?h('small',{class:'tag dim'},'Saved'):null);
+       const body=h('div',{class:'sbody',hidden:true});item.append(head,body);head.onclick=()=>{const open=body.hidden;box.querySelectorAll('.sbody').forEach(b=>b.hidden=true);body.hidden=!open;if(open)fill()};
+       function fill(){body.innerHTML='';
+         if(n.active)body.append(h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:async()=>{await act(()=>HX.lx('wifiDisconnect'),'Disconnected')}}},'Disconnect'),h('button',{class:'pbtn danger',on:{click:async()=>{await act(()=>HX.lx('wifiForget',n.ssid),'Network forgotten')}}},'Forget')));
+         else{const pw=h('input',{class:'txt',type:'password',placeholder:'Password',autocomplete:'off','aria-label':'Wi-Fi password'});const go=h('button',{class:'pbtn pri'},'Connect');
+           const need=n.secure&&!n.saved;if(need)body.append(pw);body.append(h('div',{class:'row2'},go,n.saved?h('button',{class:'pbtn danger',on:{click:()=>act(()=>HX.lx('wifiForget',n.ssid),'Network forgotten')}},'Forget'):null));
+           const doIt=()=>act(()=>HX.lx('wifiConnect',n.ssid,need?pw.value:''),'Connected to '+n.ssid);go.onclick=doIt;pw.addEventListener('keydown',e=>{if(e.key==='Enter')doIt()});if(need)setTimeout(()=>pw.focus(),30)}}
+       async function act(fn,msg){body.innerHTML='';body.append(busyEl());try{await fn();toast(msg,'');openSettings('wifi')}catch(e){body.innerHTML='';body.append(errEl(e));setTimeout(fill,2500)}}
+       box.append(item)}}
+   load(false);
+   const hid=sec(c,'Hidden network','For networks that don’t broadcast their name.');const hs=h('input',{class:'txt',placeholder:'Network name','aria-label':'Hidden network name'}),hp=h('input',{class:'txt',type:'password',placeholder:'Password (leave empty if open)','aria-label':'Hidden network password'});
+   hid.append(hs,hp,h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:async e=>{e.target.disabled=true;try{await HX.lx('wifiConnect',hs.value.trim(),hp.value,true);toast('Connected to '+hs.value.trim(),'');openSettings('wifi')}catch(err){toast('Couldn’t connect',errMsg(err))}e.target.disabled=false}}},'Join')))},
+ async bluetooth(c){const top=sec(c,'Bluetooth');top.append(busyEl());let st;try{st=await HX.lx('btStatus')}catch(e){top.lastChild.replaceWith(errEl(e));return}top.lastChild.remove();
+   if(!st.present){top.append(h('p',{class:'hint'},'No Bluetooth adapter was found.'));return}
+   top.append(srow('Bluetooth',st.powered?`On. Visible to nearby devices as “${st.name}” while this page is open.`:'Off',sswitch(st.powered,async v=>{await HX.lx('btPower',v);setTimeout(()=>openSettings('bluetooth'),800);return v},'Bluetooth')));
+   if(!st.powered)return;
+   const devs=sec(c,'Devices','Put your headphones, mouse or controller into pairing mode, then press Find devices.');const scan=h('button',{class:'pbtn',on:{click:()=>load(true)}},'Find devices');devs.querySelector('h3').append(scan);const box=h('div',{class:'slist'});devs.append(box);
+   async function load(doScan){scan.disabled=true;box.innerHTML='';box.append(busyEl(doScan?'Looking for devices (about 10 seconds)…':'Loading…'));let list;try{list=await HX.lx('btDevices',doScan)}catch(e){box.innerHTML='';box.append(errEl(e));scan.disabled=false;return}box.innerHTML='';scan.disabled=false;
+     if(!list.length)box.append(h('p',{class:'hint'},doScan?'Nothing found. Check the device is in pairing mode and close by.':'No devices yet. Press Find devices.'));
+     for(const d of list){const status=d.connected?'Connected':d.paired?'Paired':'Available';const r=h('div',{class:'srow'},h('div',{class:'sl'},h('span',{},d.name),h('small',{},status+(d.icon?' · '+d.icon.replace(/-/g,' '):''))));
+       const btn=(label,fn,cls)=>h('button',{class:'pbtn'+(cls?' '+cls:''),on:{click:async e=>{r.querySelectorAll('button').forEach(b=>b.disabled=true);e.target.textContent='…';try{await fn();load(false)}catch(err){toast('Bluetooth',errMsg(err));load(false)}}}},label);
+       if(d.connected)r.append(btn('Disconnect',()=>HX.lx('btDisconnect',d.mac)));else r.append(btn(d.paired?'Connect':'Pair',()=>HX.lx('btConnect',d.mac),'pri'));
+       if(d.paired)r.append(btn('Forget',()=>HX.lx('btRemove',d.mac),'danger'));box.append(r)}}
+   load(false)},
+ async sound(c){const s=sec(c,'Sound');s.append(busyEl());let a;try{a=await HX.lx('audio')}catch(e){s.lastChild.replaceWith(errEl(e));return}s.lastChild.remove();
+   const out=a.outputs.find(x=>x.isDefault)||a.outputs[0];
+   if(!out){s.append(h('p',{class:'hint'},'No speakers or headphones were found.'))}else{
+     const vol=h('input',{type:'range',min:0,max:100,value:Math.min(100,out.volume),'aria-label':'Volume'});let t;vol.oninput=()=>{clearTimeout(t);t=setTimeout(()=>HX.lx('setVolume',+vol.value).catch(()=>{}),60);syncVol(+vol.value)};
+     s.append(srow('Volume',`${out.label}`,vol,sswitch(!out.muted,async v=>{await HX.lx('setMute',!v);return v},'Sound on')));
+     if(a.outputs.length>1){const sel=h('select',{class:'txt','aria-label':'Output device'},a.outputs.map(o=>h('option',{value:o.name,selected:o.isDefault},o.label)));sel.onchange=()=>HX.lx('setDefaultOutput',sel.value).then(()=>toast('Output changed',sel.selectedOptions[0].textContent)).catch(e=>toast('Couldn’t switch',errMsg(e)));s.append(srow('Play sound through','',sel))}}
+   const mic=a.inputs.find(x=>x.isDefault)||a.inputs[0];const m=sec(c,'Microphone');
+   if(!mic)m.append(h('p',{class:'hint'},'No microphone was found.'));else{const mv=h('input',{type:'range',min:0,max:100,value:Math.min(100,mic.volume),'aria-label':'Microphone level'});let t2;mv.oninput=()=>{clearTimeout(t2);t2=setTimeout(()=>HX.lx('setMicVolume',+mv.value).catch(()=>{}),60)};m.append(srow('Input level',mic.label,mv));
+     if(a.inputs.length>1){const sel=h('select',{class:'txt','aria-label':'Input device'},a.inputs.map(o=>h('option',{value:o.name,selected:o.isDefault},o.label)));sel.onchange=()=>HX.lx('setDefaultInput',sel.value).catch(e=>toast('Couldn’t switch',errMsg(e)));m.append(srow('Use microphone','',sel))}}},
+ async display(c){const s=sec(c,'Brightness');let b;try{b=await HX.lx('brightness')}catch(e){b={present:false}}
+   if(b.present){const r=h('input',{type:'range',min:5,max:100,value:b.percent,'aria-label':'Brightness'});let t;r.oninput=()=>{clearTimeout(t);t=setTimeout(()=>HX.lx('setBrightness',+r.value).catch(e=>toast('Brightness',errMsg(e))),60);const q=$('#bright');if(q)q.value=r.value};s.append(srow('Screen brightness','',r))}else s.append(h('p',{class:'hint'},'This screen’s brightness is set on the monitor itself.'));
+   const d=sec(c,'Screens');d.append(busyEl());let info;try{info=await HX.lx('displays')}catch(e){d.lastChild.replaceWith(errEl(e));return}d.lastChild.remove();
+   for(const o of info.outputs){if(!o.modes.length)continue;const sel=h('select',{class:'txt','aria-label':'Resolution for '+o.name},o.modes.map(m=>h('option',{value:m.mode,selected:m.current},m.mode.replace('x',' × ')+(m.preferred?' (recommended)':''))));
+     sel.onchange=async()=>{const prev=o.modes.find(m=>m.current);try{await HX.lx('setMode',o.name,sel.value);const keep=await ask('Keep this resolution?','If the screen looks wrong, choose Cancel to go back.','Keep');if(!keep&&prev)await HX.lx('setMode',o.name,prev.mode);openSettings('display')}catch(e){toast('Couldn’t change resolution',errMsg(e))}};
+     d.append(srow(o.name+(o.primary?' (main screen)':''),'Resolution',sel))}
+   const z=sec(c,'Size','Makes NexusOS’s text and windows bigger or smaller.');const zs=h('select',{class:'txt','aria-label':'NexusOS size'},[0.75,0.9,1,1.1,1.25,1.5,1.75,2].map(v=>h('option',{value:v,selected:Math.abs(v-(info.zoom||1))<.01},Math.round(v*100)+'%')));zs.onchange=()=>HX.lx('setZoom',+zs.value);z.append(srow('NexusOS size','',zs))},
+ async power(c){const s=sec(c,'Battery');let b;try{b=await HX.lx('battery')}catch(e){b={present:false}}
+   if(b.present){s.append(srow(`${Math.round(b.percent)}%`,[b.state,b.timeToEmpty&&b.state==='discharging'?b.timeToEmpty+' left':'',b.timeToFull&&b.state==='charging'?b.timeToFull+' until full':''].filter(Boolean).join(' · ')),h('div',{class:'meter'},h('div',{style:`width:${b.percent}%`})));if(b.health)s.append(h('p',{class:'hint'},'Battery health: '+b.health))}else s.append(h('p',{class:'hint'},'No battery. This computer runs on mains power.'));
+   const p=sec(c,'Power','The screen turns off after 10 minutes of no activity.');p.append(h('div',{class:'row2 wrap'},...[['sleep','Sleep'],['restart','Restart'],['shutdown','Shut down'],['logout','Log out']].map(([k,l])=>h('button',{class:'pbtn',on:{click:()=>powerAction(k)}},l))))},
+ async time(c){const s=sec(c,'Date & time');s.append(busyEl());let t;try{t=await HX.lx('time')}catch(e){s.lastChild.replaceWith(errEl(e));return}s.lastChild.remove();
+   s.append(srow('Set time automatically',t.ntp?'On. The clock syncs over the internet.':'Off'));
+   const sel=h('select',{class:'txt','aria-label':'Time zone'},h('option',{},t.timezone));s.append(srow('Time zone','Changing it asks for your password.',sel));
+   HX.lx('timezones').then(list=>{sel.innerHTML='';for(const z of list)sel.append(h('option',{value:z,selected:z===t.timezone},z.replace(/_/g,' ')))}).catch(()=>{});
+   sel.onchange=async()=>{try{await HX.lx('setTimezone',sel.value);toast('Time zone changed',sel.value.replace(/_/g,' '))}catch(e){toast('Time zone not changed',errMsg(e));openSettings('time')}};
+   s.append(srow('24-hour clock','',sswitch(clock24,async v=>{clock24=await HX.clock24(v);tick();return clock24},'24-hour clock')))},
+ async keyboard(c){const s=sec(c,'Keyboard layout','Pick the layout printed on your keys.');let cur='gb';try{cur=(await HX.lx('keyboard')).layout}catch(e){}
+   const sel=h('select',{class:'txt','aria-label':'Keyboard layout'},KB_LAYOUTS.map(([k,n])=>h('option',{value:k,selected:k===cur},n)));if(!KB_LAYOUTS.some(k=>k[0]===cur))sel.prepend(h('option',{value:cur,selected:true},cur));
+   sel.onchange=()=>HX.lx('setKeyboard',sel.value).then(()=>toast('Keyboard layout changed',sel.selectedOptions[0].textContent)).catch(e=>toast('Layout not changed',errMsg(e)));
+   s.append(srow('Layout','',sel),h('input',{class:'txt',placeholder:'Type here to test your keys','aria-label':'Test keyboard'}))},
+ appearance(c){const accents=['#00e5ff','#ff2e88','#7cff4f','#9b5cff','#ff8a00','#ff3b3b'];const S=store.get('nxset',NX_DEFAULT);
+   const seg=h('div',{class:'seg'}),acc=h('div',{class:'row'}),wp=h('div',{class:'row'});
+   const draw=()=>{seg.innerHTML='';['light','dark'].forEach(m=>seg.append(h('button',{class:S.mode===m?'on':'',on:{click:()=>{S.mode=m;apply(S);draw()}}},m[0].toUpperCase()+m.slice(1))));
+     acc.innerHTML='';accents.forEach(a=>acc.append(h('button',{class:'acc'+(a===S.accent?' on':''),style:'background:'+a,'aria-label':'Accent '+a,on:{click:()=>{S.accent=a;apply(S);draw()}}})));
+     wp.innerHTML='';WALLS.forEach((w,i)=>wp.append(h('button',{class:'wp'+(i===S.wall?' on':''),style:`background:linear-gradient(135deg,${w.c.join(',')})`,'aria-label':w.n,title:w.n,on:{click:()=>{S.wall=i;apply(S);draw()}}})))};
+   sec(c,'Mode').append(seg);sec(c,'Accent colour').append(acc);sec(c,'Wallpaper').append(wp);draw();
+   if(HX&&!OSM())sec(c,'Clock').append(srow('24-hour clock','',sswitch(clock24,async v=>{clock24=await HX.clock24(v);tick();return clock24},'24-hour clock')))},
+ async apps(c){const s=sec(c,'Apps',OSM()?'Apps come from Flathub and run in their own sandbox.':'Apps install through winget, Windows’ own installer.');s.append(h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:()=>openApp('store')}},'Open the App Store')));
+   const l=sec(c,'Installed');l.append(busyEl());const list=await installedApps(true);l.lastChild.remove();if(!list.length)l.append(h('p',{class:'hint'},'Nothing installed from the App Store yet.'));
+   for(const a of list){const r=srow(a.name,a.id);if(a.key||OSM())r.append(h('button',{class:'pbtn',on:{click:()=>HX.store('launch',a.key||a.id).catch(e=>toast('Couldn’t open',errMsg(e)))}},'Open'));l.append(r)}},
+ system(c){const s=sec(c,'NexusOS');
+   s.append(srow('Start NexusOS when I sign in','Opens NexusOS automatically each time you log in to Windows.',(()=>{const b=sswitch(false,v=>HX.setLogin(v),'Start at sign in');HX.getLogin().then(v=>{b.classList.toggle('on',!!v);b.setAttribute('aria-checked',!!v)});return b})()));
+   s.append(srow('Full screen','Hides the Windows taskbar. F11 also toggles this.',(()=>{const b=sswitch(true,()=>HX.toggleFullscreen(),'Full screen');HX.isFullscreen().then(v=>{b.classList.toggle('on',!!v)});return b})()));
+   s.append(srow('NexusOS drive',SYS.drive,h('button',{class:'pbtn',on:{click:()=>HX.open(SYS.drive,true)}},'Show in Windows')))},
+ async updates(c){await nexusUpdatesSection(c);const s=sec(c,'System & apps','Security updates install automatically in the background every day. You can also check now.');let sec2;try{sec2=await HX.lx('security')}catch(e){sec2={}}
+   s.append(srow('Automatic security updates',sec2.autoUpdates?'On':'Off'));if(sec2.live)s.append(h('p',{class:'hint'},'You’re running from the USB stick, so updates last only until you shut down.'));
+   const log=h('div',{class:'joblog'});const bar=h('div',{class:'meter'},h('div',{style:'width:0'}));const go=h('button',{class:'pbtn pri'},'Check for updates now');
+   go.onclick=async()=>{go.disabled=true;log.textContent='Asking for your password…';bar.firstChild.style.width='5%';jobListeners.set('update',d=>{if(d.line)log.textContent=d.line;if(d.pct!=null)bar.firstChild.style.width=d.pct+'%'});
+     try{await HX.lx('updateSystem');log.textContent='Everything is up to date.';bar.firstChild.style.width='100%';toast('Updates finished','NexusOS and your apps are up to date.')}catch(e){log.textContent=errMsg(e)}go.disabled=false};
+   s.append(h('div',{class:'row2'},go),bar,log)},
+ async security(c){
+   if(OSM()){const s=sec(c,'This computer');s.append(busyEl());let st;try{st=await HX.lx('security')}catch(e){s.lastChild.replaceWith(errEl(e));st=null}
+     if(st){s.lastChild.remove();const item=(ok,label,good,bad)=>s.append(h('div',{class:'secitem '+(ok===true?'ok':ok===false?'warn':'na')},h('span',{class:'dot'}),h('div',{},h('b',{},label),h('small',{},ok===true?good:ok===false?bad:'Not available on this computer'))));
+       item(st.firewall,'Firewall','On. Nothing from the network can connect in.','Off. Turn it on with: sudo ufw enable');
+       item(st.autoUpdates,'Automatic security updates','On, checked daily.','Off');
+       item(st.apparmor,'App confinement (AppArmor)','On. System services are kept to their own files.','Off');
+       item(st.live?null:st.encrypted,'Disk encryption','Your disk is encrypted. Without your password, nobody can read it.','Not encrypted. Reinstall with “Encrypt system” ticked to protect your files if the laptop is lost.');
+       item(st.secureBoot,'Secure Boot','On. Only signed startup code can run.',st.live?'Off.':'Off. The button below turns it on and keeps the NVIDIA driver working.');
+       if(st.nvidiaInstalled){item(st.nvidiaLoaded?true:false,'NVIDIA graphics driver','Running. Games use your NVIDIA card.',st.secureBoot?'Not running: Secure Boot doesn’t trust it yet. Use the button below.':'Not running. The fix button below sorts it out.');
+         if(!st.nvidiaLoaded&&!st.secureBoot&&!st.live)s.append(h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:async e=>{e.target.disabled=true;const lg=h('div',{class:'joblog'});e.target.parentNode.after(lg);jobListeners.set('nvidia',d=>{if(d.line)lg.textContent=d.line});
+           try{await HX.lx('fixNvidia');lg.textContent='Done. Restart the computer to finish.'}catch(err){lg.textContent=errMsg(err);e.target.disabled=false}}}},'Fix the NVIDIA driver')))}
+       if(!st.live&&((st.secureBoot===false)||(st.secureBoot&&st.nvidiaInstalled&&!st.nvidiaLoaded)))s.append(h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>HX.lx('secureBootSetup').catch(e=>toast('Couldn’t start it',errMsg(e)))}},st.secureBoot?'Let Secure Boot trust the NVIDIA driver…':'Turn on Secure Boot with NVIDIA…')));
+       if(st.live)s.append(h('p',{class:'hint'},'You’re running from the USB stick. Install NexusOS to get encryption and a password-protected account.'))}
+     const pw=sec(c,'Password','Your password protects your account, installs and settings changes.');const p1=h('input',{class:'txt',type:'password',placeholder:'New password','aria-label':'New password',autocomplete:'new-password'}),p2=h('input',{class:'txt',type:'password',placeholder:'Type it again','aria-label':'Repeat new password',autocomplete:'new-password'});
+     const go=h('button',{class:'pbtn',on:{click:async()=>{if(p1.value!==p2.value){toast('Passwords don’t match','Type the same password twice.');return}go.disabled=true;try{await HX.lx('changePassword',p1.value);p1.value=p2.value='';toast('Password changed','Use it next time you sign in.')}catch(e){toast('Password not changed',errMsg(e))}go.disabled=false}}},'Change password');pw.append(p1,p2,h('p',{class:'hint'},'You’ll be asked for your current password first.'),h('div',{class:'row2'},go))}
+   const hs=sec(c,'NexusOS’s own protections');[
+     ['Browser in its own sandbox','Websites can’t reach your files or NexusOS’s system functions.'],
+     ['Sites ask first','Camera, microphone, location and notifications need your OK. USB and other devices are always blocked.'],
+     ['Safer downloads',SYS&&SYS.isWin?'Downloads are marked as from the internet so Windows SmartScreen checks them, and NexusOS asks before running any program.':'Downloaded files can’t run on their own, and NexusOS asks before running any program.'],
+     ['Writes stay in its drive','NexusOS only changes files inside '+(OSM()?'your home folder':'the NexusOS drive')+'.'],
+     ['Encrypted DNS','Web addresses are looked up over HTTPS when your network supports it.'],
+     ['Up-to-date engine',`Electron ${SYS?SYS.electron:''} with Chromium ${SYS?SYS.chrome.split('.')[0]:''}.`]].forEach(([a,b])=>hs.append(h('div',{class:'secitem ok'},h('span',{class:'dot'}),h('div',{},h('b',{},a),h('small',{},b)))));
+   if(SYS&&SYS.isWin)hs.append(h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>HX.winSettings('security')}},'Open Windows Security')))},
+ async storage(c){const s=sec(c,OSM()?'Your files':'NexusOS drive');s.append(busyEl('Adding up…'));try{const u=await HX.driveUsage();s.lastChild.remove();s.append(srow(fmtSize(u.bytes),`${u.files.toLocaleString('en-GB')} files in ${OSM()?'your home folder':'the NexusOS drive'}`));
+     if(u.total){const used=u.total-u.free;s.append(srow('Disk',`${fmtSize(u.free)} free of ${fmtSize(u.total)}`),h('div',{class:'meter'},h('div',{style:`width:${Math.round(used/u.total*100)}%`})))}}catch(e){s.lastChild.replaceWith(errEl(e))}
+   s.append(h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>openApp('files',{dir:SYS.drive})}},'Open in Files')))},
+ winset(c){const s=sec(c,'Windows settings','These are run by Windows, so NexusOS opens Windows’ own page for them.');
+   [['wifi','Wi-Fi'],['bluetooth','Bluetooth'],['sound','Sound'],['display','Display'],['power','Power & sleep'],['time','Date & time'],['keyboard','Keyboard'],['update','Windows Update']].forEach(([k,l])=>s.append(srow(l,'',h('button',{class:'pbtn',on:{click:()=>HX.winSettings(k).catch(e=>toast('Couldn’t open',errMsg(e)))}},'Open'))))},
+ install(c){const s=sec(c,'Install NexusOS','Put NexusOS on this computer’s disk. You can keep Windows alongside it or replace it.');
+   s.append(h('p',{class:'hint'},'The installer lets you choose your disk, set a password and encrypt your system. Back up anything important first. Replacing a disk erases it.'),h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:()=>HX.lx('installOS').catch(e=>toast('Couldn’t start the installer',errMsg(e)))}},'Start the installer')))},
+ about(c){const s=sec(c,OSM()?'NexusOS '+(SYS.version||''):'NexusOS '+(SYS?SYS.version:'')); s.append(h('p',{class:'hint'},OSM()?'NexusOS is built on Debian 13. NexusOS is its desktop.':'NexusOS runs on top of '+(SYS&&SYS.isWin?'Windows':'your computer')+'.'),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>openApp('about')}},'More about this computer')))}
+};
+function openSettings(page){if(wins.settings&&wins.settings.api.show){focus('settings');wins.settings.api.show(page)}else openApp('settings',page)}
+async function powerAction(k){closePanels();
+  if(!OSM()){if(k==='logout'||k==='shutdown')shutDown();return}
+  const labels={sleep:['Sleep now?','Your apps stay open.','Sleep'],restart:['Restart now?','Save your work first. Open apps will close.','Restart'],shutdown:['Shut down now?','Save your work first. Open apps will close.','Shut down'],logout:['Log out?','Open apps will close.','Log out']}[k];
+  if(k!=='sleep'&&!(await ask(labels[0],labels[1],labels[2],true)))return;
+  if(k==='shutdown'||k==='restart'||k==='logout'){const bt=$('#boot');$('#boot h2').textContent=k==='restart'?'Restarting':k==='logout'?'Logging out':'Shutting down';bt.classList.remove('done')}
+  try{await HX.lx('power',k)}catch(e){$('#boot').classList.add('done');toast('That didn’t work',errMsg(e))}}
+/* ---------- quick settings (real on NexusOS) ---------- */
+let quickState={bright:false},qbT=0,qvT=0;
+function syncVol(v){const e=$('#vol');if(e)e.value=v}
+async function refreshQuick(){const vr=$('#vol').closest('.slider');
+  if(!OSM()){vr.hidden=!!HX;return}
+  vr.hidden=false;
+  const [n,bt,br,au]=await Promise.all(['netStatus','btStatus','brightness','audio'].map(k=>HX.lx(k).catch(()=>null)));
+  const w=$('[data-t="wifi"]'),b=$('[data-t="bt"]');
+  if(n){w.classList.toggle('on',!!(n.wifiConnected||n.ethernet));w.lastChild.textContent=n.wifiConnected||(n.ethernet?'Wired':!n.wifiDevice?'No Wi-Fi':n.wifiEnabled?'Not connected':'Wi-Fi off')}
+  if(bt){b.classList.toggle('on',!!(bt.present&&bt.powered));b.lastChild.textContent=!bt.present?'No Bluetooth':bt.powered?'Bluetooth':'Bluetooth off'}
+  quickState.bright=!!(br&&br.present);if(quickState.bright){$('#bright').min=5;$('#bright').value=br.percent}
+  const out=au&&(au.outputs.find(x=>x.isDefault)||au.outputs[0]);if(out)syncVol(Math.min(100,out.volume))}
+let CAT=null;
+
+/* ---------- taskbar ---------- */
+const PINNED=['web','files','store','notes','calc','term','paint','settings'];
+function renderBar(){
+  const box=$('#apps');box.innerHTML='';
+  const keys=[...PINNED];Object.values(wins).forEach(w=>{if(!keys.includes(w.key))keys.push(w.key)});
+  keys.forEach(k=>{
+    const open=Object.keys(wins).filter(id=>wins[id].key===k);
+    const on=open.includes(active);
+    const b=h('button',{class:'tb'+(open.length?' run':'')+(on?' on':''),title:APPS[k].name,'aria-label':APPS[k].name},glyph(k));
+    b.onclick=()=>{if(!open.length)return openApp(k);const id=open[open.length-1];if(on)minimise(id);else focus(id)};
+    box.append(b);
+  });
+  if(extWins.length){box.append(h('div',{class:'sep'}));
+   extWins.forEach(w=>{const name=w.title||w.cls;const nm=(w.cls.split('.').pop()||name);let g=letterIcon(nm);
+    const a=STORE_CACHE.list.find(x=>x.name&&(nm.toLowerCase().includes(x.name.toLowerCase().split(' ')[0])||x.id.toLowerCase().split('.').pop()===nm.toLowerCase()));
+    const b=h('button',{class:'tb run',title:name+' (middle-click to close)','aria-label':name},g);
+    if(a)appIcon(a.id).then(u=>{if(u){const n2=letterIcon(nm,u);g.replaceWith(n2);g=n2}});
+    b.onclick=()=>HX.lx('focusWindow',w.id).catch(()=>{});b.addEventListener('auxclick',e=>{if(e.button===1)HX.lx('closeWindow',w.id).catch(()=>{})});box.append(b)})}
+}
+
+/* ---------- panels ---------- */
+function closePanels(){$('#start').classList.remove('open');$('#quick').classList.remove('open');if(typeof pm!=='undefined'&&pm){pm.remove();pm=null}}
+$('#startBtn').onclick=e=>{e.stopPropagation();$('#quick').classList.remove('open');const s=$('#start');s.classList.toggle('open');if(s.classList.contains('open')){$('#search').value='';renderGrid('');setTimeout(()=>$('#search').focus(),50)}};
+$('#tray').onclick=e=>{e.stopPropagation();$('#start').classList.remove('open');$('#quick').classList.toggle('open');renderCal();if($('#quick').classList.contains('open'))refreshQuick()};
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('.panel,#bar'))closePanels()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePanels();if(e.key==='Meta'||(e.ctrlKey&&e.key==='Escape')){e.preventDefault();$('#startBtn').click()}});
+function renderGrid(q){const g=$('#grid');g.innerHTML='';const ql=q.toLowerCase();
+ Object.keys(APPS).filter(k=>APPS[k].name.toLowerCase().includes(ql)).forEach(k=>g.append(h('button',{class:'icon',on:{click:()=>openApp(k)}},glyph(k),APPS[k].name)));
+ if(OSM()){const extra=[['System terminal',()=>HX.lx('openTerminal')]];if(SYS.live)extra.push(['Install NexusOS',()=>openSettings('install')]);
+  extra.filter(([n])=>n.toLowerCase().includes(ql)).forEach(([n,fn])=>g.append(h('button',{class:'icon ext',on:{click:()=>{closePanels();Promise.resolve(fn()).catch(e=>toast('Couldn’t open that',errMsg(e)))}}},letterIcon(n),n)))}
+ if(!g.children.length)g.append(h('div',{class:'nomatch',style:'color:var(--muted);padding:8px'},'No apps match “'+q+'”'));
+ if(HX)installedApps().then(list=>{if($('#search').value!==q||!$('#start').classList.contains('open'))return;
+  const add=list.filter(a=>a.name&&a.name.toLowerCase().includes(ql)&&(OSM()||(CAT&&CAT.some(c=>c.key===a.key&&c.canLaunch))));if(!add.length)return;const nm=$('.nomatch',g);if(nm)nm.remove();
+  add.forEach(a=>{let gl=letterIcon(a.name);appIcon(a.id).then(u=>{if(u){const n2=letterIcon(a.name,u);gl.replaceWith(n2);gl=n2}});
+   g.append(h('button',{class:'icon ext',title:a.name,on:{click:()=>{closePanels();HX.store('launch',a.key||a.id).then(()=>toast('Opening '+a.name,'')).catch(e=>toast('Couldn’t open '+a.name,errMsg(e)))}}},gl,h('span',{class:'dname'},a.name)))})})}
+$('#search').addEventListener('input',e=>renderGrid(e.target.value));
+$('#search').addEventListener('keydown',e=>{if(e.key==='Enter'){const f=$('#grid .icon');f&&f.click()}});
+let pm=null;
+$('#power').onclick=e=>{e.stopPropagation();if(pm){pm.remove();pm=null;return}
+ const B=(l,fn)=>h('button',{on:{click:fn}},l);
+ pm=OSM()?h('div',{class:'pmenu'},B('Sleep',()=>powerAction('sleep')),B('Restart',()=>powerAction('restart')),B('Shut down',()=>powerAction('shutdown')),B('Log out',()=>powerAction('logout')))
+  :h('div',{class:'pmenu'},B('Restart NexusOS',()=>{closePanels();Object.keys(wins).forEach(close);boot()}),HX?B('Toggle full screen',()=>{closePanels();HX.toggleFullscreen()}):null,B(HX?'Quit NexusOS':'Shut down (restart)',shutDown));
+ $('#start').append(pm)};
+function shutDown(){closePanels();const bt=$('#boot');$('#boot h2').textContent='Shutting down';bt.classList.remove('done');setTimeout(()=>{if(HX)HX.quit();else{$('#boot h2').textContent='NexusOS';Object.keys(wins).forEach(close);boot()}},1200)}
+document.querySelectorAll('.tile').forEach(t=>t.onclick=()=>{const k=t.dataset.t;
+  if(k==='focus'){t.classList.toggle('on');toast(t.classList.contains('on')?'Focus on':'Focus off',t.classList.contains('on')?'Notifications are paused.':'Notifications are back on.');return}
+  if(OSM()){closePanels();openSettings(k==='wifi'?'wifi':'bluetooth');return}
+  if(HX&&SYS&&SYS.isWin){closePanels();HX.winSettings(k==='wifi'?'wifi':'bluetooth').catch(()=>{});return}
+  if(k==='wifi'){closePanels();openApp('web');return}
+  t.classList.toggle('on')});
+$('#bright').oninput=e=>{const v=+e.target.value;if(OSM()&&quickState.bright){clearTimeout(qbT);qbT=setTimeout(()=>HX.lx('setBrightness',v).catch(()=>{}),60)}else document.body.style.filter=v<100?`brightness(${v/100})`:''};
+$('#vol').oninput=e=>{if(!OSM())return;const v=+e.target.value;clearTimeout(qvT);qvT=setTimeout(()=>HX.lx('setVolume',v).catch(()=>{}),60)};
+function renderCal(){const d=new Date(),y=d.getFullYear(),m=d.getMonth(),first=(new Date(y,m,1).getDay()+6)%7,days=new Date(y,m+1,0).getDate(),prev=new Date(y,m,0).getDate();
+  let rows='',c=0,cells=[];for(let i=first;i>0;i--)cells.push(`<td class="x">${prev-i+1}</td>`);for(let i=1;i<=days;i++)cells.push(`<td${i===d.getDate()?' class="t"':''}>${i}</td>`);let n=1;while(cells.length%7)cells.push(`<td class="x">${n++}</td>`);
+  for(let i=0;i<cells.length;i+=7)rows+='<tr>'+cells.slice(i,i+7).join('')+'</tr>';
+  $('#cal').innerHTML=`<div class="ch"><b>${d.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</b><span style="color:var(--muted)">${d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric'})}</span></div><table><tr>${['Mo','Tu','We','Th','Fr','Sa','Su'].map(x=>`<th>${x}</th>`).join('')}</tr>${rows}</table>`}
+function tick(){const d=new Date();$('#clock b').textContent=d.toLocaleTimeString('en-GB',{hour:clock24?'2-digit':'numeric',minute:'2-digit',hour12:!clock24});$('#clock span').textContent=d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})}
+setInterval(tick,1000);tick();
+function toast(t,s){const e=h('div',{class:'toast'},h('b',{},t),s?h('span',{},s):null);const prev=[...document.querySelectorAll('.toast:not(.out)')];let top=16;prev.forEach(x=>top=Math.max(top,x.offsetTop+x.offsetHeight+8));e.style.top=top+'px';document.body.append(e);setTimeout(()=>e.classList.add('out'),2600);setTimeout(()=>e.remove(),3000)}
+
+/* ---------- file system ---------- */
+const FS=store.get('fs',null)||{
+ Documents:[{n:'Welcome.txt',t:'txt',c:'Welcome to NexusOS.\n\nDouble-click an icon to open it, drag windows by their title bar, and double-click a title bar to maximise.\n\nTry the Terminal: type "help".'},{n:'Shopping list.txt',t:'txt',c:'- Oat milk\n- Coffee beans\n- Basil\n- Batteries (AA)'},{n:'Ideas.txt',t:'txt',c:'Weekend: walk the Itchen Way, then lunch by the water.'}],
+ Pictures:[{n:'Sketch.png',t:'img',c:null}],
+ Downloads:[{n:'halcyon-release-notes.txt',t:'txt',c:'NexusOS 1.0\n- New taskbar\n- Quick settings\n- Paint, Mines and Terminal apps'}]
+};
+const saveFS=()=>store.set('fs',FS);
+
+
+/* ---------- NexusOS drive helpers (desktop app) ---------- */
+const UPICON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+const IMG_RE=/\.(png|jpe?g|gif|webp|bmp)$/i;
+const errMsg=e=>String((e&&e.message)||e).replace(/^Error invoking remote method '[^']+': (Error: )?/,'');
+const inDrive=p=>SYS&&(p===SYS.drive||p.startsWith(SYS.drive+SYS.sep));
+const shortPath=p=>inDrive(p)?(OSM()?'Home':'NexusOS')+(p===SYS.drive?'':' › '+p.slice(SYS.drive.length+1).split(SYS.sep).join(' › ')):p;
+const BIN=()=>SYS&&SYS.isWin?'Recycle Bin':'Bin';
+const baseOf=p=>p.split(SYS?SYS.sep:'/').pop();
+function openPath(path,name){name=name||baseOf(path);if(TEXT_RE.test(name))openApp('notes',{real:path,n:name});else if(IMG_RE.test(name))openApp('paint',{real:path,n:name,t:'img'});else openPathSafe(path,name)}
+function refreshFiles(){Object.values(wins).forEach(w=>{if(w.key==='files'&&w.api.refresh)w.api.refresh()});refreshDesktop()}
+
+/* ---------- apps ---------- */
+const LEGACY={
+ files:{name:'Files',w:760,h:480,mount(b,api,start){
+  let cur=start?{real:start}:{v:'Documents'};const nav=h('nav'),main=h('div',{class:'main'}),bar=h('div',{class:'pathbar'}),list=h('ul');main.append(bar,list);
+  const navBtn=(label,on,fn)=>nav.append(h('button',{class:on?'on':'',on:{click:fn}},label));
+  const row=(ic,name,meta,open)=>{const li=h('li',{tabIndex:0,on:{dblclick:open,keydown:e=>{if(e.key==='Enter')open()},click:e=>{if(e.pointerType==='touch')open()}}},fileIcon(ic),h('span',{style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},name),h('small',{},meta));list.append(li)};
+  async function draw(){
+   nav.innerHTML='';nav.append(h('div',{class:'h'},'NexusOS'));
+   Object.keys(FS).forEach(k=>navBtn(k,cur.v===k,()=>{cur={v:k};draw()}));
+   if(HX&&SYS){nav.append(h('div',{class:'h'},'This PC'));
+    [['Home',''],['Desktop','Desktop'],['Documents','Documents'],['Downloads','Downloads'],['Pictures','Pictures'],['Music','Music'],['Videos','Videos']].forEach(([l,sub])=>{const p=sub?SYS.home+SYS.sep+sub:SYS.home;navBtn(l,cur.real===p,()=>{cur={real:p};draw()})})}
+   list.innerHTML='';bar.innerHTML='';
+   if(cur.v){bar.append(h('b',{},'NexusOS › '+cur.v));api.setTitle('Files — '+cur.v);
+    if(!FS[cur.v].length)list.append(h('li',{style:'color:var(--muted)'},'','This folder is empty.'));
+    FS[cur.v].forEach(f=>row(f.t,f.n,f.t==='txt'?(f.c||'').length+' B':'image',()=>f.t==='txt'?openApp('notes',f):openApp('paint',f)));return}
+   let res;try{res=await HX.list(cur.real)}catch(e){bar.append(h('b',{},cur.real));list.append(h('li',{style:'color:var(--muted)'},'','NexusOS can’t open this folder. It may not exist or you may not have permission.'));return}
+   const up=h('button',{class:'ibtn',title:'Up one folder','aria-label':'Up one folder',disabled:!res.parent,html:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',on:{click:()=>{if(res.parent){cur={real:res.parent};draw()}}}});
+   const ext=h('button',{class:'pbtn',on:{click:()=>HX.open(res.dir)}},'Open in Explorer');
+   bar.append(up,h('b',{style:'flex:1;overflow:hidden;text-overflow:ellipsis'},res.dir),ext);
+   api.setTitle('Files — '+res.dir.split(SYS.sep).pop());
+   if(!res.entries.length)list.append(h('li',{style:'color:var(--muted)'},'','This folder is empty.'));
+   res.entries.slice(0,500).forEach(f=>{
+    const kind=f.dir?'dir':/\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name)?'img':'txt';
+    row(kind,f.name,f.dir?'folder':fmtSize(f.size),()=>{if(f.dir){cur={real:f.path};draw()}else if(TEXT_RE.test(f.name))openApp('notes',{real:f.path,n:f.name});else HX.open(f.path)})});
+   if(res.entries.length>500)list.append(h('li',{style:'color:var(--muted)'},'','Showing the first 500 items. Open in Explorer to see the rest.'));
+  }
+  b.append(h('div',{class:'files'},nav,main));draw();api.refresh=draw;}},
+ notes:{name:'Notes',w:560,h:440,multi:true,mount(b,api,file){
+  const ta=h('textarea',{class:'note',spellcheck:true,placeholder:'Start typing…'});
+  if(file&&file.real){
+   const status=h('span',{style:'flex:1'},'Loading…'),save=h('button',{class:'pbtn',disabled:true},'Save');
+   b.style.display='flex';b.style.flexDirection='column';ta.style.flex='1';
+   b.append(h('div',{class:'notebar'},status,save));api.setTitle(file.n+' — Notes');
+   HX.readText(file.real).then(t=>{ta.value=t;status.textContent=file.real}).catch(e=>{status.textContent='Couldn’t open this file: '+(e.message||e).replace(/^Error invoking remote method '[^']+': (Error: )?/,'');ta.disabled=true});
+   let dirty=false;ta.addEventListener('input',()=>{if(!dirty){dirty=true;save.disabled=false;api.setTitle('● '+file.n+' — Notes')}});
+   const doSave=()=>HX.writeText(file.real,ta.value).then(()=>{dirty=false;save.disabled=true;api.setTitle(file.n+' — Notes');toast('Saved',file.n)}).catch(()=>toast('Couldn’t save','You may not have permission to change this file.'));
+   save.onclick=doSave;ta.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();if(dirty)doSave()}});
+  }
+  else if(file){ta.value=file.c;api.setTitle(file.n+' — Notes');ta.addEventListener('input',()=>{file.c=ta.value;saveFS()})}
+  else{ta.value=store.get('scratch','');ta.addEventListener('input',()=>store.set('scratch',ta.value))}
+  b.append(ta);setTimeout(()=>ta.focus(),60);}},
+ term:{name:'Terminal',w:620,h:380,mount(b,api){
+  const t=h('div',{class:'term'});let cwd='~';
+  const line=s=>{t.insertBefore(h('div',{},s),inp.parentNode)};
+  const inp=h('input',{spellcheck:false,autocomplete:'off','aria-label':'Command'});
+  const who=()=>(SYS?SYS.user:'xiaoming').toLowerCase();const prompt=()=>h('span',{class:'p'},who()+'@nexus '+cwd+' $ ');
+  const row=h('div',{},prompt(),inp);
+  t.append(h('div',{},'NexusOS Terminal — type "help" for commands.'),row);
+  const hist=[];let hi=0;
+  const cmds={
+   help:()=>'help, ls, cd <dir>, cat <file>, echo <text>, date, whoami, open <app>, browse <site or search>, neofetch, shutdown, clear',
+   browse:a=>{openApp('web',a||'');return a?'Opening '+a+'…':'Opening Browser…'},
+   shutdown:()=>{if(OSM()){powerAction('shutdown');return''}shutDown();return'Shutting down…'},
+   ls:()=>cwd==='~'?Object.keys(FS).join('   '):(FS[cwd.slice(2)]||[]).map(f=>f.n).join('   ')||'(empty)',
+   cd:a=>{if(!a||a==='~'||a==='..'){cwd='~';return''}if(FS[a]&&cwd==='~'){cwd='~/'+a;return''}return'cd: no such folder: '+a},
+   cat:a=>{const f=(FS[cwd.slice(2)]||[]).find(f=>f.n===a);return f?(f.t==='txt'?f.c:'cat: '+a+' is an image'):'cat: '+(a||'')+': not found (use cd first)'},
+   echo:a=>a||'',date:()=>new Date().toString(),whoami:()=>who(),
+   open:a=>{const k=Object.keys(APPS).find(k=>APPS[k].name.toLowerCase()===String(a).toLowerCase()||k===a);if(k){openApp(k);return'Opening '+APPS[k].name+'…'}return'open: unknown app: '+a},
+   neofetch:()=>`   ◆      ${who()}@nexus\n  ◆ ◆     OS: NexusOS 1.1${SYS?' on '+SYS.platform:''}\n   ◆      CPU: ${SYS?SYS.cpu+' ('+SYS.cores+' threads)':'browser'}\n          Memory: ${SYS?fmtSize(SYS.memTotal-SYS.memFree)+' / '+fmtSize(SYS.memTotal):'n/a'}\n          Uptime: ${SYS?fmtUp(SYS.uptime):'n/a'}\n          Network: ${navigator.onLine?'online':'offline'}\n          Windows open: ${Object.keys(wins).length}\n          Resolution: ${screen.width}×${screen.height}`,
+   clear:()=>{[...t.children].forEach(c=>c!==row&&c.remove());return null}
+  };
+  inp.addEventListener('keydown',e=>{
+   if(e.key==='ArrowUp'){if(hi>0)inp.value=hist[--hi];e.preventDefault();return}
+   if(e.key==='ArrowDown'){inp.value=hist[++hi]||'';if(hi>hist.length)hi=hist.length;return}
+   if(e.key!=='Enter')return;const v=inp.value.trim();inp.value='';
+   line([prompt(),v]);if(v){hist.push(v);hi=hist.length}
+   const [c,...a]=v.split(' ');if(!c){b.scrollTop=1e9;return}
+   const out=cmds[c]?cmds[c](a.join(' ')):c+': command not found';
+   if(out)line(out);row.replaceChild(prompt(),row.firstChild);b.scrollTop=1e9});
+  t.addEventListener('click',()=>inp.focus());b.append(t);setTimeout(()=>inp.focus(),60);}},
+ paint:{name:'Paint',w:680,h:480,mount(b,api,file){
+  const cv=h('canvas'),cols=['#12211f','#e85d8a','#f0b451','#3fd0b4','#2fa6d6','#5b7cfa','#ffffff'];let col=cols[0],size=5;
+  const sws=cols.map(c=>h('button',{class:'sw8'+(c===col?' on':''),style:'background:'+c,'aria-label':'Colour '+c,on:{click:e=>{col=c;sws.forEach(s=>s.classList.remove('on'));e.currentTarget.classList.add('on')}}}));
+  const rng=h('input',{type:'range',min:1,max:40,value:5,style:'max-width:110px;flex:none','aria-label':'Brush size',on:{input:e=>size=+e.target.value}});
+  const ctx=cv.getContext('2d');
+  const fit=()=>{const r=cv.getBoundingClientRect();if(!r.width)return;const tmp=document.createElement('canvas');tmp.width=cv.width;tmp.height=cv.height;tmp.getContext('2d').drawImage(cv,0,0);cv.width=r.width*devicePixelRatio;cv.height=r.height*devicePixelRatio;ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);ctx.drawImage(tmp,0,0)};
+  let target=file&&file.t==='img'?file:null;
+  const save=h('button',{class:'pbtn',on:{click:()=>{const url=cv.toDataURL('image/png');if(target){target.c=url}else{target={n:'Drawing '+(FS.Pictures.length+1)+'.png',t:'img',c:url};FS.Pictures.push(target)}saveFS();api.setTitle(target.n+' — Paint');Object.values(wins).forEach(w=>w.api.refresh&&w.api.refresh());toast('Saved',target.n+' is in Pictures.')}}},'Save');
+  b.append(h('div',{class:'paint'},h('div',{class:'ptools'},sws,rng,h('button',{class:'pbtn',on:{click:()=>{ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height)}}},'Clear'),save),cv));
+  requestAnimationFrame(()=>{fit();if(target&&target.c){const im=new Image();im.onload=()=>ctx.drawImage(im,0,0);im.src=target.c;api.setTitle(target.n+' — Paint')}});
+  api.el.addEventListener('winresize',fit);const ro=new ResizeObserver(fit);ro.observe(cv);api.onClose=()=>ro.disconnect();
+  let last=null;
+  cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);const r=cv.getBoundingClientRect();last=[(e.clientX-r.left)*devicePixelRatio,(e.clientY-r.top)*devicePixelRatio];draw(e)});
+  const draw=e=>{if(!last)return;const r=cv.getBoundingClientRect(),p=[(e.clientX-r.left)*devicePixelRatio,(e.clientY-r.top)*devicePixelRatio];ctx.strokeStyle=col;ctx.lineWidth=size*devicePixelRatio;ctx.lineCap=ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(...last);ctx.lineTo(...p);ctx.stroke();last=p};
+  cv.addEventListener('pointermove',draw);cv.addEventListener('pointerup',()=>last=null);}},
+};
+const APPS={
+ files:{name:'Files',w:820,h:520,onArg:(w,arg)=>w.api.go&&w.api.go(arg),mount(b,api,start){
+  if(!HX||!SYS)return LEGACY.files.mount(b,api,start&&start.real);
+  const D=SYS.drive,sep=SYS.sep;let cur=(start&&start.dir)||D+sep+'Documents';let selName=(start&&start.select)||null;let res=null;let mode=null;
+  const nav=h('nav'),main=h('div',{class:'main'}),bar=h('div',{class:'pathbar'}),acts=h('div',{class:'fileacts'}),list=h('ul');main.append(bar,acts,list);
+  const go=p=>{cur=p;selName=null;mode=null;draw()};
+  const navBtn=(label,p)=>nav.append(h('button',{class:cur===p?'on':'',on:{click:()=>go(p)}},label));
+  const sel=()=>res&&res.entries.find(e=>e.name===selName);
+  const open=f=>{if(f.dir)go(f.path);else openPath(f.path,f.name)};
+  // other drives (NexusOS): Windows partitions, USB sticks, SD cards
+  let DRV=[];const devBox=h('div',{class:'devs'});
+  const driveOf=p=>DRV.find(d=>d.mountpoint&&(p===d.mountpoint||p.startsWith(d.mountpoint+'/')));
+  function fillDevs(){devBox.innerHTML='';for(const d of DRV){const on=!!(d.mountpoint&&driveOf(cur)===d);
+    devBox.append(h('button',{class:on?'on':'',title:d.label+' · '+fmtSize(d.size)+(d.locked?' · locked (BitLocker)':d.readOnly?' · read-only':''),on:{click:()=>openDrive(d)}},(d.locked?'🔒 ':'')+d.label+' ',h('small',{},fmtSize(d.size))))}}
+  async function loadDrives(){if(!OSM())return;try{DRV=await HX.lx('drives')}catch(e){DRV=[]}fillDevs()}
+  async function openDrive(d){try{
+    if(d.locked){const key=await askText('Unlock '+d.label,'This drive is locked with BitLocker. Type its recovery key (the 48 digits from account.microsoft.com/devices/recoverykey). It stays unlocked until you restart, and NexusOS only ever reads it.','Recovery key','Unlock');
+      if(!key)return;await HX.lx('unlockDrive',d.path,key);toast('Unlocked',d.label);await loadDrives();const nd=DRV.find(x=>x.windows&&!x.locked);if(nd)return openDrive(nd);return}
+    const mp=d.mountpoint||await HX.lx('mountDrive',d.path);if(!mp)throw new Error('Couldn’t open that drive.');await loadDrives();go(mp)}
+   catch(e){toast('Couldn’t open '+d.label,errMsg(e))}}
+  function renderActs(){acts.innerHTML='';const s=sel();
+    if(mode&&mode.kind==='delete'&&s){acts.append(h('span',{class:'nstat'},`Move “${s.name}” to the ${BIN()}?`),h('button',{class:'pbtn danger',on:{click:async()=>{try{await HX.trash(s.path);toast('Moved to the '+BIN(),s.name);selName=null}catch(e){toast('Couldn’t delete',errMsg(e))}mode=null;draw();refreshDesktop()}}},'Move to '+BIN()),h('button',{class:'pbtn',on:{click:()=>{mode=null;renderActs()}}},'Cancel'));return}
+    if(res&&res.inDrive){acts.append(h('button',{class:'pbtn',on:{click:newFolder}},'New folder'));if(!OSM())acts.append(h('button',{class:'pbtn',on:{click:addFromPC}},'Add from PC…'))}
+    if(s){acts.append(h('button',{class:'pbtn',on:{click:()=>open(s)}},'Open'));if(res.inDrive)acts.append(h('button',{class:'pbtn',on:{click:()=>startRename(s)}},'Rename'));
+      if(!res.inDrive&&OSM())acts.append(h('button',{class:'pbtn pri',on:{click:async e=>{e.target.disabled=true;e.target.textContent='Copying…';try{const p=await HX.copyIn(s.path);toast('Copied to your files',shortPath(p))}catch(err){toast('Couldn’t copy',errMsg(err))}renderActs()}}},'Copy to my files'));
+      if(!s.dir&&res.inDrive&&!OSM())acts.append(h('button',{class:'pbtn',on:{click:()=>HX.copyToPC(s.path).then(p=>{if(p)toast('Copied to your PC',p)}).catch(e=>toast('Couldn’t copy',errMsg(e)))}},'Copy to PC…'));
+      if(res.inDrive)acts.append(h('button',{class:'pbtn danger',on:{click:()=>{mode={kind:'delete'};renderActs()}}},'Delete'))}
+    const dv=OSM()&&res&&driveOf(res.dir);if(dv){acts.append(h('span',{style:'flex:1'}),h('span',{class:'nstat'},dv.readOnly?'Read-only: NexusOS never changes this drive':''));if(dv.removable)acts.append(h('button',{class:'pbtn',on:{click:async()=>{try{await HX.lx('unmountDrive',dv.path);toast('Safe to remove',dv.label);go(D);loadDrives()}catch(e){toast('Couldn’t eject',errMsg(e))}}}},'Eject'))}
+    if(!OSM())acts.append(h('span',{style:'flex:1'}),h('button',{class:'pbtn',title:SYS.isWin?'Open this folder in Windows File Explorer':'Open this folder in your file manager',on:{click:()=>HX.open(res?res.dir:cur,true).catch(e=>toast('Couldn’t open',errMsg(e)))}},SYS.isWin?'Show in Windows':'Show in file manager'))}
+  function setSel(name){selName=name;mode=null;list.querySelectorAll('li[data-n]').forEach(li=>li.classList.toggle('sel',li.dataset.n===name));renderActs()}
+  async function newFolder(){try{const p=await HX.mkdir(res.dir,'New folder');selName=baseOf(p);await draw();const s=sel();if(s)startRename(s);refreshDesktop()}catch(e){toast('Couldn’t make a folder',errMsg(e))}}
+  async function addFromPC(){try{const n=await HX.addFromPC(res.dir);if(n){toast('Added to NexusOS',n+' file'+(n>1?'s':'')+' copied into '+shortPath(res.dir));draw();refreshDesktop()}}catch(e){toast('Couldn’t copy',errMsg(e))}}
+  function startRename(f){const li=list.querySelector(`li[data-n="${CSS.escape(f.name)}"]`);if(!li)return;const span=li.children[1];const inp=h('input',{class:'ren',value:f.name,spellcheck:false,'aria-label':'New name'});span.replaceWith(inp);inp.focus();
+    const dot=f.dir?-1:f.name.lastIndexOf('.');inp.setSelectionRange(0,dot>0?dot:f.name.length);let done=false;
+    const finish=async ok=>{if(done)return;done=true;const v=inp.value.trim();if(ok&&v&&v!==f.name){try{const np=await HX.rename(f.path,v);selName=baseOf(np)}catch(e){toast('Couldn’t rename',errMsg(e))}}draw();refreshDesktop()};
+    inp.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter')finish(true);if(e.key==='Escape')finish(false)});inp.addEventListener('blur',()=>finish(true))}
+  async function draw(){
+    nav.innerHTML='';nav.append(h('div',{class:'h'},OSM()?'Your files':'NexusOS'));navBtn(OSM()?'Home':'NexusOS drive',D);SYS.folders.forEach(f=>navBtn(f,D+sep+f));
+    nav.append(h('div',{class:'h'},OSM()?'Drives':'This PC'));(SYS.places||[]).filter(pl=>!OSM()||!pl.path.startsWith('/media/')).forEach(pl=>navBtn(pl.label,pl.path));if(OSM()){nav.append(devBox);fillDevs()}
+    try{res=await HX.list(cur)}catch(e){res=null;bar.innerHTML='';list.innerHTML='';bar.append(h('b',{},cur));list.append(h('li',{class:'empty'},'','NexusOS can’t open this folder. It may not exist or you may not have permission.'));renderActs();return}
+    const canUp=res.inDrive?res.dir!==D:!!res.parent;
+    bar.innerHTML='';bar.append(h('button',{class:'ibtn',title:'Up one folder','aria-label':'Up one folder',disabled:!canUp,html:UPICON,on:{click:()=>{if(canUp)go(res.parent)}}}),h('b',{style:'flex:1;overflow:hidden;text-overflow:ellipsis'},shortPath(res.dir)));
+    api.setTitle('Files — '+(res.dir===D?(OSM()?'Home':'NexusOS drive'):baseOf(res.dir)||res.dir));
+    list.innerHTML='';if(selName&&!sel())selName=null;
+    if(!res.entries.length)list.append(h('li',{class:'empty'},'',res.inDrive?'This folder is empty. Downloads, notes and drawings you save show up in NexusOS’s folders.':'This folder is empty.'));
+    res.entries.slice(0,500).forEach(f=>{const kind=f.dir?'dir':IMG_RE.test(f.name)?'img':'txt';
+      const li=h('li',{tabIndex:0,class:f.name===selName?'sel':'','data-n':f.name,on:{click:e=>{setSel(f.name);if(e.pointerType==='touch')open(f)},dblclick:()=>open(f),
+        keydown:e=>{if(e.target.tagName==='INPUT')return;if(e.key==='Enter')open(f);else if(e.key==='Delete'){setSel(f.name);mode={kind:'delete'};renderActs()}else if(e.key==='F2')startRename(f)}}},
+        fileIcon(kind),h('span',{style:'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'},f.name),h('small',{},f.dir?'folder':fmtSize(f.size)));list.append(li)});
+    if(res.entries.length>500)list.append(h('li',{class:'empty'},'','Showing the first 500 items.'));
+    renderActs();const s=list.querySelector('li.sel');if(s)s.scrollIntoView({block:'nearest'})}
+  b.append(h('div',{class:'files'},nav,main));draw();loadDrives();if(OSM()){const t=setInterval(()=>{if(!b.isConnected)return clearInterval(t);loadDrives()},4000)}api.refresh=draw;api.go=arg=>{cur=(arg&&arg.dir)||cur;selName=(arg&&arg.select)||null;mode=null;draw()}}},
+ notes:{name:'Notes',w:580,h:460,multi:true,mount(b,api,file){
+  if(!HX||!SYS)return LEGACY.notes.mount(b,api,file);
+  let real=file&&file.real?file.real:null,name=file&&file.n?file.n:null,dirty=false;
+  const ta=h('textarea',{class:'note',spellcheck:true,placeholder:'Start typing…'});
+  const status=h('span',{class:'nstat'}),nameIn=h('input',{class:'nname',value:'Untitled.txt','aria-label':'File name',spellcheck:false}),save=h('button',{class:'pbtn'},'Save');
+  const barEl=h('div',{class:'notebar'});b.style.display='flex';b.style.flexDirection='column';ta.style.flex='1';b.append(barEl,ta);
+  const paintBar=()=>{barEl.innerHTML='';if(real)barEl.append(status,save);else barEl.append(h('span',{class:'nstat',style:'flex:none'},'Save to Documents as'),nameIn,h('span',{style:'flex:1'}),save);
+    if(real)status.textContent=shortPath(real.slice(0,real.lastIndexOf(SYS.sep)));save.disabled=!!real&&!dirty;api.setTitle((dirty?'● ':'')+(name||'Untitled')+' — Notes')};
+  const doSave=async()=>{try{if(!real){let n=nameIn.value.trim()||'Untitled.txt';if(!/\.[a-z0-9]{1,5}$/i.test(n))n+='.txt';real=await HX.unique(SYS.drive+SYS.sep+'Documents',n);name=baseOf(real)}
+      await HX.writeText(real,ta.value);dirty=false;paintBar();toast('Saved',name+' · '+shortPath(real.slice(0,real.lastIndexOf(SYS.sep))));refreshFiles()}catch(e){toast('Couldn’t save',errMsg(e))}};
+  if(real){status.textContent='Loading…';HX.readText(real).then(t=>{ta.value=t;paintBar()}).catch(e=>{status.textContent='Couldn’t open this file: '+errMsg(e);ta.disabled=true})}
+  paintBar();
+  ta.addEventListener('input',()=>{if(!dirty){dirty=true;paintBar()}});
+  save.onclick=doSave;ta.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();doSave()}});
+  nameIn.addEventListener('keydown',e=>{if(e.key==='Enter')doSave()});setTimeout(()=>ta.focus(),60)}},
+ web:{name:'Browser',w:1000,h:640,onArg:(w,url)=>w.api.go(url),mount(b,api,url){
+  if(!HX){b.append(h('div',{class:'about'},h('h1',{},'Browser'),h('p',{},'The browser works when NexusOS runs as the desktop app on your PC.')));api.go=()=>{};return}
+  const HOME='https://duckduckgo.com/';
+  const tabsEl=h('div',{class:'tabs'}),views=h('div',{class:'views'}),prog=h('div',{class:'prog'});
+  const addr=h('input',{placeholder:'Search or type a web address',spellcheck:false,autocomplete:'off','aria-label':'Address'});
+  const I2=p=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+p+'</svg>';
+  const back=h('button',{class:'ibtn',title:'Back','aria-label':'Back',html:I2('<path d="M15 18l-6-6 6-6"/>')}),fwd=h('button',{class:'ibtn',title:'Forward','aria-label':'Forward',html:I2('<path d="M9 18l6-6-6-6"/>')}),rel=h('button',{class:'ibtn',title:'Reload','aria-label':'Reload',html:I2('<path d="M21 12a9 9 0 1 1-2.6-6.4L21 8"/><path d="M21 3v5h-5"/>')}),home=h('button',{class:'ibtn',title:'Home','aria-label':'Home',html:I2('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>')}),newt=h('button',{class:'ibtn',title:'New tab','aria-label':'New tab',html:I2('<path d="M12 5v14M5 12h14"/>')}),ext=h('button',{class:'ibtn',title:'Open in your normal browser','aria-label':'Open in your normal browser',html:I2('<path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>')});
+  b.append(h('div',{class:'brw'},tabsEl,h('div',{class:'navr'},back,fwd,rel,home,addr,newt,ext),prog,views));
+  const tabs=[];let cur=null;
+  const norm=v=>{v=v.trim();if(!v)return HOME;if(/^[a-z]+:\/\//i.test(v))return v;if(/^[^\s]+\.[a-z]{2,}(\/.*)?$/i.test(v)||/^localhost(:\d+)?/.test(v))return 'https://'+v;return 'https://duckduckgo.com/?q='+encodeURIComponent(v)};
+  function sync(){if(!cur)return;let can=false,canF=false;try{can=cur.wv.canGoBack();canF=cur.wv.canGoForward()}catch(e){}back.disabled=!can;fwd.disabled=!canF;if(document.activeElement!==addr)addr.value=cur.url||'';api.setTitle((cur.title||'New tab')+' — Browser');drawTabs()}
+  function drawTabs(){tabsEl.innerHTML='';tabs.forEach(t=>{const x=h('i',{title:'Close tab'},'×');x.onclick=e=>{e.stopPropagation();closeTab(t)};tabsEl.append(h('button',{class:'tab'+(t===cur?' on':''),on:{click:()=>select(t)}},h('span',{},t.title||'New tab'),x))})}
+  function select(t){cur=t;tabs.forEach(x=>x.wv.classList.toggle('hide',x!==t));sync()}
+  function closeTab(t){const i=tabs.indexOf(t);t.wv.remove();tabs.splice(i,1);if(!tabs.length)return api.close();if(cur===t)select(tabs[Math.max(0,i-1)]);else drawTabs()}
+  function newTab(u){const wv=document.createElement('webview');wv.setAttribute('partition','persist:halcyon');wv.setAttribute('src',norm(u||''));const t={wv,title:'Loading…',url:norm(u||'')};
+   wv.addEventListener('did-start-loading',()=>{prog.style.width='60%'});
+   wv.addEventListener('did-stop-loading',()=>{prog.style.width='100%';setTimeout(()=>prog.style.width='0',250);if(t===cur)sync()});
+   wv.addEventListener('page-title-updated',e=>{t.title=e.title;if(t===cur)sync();else drawTabs()});
+   wv.addEventListener('did-navigate',e=>{t.url=e.url;if(t===cur)sync()});wv.addEventListener('did-navigate-in-page',e=>{if(e.isMainFrame){t.url=e.url;if(t===cur)sync()}});
+   wv.addEventListener('did-fail-load',e=>{if(e.isMainFrame&&e.errorCode!==-3){t.title='Can’t reach this page';if(t===cur)sync();toast('Can’t reach this page','Check your internet connection and the address.')}});
+   wv.addEventListener('focus',()=>api.el.dispatchEvent(new Event('pointerdown')));
+   views.append(wv);tabs.push(t);select(t)}
+  back.onclick=()=>cur&&cur.wv.goBack();fwd.onclick=()=>cur&&cur.wv.goForward();rel.onclick=()=>cur&&cur.wv.reload();home.onclick=()=>cur&&cur.wv.loadURL(HOME);newt.onclick=()=>{newTab();addr.focus()};ext.onclick=()=>cur&&HX.external(cur.url);
+  addr.addEventListener('keydown',e=>{if(e.key==='Enter'&&cur){const u=norm(addr.value);cur.url=u;cur.wv.loadURL(u);addr.blur()}});
+  addr.addEventListener('focus',()=>addr.select());
+  api.go=u=>newTab(u);
+  newTab(url||'');}},
+ calc:{name:'Calculator',w:300,h:440,mount(b){
+  let expr='',shown='0';const small=h('small'),big=h('div',{},'0');
+  const upd=()=>{small.textContent=expr;big.textContent=shown};
+  const ev=calcEval;
+  const press=k=>{
+   if(k==='C'){expr='';shown='0'}
+   else if(k==='⌫'){expr=expr.slice(0,-1);shown=expr||'0'}
+   else if(k==='='){try{shown=String(ev(expr));expr=shown}catch(e){shown='Error';expr=''}}
+   else if(k==='±'){try{shown=String(-ev(expr||'0'));expr=shown}catch(e){}}
+   else{const m={'×':'*','÷':'/','−':'-'}[k]||k;if(/[+\-*/]/.test(m)&&/[+\-*/]$/.test(expr))expr=expr.slice(0,-1);expr+=m;shown=expr.replace(/\*/g,'×').replace(/\//g,'÷')}
+   upd()};
+  const keys=['C','⌫','%','÷','7','8','9','×','4','5','6','−','1','2','3','+','±','0','.','='];
+  const kp=h('div',{class:'keys'},keys.map(k=>h('button',{class:k==='='?'eq':/[÷×−+%]/.test(k)?'op':'',on:{click:()=>press(k)}},k)));
+  b.append(h('div',{class:'calc'},h('div',{class:'disp'},small,big),kp));
+  b.tabIndex=0;b.addEventListener('keydown',e=>{const map={Enter:'=',Backspace:'⌫',Escape:'C','*':'×','/':'÷','-':'−'};const k=map[e.key]||e.key;if(keys.includes(k)||/^[0-9]$/.test(k)){e.preventDefault();press(k)}});setTimeout(()=>b.focus(),60);}},
+ term:{name:'Terminal',w:640,h:400,mount(b,api){
+  if(!HX||!SYS)return LEGACY.term.mount(b,api);
+  const D=SYS.drive,sep=SYS.sep;let cwd=D;
+  const t=h('div',{class:'term'});const line=s=>{t.insertBefore(h('div',{},s),row)};
+  const inp=h('input',{spellcheck:false,autocomplete:'off','aria-label':'Command'});
+  const who=()=>(SYS.user||'user').toLowerCase();const disp=()=>'~'+(cwd===D?'':'/'+cwd.slice(D.length+1).split(sep).join('/'));
+  const prompt=()=>h('span',{class:'p'},who()+'@nexus '+disp()+' $ ');const row=h('div',{},prompt(),inp);
+  t.append(h('div',{},'NexusOS Terminal '+SYS.version+'. Your home (~) is '+(OSM()?'your home folder':'the NexusOS drive')+'. Type "help" for commands.'+(OSM()?' For a full Linux shell, open “System terminal” from Start.':'')),row);
+  const resolve=a=>{a=(a||'').trim().replace(/^["']|["']$/g,'');let p=a.startsWith('~')?D:cwd;for(const part of a.replace(/^~/,'').split(/[\\/]+/)){if(!part||part==='.')continue;if(part==='..'){if(p!==D)p=p.slice(0,p.lastIndexOf(sep));}else p=p+sep+part}return p};
+  const hist=[];let hi=0;
+  const cmds={
+   help:()=>'ls [dir] · cd <dir> · pwd · cat <file> · mkdir <name> · rm <file> · open <app or file>\nbrowse <site or search> · neofetch · whoami · date · echo <text> · clear · shutdown',
+   ls:async a=>{const r=await HX.list(resolve(a));return r.entries.map(e=>e.dir?e.name+'/':e.name).join('   ')||'(empty)'},
+   cd:async a=>{const p=resolve(a||'~');const r=await HX.list(p);if(!r.inDrive)return'cd: stays inside '+(OSM()?'your home folder':'the NexusOS drive');cwd=r.dir;return''},
+   pwd:()=>cwd,
+   cat:async a=>{if(!a)return'cat: which file?';return await HX.readText(resolve(a))},
+   mkdir:async a=>{if(!a)return'mkdir: give the folder a name';await HX.mkdir(cwd,a);refreshFiles();return''},
+   rm:async a=>{if(!a)return'rm: which file?';await HX.trash(resolve(a));refreshFiles();return'Moved to the '+BIN()+'.'},
+   open:async a=>{const k=Object.keys(APPS).find(k=>APPS[k].name.toLowerCase()===String(a).toLowerCase()||k===a);if(k){openApp(k);return'Opening '+APPS[k].name+'…'}
+     if(!a)return'open: which app or file?';const p=resolve(a);const r=await HX.list(p.slice(0,p.lastIndexOf(sep)));const f=r.entries.find(e=>e.name===baseOf(p));if(!f)return'open: not found: '+a;if(f.dir){openApp('files',{dir:f.path});return'Opening folder…'}openPath(f.path,f.name);return'Opening '+f.name+'…'},
+   browse:a=>{openApp('web',a||'');return a?'Opening '+a+'…':'Opening Browser…'},
+   shutdown:()=>{if(OSM()){powerAction('shutdown');return''}shutDown();return'Shutting down…'},
+   echo:a=>a||'',date:()=>new Date().toString(),whoami:()=>who(),
+   neofetch:()=>`   ◆      ${who()}@nexus\n  ◆ ◆     OS: ${OSM()?'NexusOS '+SYS.version+' (Debian)':'NexusOS '+SYS.version+' on '+SYS.platform}\n   ◆      CPU: ${SYS.cpu} (${SYS.cores} threads)\n          Memory: ${fmtSize(SYS.memTotal-SYS.memFree)} / ${fmtSize(SYS.memTotal)}${OSM()?'':' (shared with '+(SYS.isWin?'Windows':'your computer')+')'}\n          NexusOS uses: ${fmtSize(SYS.appMem||0)}\n          Uptime: ${fmtUp(SYS.uptime)}\n          Network: ${navigator.onLine?'online':'offline'}\n          Windows open: ${Object.keys(wins).length}`,
+   clear:()=>{[...t.children].forEach(c=>c!==row&&c.remove());return null}
+  };
+  inp.addEventListener('keydown',e=>{
+   if(e.key==='ArrowUp'){if(hi>0)inp.value=hist[--hi];e.preventDefault();return}
+   if(e.key==='ArrowDown'){inp.value=hist[++hi]||'';if(hi>hist.length)hi=hist.length;return}
+   if(e.key!=='Enter')return;const v=inp.value.trim();inp.value='';line([prompt(),v]);if(v){hist.push(v);hi=hist.length}
+   const sp=v.indexOf(' ');const c=sp<0?v:v.slice(0,sp),a=sp<0?'':v.slice(sp+1);if(!c){b.scrollTop=1e9;return}
+   inp.disabled=true;Promise.resolve().then(()=>cmds[c]?cmds[c](a):c+': command not found').then(o=>{if(o)line(o)}).catch(err=>line(c+': '+errMsg(err))).finally(()=>{inp.disabled=false;row.replaceChild(prompt(),row.firstChild);b.scrollTop=1e9;inp.focus()})});
+  t.addEventListener('click',()=>inp.focus());b.append(t);setTimeout(()=>inp.focus(),60)}},
+ paint:{name:'Paint',w:700,h:500,mount(b,api,file){
+  if(!HX||!SYS)return LEGACY.paint.mount(b,api,file);
+  let real=file&&file.real?file.real:null,nm=file&&file.n?file.n:null;
+  const cv=h('canvas'),cols=['#12211f','#e85d8a','#f0b451','#3fd0b4','#2fa6d6','#5b7cfa','#ffffff'];let col=cols[0],size=5;
+  const sws=cols.map(c=>h('button',{class:'sw8'+(c===col?' on':''),style:'background:'+c,'aria-label':'Colour '+c,on:{click:e=>{col=c;sws.forEach(s=>s.classList.remove('on'));e.currentTarget.classList.add('on')}}}));
+  const rng=h('input',{type:'range',min:1,max:40,value:5,style:'max-width:110px;flex:none','aria-label':'Brush size',on:{input:e=>size=+e.target.value}});
+  const ctx=cv.getContext('2d');
+  const fit=()=>{const r=cv.getBoundingClientRect();if(!r.width)return;const tmp=document.createElement('canvas');tmp.width=cv.width;tmp.height=cv.height;tmp.getContext('2d').drawImage(cv,0,0);cv.width=r.width*devicePixelRatio;cv.height=r.height*devicePixelRatio;ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height);ctx.drawImage(tmp,0,0)};
+  const save=h('button',{class:'pbtn',on:{click:async()=>{try{if(!real||!/\.png$/i.test(real))real=await HX.unique(SYS.drive+SYS.sep+'Pictures',(nm?nm.replace(/\.[^.]+$/,''):'Drawing')+'.png');
+      await HX.writeBinary(real,cv.toDataURL('image/png').split(',')[1]);nm=baseOf(real);api.setTitle(nm+' — Paint');toast('Saved',nm+' · '+shortPath(real.slice(0,real.lastIndexOf(SYS.sep))));refreshFiles()}catch(e){toast('Couldn’t save',errMsg(e))}}}},'Save');
+  b.append(h('div',{class:'paint'},h('div',{class:'ptools'},sws,rng,h('button',{class:'pbtn',on:{click:()=>{ctx.fillStyle='#fff';ctx.fillRect(0,0,cv.width,cv.height)}}},'Clear'),save),cv));
+  requestAnimationFrame(()=>{fit();if(real){api.setTitle(nm+' — Paint');HX.readDataUrl(real).then(u=>{const im=new Image();im.onload=()=>{const s=Math.min(1,cv.width/im.width,cv.height/im.height);ctx.drawImage(im,0,0,im.width*s,im.height*s)};im.src=u}).catch(e=>toast('Couldn’t open the image',errMsg(e)))}});
+  api.el.addEventListener('winresize',fit);const ro=new ResizeObserver(fit);ro.observe(cv);api.onClose=()=>ro.disconnect();
+  let last=null;
+  cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);const r=cv.getBoundingClientRect();last=[(e.clientX-r.left)*devicePixelRatio,(e.clientY-r.top)*devicePixelRatio];draw(e)});
+  const draw=e=>{if(!last)return;const r=cv.getBoundingClientRect(),p=[(e.clientX-r.left)*devicePixelRatio,(e.clientY-r.top)*devicePixelRatio];ctx.strokeStyle=col;ctx.lineWidth=size*devicePixelRatio;ctx.lineCap=ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(...last);ctx.lineTo(...p);ctx.stroke();last=p};
+  cv.addEventListener('pointermove',draw);cv.addEventListener('pointerup',()=>last=null)}},
+ mines:{name:'Mines',w:320,h:410,mount(b){
+  const N=9,M=10;let cells,over,left,flags,started,timer,secs;
+  const grid=h('div',{class:'mgrid'}),fl=h('span'),tm=h('span'),face=h('button',{class:'pbtn',on:{click:()=>reset()}},'New game');
+  function reset(){clearInterval(timer);secs=0;started=false;over=false;flags=0;left=N*N-M;cells=[];grid.innerHTML='';tm.textContent='⏱ 0';
+   for(let i=0;i<N*N;i++){const btn=h('button',{'aria-label':'Cell'});const c={m:false,o:false,f:false,btn,i};btn.onclick=()=>reveal(c);btn.oncontextmenu=e=>{e.preventDefault();flag(c)};let lp;btn.addEventListener('touchstart',()=>{lp=setTimeout(()=>{flag(c);lp='done'},450)},{passive:true});btn.addEventListener('touchend',e=>{if(lp==='done')e.preventDefault();clearTimeout(lp)});cells.push(c);grid.append(btn)}
+   fl.textContent='⚑ '+M}
+  const nb=i=>{const r=Math.floor(i/N),c=i%N,o=[];for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){if(!dr&&!dc)continue;const rr=r+dr,cc=c+dc;if(rr>=0&&rr<N&&cc>=0&&cc<N)o.push(cells[rr*N+cc])}return o};
+  function plant(safe){const bad=new Set([safe.i,...nb(safe.i).map(c=>c.i)]);let n=0;while(n<M){const k=Math.floor(Math.random()*N*N);if(!bad.has(k)&&!cells[k].m){cells[k].m=true;n++}}started=true;timer=setInterval(()=>tm.textContent='⏱ '+(++secs),1000)}
+  function flag(c){if(over||c.o)return;c.f=!c.f;flags+=c.f?1:-1;c.btn.textContent=c.f?'⚑':'';fl.textContent='⚑ '+(M-flags)}
+  function reveal(c){if(over||c.o||c.f)return;if(!started)plant(c);
+   if(c.m){over=true;clearInterval(timer);cells.forEach(x=>{if(x.m){x.btn.textContent='✹';x.btn.classList.add('b')}});toast('Boom','You hit a mine. Press New game to try again.');return}
+   const st=[c];while(st.length){const x=st.pop();if(x.o||x.f)continue;x.o=true;left--;const n=nb(x.i).filter(y=>y.m).length;x.btn.classList.add('o');x.btn.textContent=n||'';x.btn.style.color=['','#2fa6d6','#3fb07a','#e85d8a','#5b7cfa','#c0572b','#1aa3a3','#888','#888'][n];if(!n)nb(x.i).forEach(y=>!y.o&&st.push(y))}
+   if(left===0){over=true;clearInterval(timer);toast('Cleared!','You found all the mines in '+secs+' s.')}}
+  b.append(h('div',{class:'mine'},h('div',{class:'st'},fl,face,tm),grid,h('small',{style:'color:var(--muted)'},'Right-click or long-press to flag')));reset();}},
+ settings:{name:'Settings',w:820,h:560,onArg:(w,page)=>w.api.show&&w.api.show(page),mount(b,api,page){
+  const nav=h('nav',{class:'snav','aria-label':'Settings pages'}),pane=h('div',{class:'spane'});b.append(h('div',{class:'settings'},nav,pane));
+  api.show=p=>{const P=settingsPages();if(!P.some(x=>x[0]===p))p=P[0][0];nav.innerHTML='';
+   P.forEach(([k,l])=>nav.append(h('button',{class:k===p?'on':'','aria-current':k===p?'page':'false',on:{click:()=>api.show(k)}},l)));
+   pane.innerHTML='';pane.scrollTop=0;const c=h('div',{class:'spage'});pane.append(c);api.setTitle('Settings — '+P.find(x=>x[0]===p)[1]);
+   try{Promise.resolve(PAGES[p](c)).catch(e=>c.append(errEl(e)))}catch(e){c.append(errEl(e))}};
+  api.show(typeof page==='string'?page:null)}},
+ store:{name:'App Store',w:880,h:600,mount(b,api){
+  const wrap=h('div',{class:'appstore'});b.append(wrap);
+  if(!HX){wrap.append(h('div',{class:'spage'},h('p',{class:'hint'},'The App Store works when NexusOS runs as the desktop app or as NexusOS.')));return}
+  const q=h('input',{class:'txt',type:'search',placeholder:'Search apps','aria-label':'Search apps'});
+  wrap.append(h('div',{class:'ashead'},h('div',{},h('h2',{},'App Store'),h('small',{},OSM()?'Apps come from Flathub. Each one runs in its own sandbox and updates with NexusOS.':'Apps install with winget, Windows’ own installer, straight from each publisher.')),q));
+  const grid=h('div',{class:'asgrid'});wrap.append(grid);
+  let cat=[],inst=[];const busy={};
+  q.addEventListener('input',()=>draw());
+  async function load(){grid.innerHTML='';grid.append(busyEl('Loading apps…'));
+   try{if(!(await HX.store('available'))){grid.innerHTML='';grid.append(h('p',{class:'hint'},OSM()||(SYS&&SYS.isLinux)?'Flatpak isn’t installed, so apps can’t be added here.':'winget isn’t available. Install “App Installer” from the Microsoft Store, then open this window again.'));return}
+    [cat,inst]=await Promise.all([HX.catalog(),installedApps(true)])}catch(e){grid.innerHTML='';grid.append(errEl(e));return}
+   draw()}
+  function paintJob(key){const card=grid.querySelector(`[data-k="${key}"]`),j=busy[key];if(!card||!j)return;$('.asstat',card).textContent=j.line||'';$('.meter div',card).style.width=(j.pct||3)+'%'}
+  async function run(c,action){const verb=action==='install'?'Installing':'Removing';busy[c.key]={line:verb+'…',pct:3};draw();
+   jobListeners.set('store:'+c.key,d=>{if(!busy[c.key])return;if(d.line)busy[c.key].line=d.line;if(d.pct!=null)busy[c.key].pct=d.pct;paintJob(c.key)});
+   try{await HX.store(action,c.key);toast(action==='install'?c.name+' is installed':c.name+' was removed',action==='install'?'Find it in Start.':'')}catch(e){toast(action==='install'?'Couldn’t install '+c.name:'Couldn’t remove '+c.name,errMsg(e))}
+   delete busy[c.key];jobListeners.delete('store:'+c.key);inst=await installedApps(true);draw()}
+  function draw(){const f=q.value.trim().toLowerCase();grid.innerHTML='';
+   const list=cat.filter(c=>!f||(c.name+' '+c.blurb+' '+c.cat).toLowerCase().includes(f));
+   if(!list.length)grid.append(h('p',{class:'hint'},'No apps match “'+q.value.trim()+'”.'));
+   for(const c of list){const isIn=inst.some(a=>a.key===c.key),j=busy[c.key];
+    const ic=h('div',{},letterIcon(c.name));if(isIn&&OSM())appIcon(c.id).then(u=>{if(u)ic.replaceChildren(letterIcon(c.name,u))});
+    const acts=h('div',{class:'row2 wrap'});
+    const body=h('div',{class:'asbody'},h('b',{},c.name),h('small',{},c.cat+(c.gpu&&SYS&&SYS.nvidia?' · runs on your NVIDIA GPU':'')),h('p',{},c.blurb));
+    if(j)body.append(h('div',{class:'meter'},h('div',{style:'width:'+(j.pct||3)+'%'})),h('small',{class:'asstat'},j.line||''));
+    else if(isIn){if(c.canLaunch)acts.append(h('button',{class:'pbtn pri',on:{click:()=>HX.store('launch',c.key).then(()=>toast('Opening '+c.name,'')).catch(e=>toast('Couldn’t open '+c.name,errMsg(e)))}},'Open'));
+     acts.append(h('button',{class:'pbtn danger',on:{click:async()=>{if(await ask('Remove '+c.name+'?','The app is removed from this computer. Its settings stay in case you install it again.','Remove',true))run(c,'uninstall')}}},'Remove'))}
+    else acts.append(h('button',{class:'pbtn pri',on:{click:()=>run(c,'install')}},'Install'));
+    body.append(acts);grid.append(h('div',{class:'ascard','data-k':c.key},ic,body))}}
+  load()}},
+ about:{name:'About NexusOS',w:520,h:520,mount(b){
+  const dl=h('dl',{});const add=(k,v)=>dl.append(h('dt',{},k),h('dd',{style:'margin:0'},v));
+  const mem=h('div',{style:'display:flex;flex-direction:column;gap:4px'});
+  b.append(h('div',{class:'about'},glyph('about'),h('h1',{},OSM()?'NexusOS '+SYS.version:'NexusOS '+(SYS?SYS.version:'1.4')),h('p',{},OSM()?'Your own gaming operating system, built on Debian 13, with NVIDIA graphics, Flathub apps and a locked-down browser.':HX?'A desktop that runs on top of Windows. The browser, files and system details are real, and NexusOS keeps its own drive for what you save.':'A desktop that runs in your browser. Windows drag, resize, snap to full screen when you pull them to the top edge, and remember what you write.'),dl,mem));
+  add('Version',(SYS?SYS.version:'1.4'));add('User',SYS?SYS.user:'Xiaoming');
+  if(SYS){add('Computer',SYS.host);if(SYS.nvidia)add('Graphics','NVIDIA driver running');else if(SYS.nvidiaInstalled)add('Graphics','NVIDIA driver not running. See Settings › Security & privacy.');add('Engine','Electron '+SYS.electron+' · Chromium '+SYS.chrome.split('.')[0]);add('Host system',SYS.platform+' · '+SYS.arch);add('Processor',SYS.cpu+' · '+SYS.cores+' threads');add('Uptime',fmtUp(SYS.uptime));
+   const used=SYS.memTotal-SYS.memFree;
+   mem.append(h('div',{style:'color:var(--muted)'},OSM()?`Memory: ${fmtSize(used)} of ${fmtSize(SYS.memTotal)} in use`:`Your PC’s memory: ${fmtSize(used)} of ${fmtSize(SYS.memTotal)} in use, shared with Windows and your other apps`),h('div',{class:'meter'},h('div',{style:'width:'+Math.round(used/SYS.memTotal*100)+'%'})),
+     h('div',{style:'color:var(--muted);font-size:12px'},OSM()?`NexusOS’s desktop is using about ${fmtSize(SYS.appMem||0)}. The rest is free for your games and apps.`:`NexusOS itself is using about ${fmtSize(SYS.appMem||0)}. It isn’t a virtual machine, so there’s no memory to set aside: it takes what it needs and gives it back when you close it.`));
+   const drv=h('dd',{style:'margin:0'},'Checking…');dl.append(h('dt',{},OSM()?'Your files':'NexusOS drive'),drv);
+   HX.driveUsage().then(u=>{drv.textContent=`${fmtSize(u.bytes)} in ${u.files} file${u.files===1?'':'s'}`+(u.free!=null?` · ${fmtSize(u.free)} free on this disk`:'')}).catch(()=>{drv.textContent='Not available'})}
+  add('Display',screen.width+' × '+screen.height);add('Network',navigator.onLine?'Connected':'Offline');
+  if(!OSM())add('Shortcuts','F11: full screen · Ctrl + Shift + Q: quit');}}
+};
+
+/* ---------- wallpaper ---------- */
+const NX_DEFAULT={accent:'#00e5ff',wall:0,mode:'dark'};
+const WALLS=[{n:'Neon Grid',c:['#04050a','#0b0f2a','#00e5ff','#ff2e88']},{n:'Crimson',c:['#050306','#1f0610','#ff2e55','#ff9a3c']},{n:'Toxic',c:['#020604','#06180d','#7cff4f','#00e5ff']},{n:'Void',c:['#030308','#140a2e','#9b5cff','#00e5ff']}];
+const wc=$('#wall'),wx=wc.getContext('2d');let wallIdx=0;
+const STARS=Array.from({length:90},(_,i)=>{const r=Math.sin(i*12.9898+4.1)*43758.5453;const q=Math.sin(i*78.233+1.7)*12345.678;return[r-Math.floor(r),(q-Math.floor(q))*.58,(i%7)/7]});
+function paintWall(t){const W=Math.round(innerWidth*devicePixelRatio/2),H=Math.round(innerHeight*devicePixelRatio/2);if(wc.width!==W)wc.width=W;if(wc.height!==H)wc.height=H;const c=WALLS[wallIdx].c;const hz=H*.62;
+  const g=wx.createLinearGradient(0,0,0,H);g.addColorStop(0,c[0]);g.addColorStop(.62,c[1]);g.addColorStop(1,c[0]);wx.fillStyle=g;wx.fillRect(0,0,W,H);
+  for(const [x,y,b] of STARS){wx.globalAlpha=.25+.5*b*(.6+.4*Math.sin((t||0)/900+x*40));wx.fillStyle='#fff';wx.fillRect(x*W,y*H,1+b,1+b)}
+  const r=wx.createRadialGradient(W*.5,hz,0,W*.5,hz,H*.6);r.addColorStop(0,c[3]+'66');r.addColorStop(.35,c[3]+'1c');r.addColorStop(1,c[3]+'00');wx.globalAlpha=1;wx.fillStyle=r;wx.fillRect(0,0,W,H);
+  const gl=wx.createLinearGradient(0,hz,0,H);gl.addColorStop(0,c[0]+'00');gl.addColorStop(1,c[0]+'cc');
+  wx.strokeStyle=c[2];wx.lineWidth=Math.max(1,H/700);const s=((t||0)/5000)%1;
+  for(let i=0;i<16;i++){const f=(i+s)/16,y=hz+(H-hz)*f*f;wx.globalAlpha=.06+.4*f;wx.beginPath();wx.moveTo(0,y);wx.lineTo(W,y);wx.stroke()}
+  wx.globalAlpha=.2;for(let i=-24;i<=24;i++){wx.beginPath();wx.moveTo(W/2+i*W*.018,hz);wx.lineTo(W/2+i*W*.16,H);wx.stroke()}
+  wx.globalAlpha=.9;wx.fillStyle=c[2];wx.fillRect(0,hz-1,W,Math.max(1.5,H/450));wx.globalAlpha=1;wx.fillStyle=gl;wx.fillRect(0,hz,W,H-hz)}
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+// the wallpaper stops moving while other apps (games) are open, so it never costs them frame rate
+(function loop(t){if(!(typeof extWins!=='undefined'&&extWins.length))paintWall(t);if(!reduce)setTimeout(()=>requestAnimationFrame(loop),66)})();
+addEventListener('resize',()=>paintWall(performance.now()));
+
+function apply(S){document.documentElement.classList.toggle('light',S.mode==='light');document.documentElement.style.setProperty('--accent',S.accent);wallIdx=S.wall;paintWall(performance.now());store.set('nxset',S)}
+apply(store.get('nxset',NX_DEFAULT));
+
+/* ---------- desktop ---------- */
+const DESK=['web','files','store','notes','calc','term','paint','mines','settings','about'];
+DESK.forEach(k=>{const b=h('button',{class:'icon'},glyph(k),APPS[k].name);b.addEventListener('dblclick',()=>openApp(k));b.addEventListener('keydown',e=>{if(e.key==='Enter')openApp(k)});b.addEventListener('click',e=>{if(e.pointerType==='touch'||matchMedia('(hover:none)').matches)openApp(k)});$('#desk').append(b)});
+renderBar();
+let deskSig='';
+function refreshDesktop(){if(!HX||!SYS)return;HX.list(SYS.drive+SYS.sep+'Desktop').then(res=>{const sig=res.entries.map(e=>e.name+(e.dir?'/':'')).join('|');if(sig===deskSig)return;deskSig=sig;
+  document.querySelectorAll('#desk .dfile').forEach(e=>e.remove());
+  for(const f of res.entries.slice(0,40)){const kind=f.dir?'dir':IMG_RE.test(f.name)?'img':'txt';const g=h('div',{class:'glyph fglyph'},fileIcon(kind));
+    const b=h('button',{class:'icon dfile',title:f.name},g,h('span',{class:'dname'},f.name));const open=()=>{if(f.dir)openApp('files',{dir:f.path});else openPath(f.path,f.name)};
+    b.addEventListener('dblclick',open);b.addEventListener('keydown',e=>{if(e.key==='Enter')open()});b.addEventListener('click',e=>{if(e.pointerType==='touch'||matchMedia('(hover:none)').matches)open()});$('#desk').append(b)}}).catch(()=>{})}
+const dlBox=h('div',{id:'dls'});document.body.append(dlBox);const dls={};
+function onDownload(d){let c=dls[d.id];
+  if(!c){c=dls[d.id]={el:h('div',{class:'dlcard',role:'status'})};dlBox.append(c.el)}
+  const pct=d.total>0?Math.min(100,d.received/d.total*100):0;c.el.innerHTML='';
+  const title=h('b',{},d.name);
+  if(d.state==='start'||d.state==='progress'){c.el.append(title,h('div',{class:'bar2'},h('div',{style:'width:'+(d.total>0?pct:30)+'%'})),h('small',{},d.total>0?`${fmtSize(d.received)} of ${fmtSize(d.total)}`:`${fmtSize(d.received)} downloaded`))}
+  else if(d.state==='completed'){c.el.append(title,h('small',{},`Saved to ${OSM()?'Home':'NexusOS'} › Downloads · ${fmtSize(d.received)}`),...(d.risky?[h('small',{class:'dlwarn'},'This is a program. Only open it if you trust where it came from.')]:[]),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>{openPath(d.path,d.name);dismiss()}}},'Open'),h('button',{class:'pbtn',on:{click:()=>{openApp('files',{dir:SYS.drive+SYS.sep+'Downloads',select:d.name});dismiss()}}},'Show in Files')));refreshFiles();c.t=setTimeout(dismiss,12000)}
+  else{c.el.append(title,h('small',{},d.state==='cancelled'?'Download cancelled.':'Download failed. Check your connection and try again.'),h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:dismiss}},'Dismiss')));c.t=setTimeout(dismiss,8000)}
+  function dismiss(){clearTimeout(c.t);c.el.classList.add('out');setTimeout(()=>{c.el.remove();delete dls[d.id]},300)}}
+async function migrateOldFiles(){if(!HX||!SYS||store.get('migrated12',false))return;const old=store.get('fs',null);store.set('migrated12',true);if(!old)return;let n=0;
+  for(const folder of ['Documents','Downloads'])for(const f of (old[folder]||[])){if(f.t!=='txt'||!f.c)continue;if(f.n==='Welcome.txt'||f.n==='halcyon-release-notes.txt')continue;try{const p=await HX.unique(SYS.drive+SYS.sep+folder,f.n);await HX.writeText(p,f.c);n++}catch(e){}}
+  if(n)toast('Your notes moved to the NexusOS drive',n+' file'+(n>1?'s are':' is')+' now in Documents and Downloads.')}
+
+function boot(){const bt=$('#boot');$('#boot h2').textContent='NexusOS';bt.classList.remove('done');setTimeout(()=>{bt.classList.add('done');setTimeout(()=>{if(!Object.keys(wins).length){toast('Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+(SYS?SYS.user:'Xiaoming'),'Click the flower in the taskbar to open Start.')}},400)},1400)}
+/* ---------- real PC hooks ---------- */
+function loadSys(){if(!HX)return Promise.resolve();return HX.sysInfo().then(x=>{SYS=x;const n=x.user||'User';$('.me').lastChild.textContent=n;$('.avatar').textContent=n.slice(0,2).toUpperCase()}).catch(()=>{})}
+if(HX){setInterval(loadSys,15000);HX.onOpenUrl(u=>openApp('web',u));HX.onDownload(onDownload);HX.onJob(onJob);HX.onPermission(onPermission);setInterval(refreshDesktop,4000);HX.catalog().then(c=>{CAT=c}).catch(()=>{})}
+const wifi=$('[data-t="wifi"]');
+function net(){$('#tray svg').style.opacity=navigator.onLine?1:.35;if(OSM()){refreshQuick();return}if(HX&&SYS&&SYS.isWin){wifi.classList.toggle('on',navigator.onLine);wifi.lastChild.textContent=navigator.onLine?'Online':'Offline';return}wifi.classList.toggle('on',navigator.onLine);wifi.lastChild.textContent=navigator.onLine?'Online':'Offline'}
+addEventListener('online',()=>{net();toast('Back online','Your internet connection is working again.')});addEventListener('offline',()=>{net();toast('You’re offline','NexusOS lost its internet connection.')});net();
+if(navigator.getBattery)navigator.getBattery().then(bat=>{const svg=$('#tray svg:nth-of-type(2)');const rect=svg.querySelector('rect[fill]');const draw=()=>{rect.setAttribute('width',Math.max(1,11*bat.level));svg.parentNode.title='Battery '+Math.round(bat.level*100)+'%'+(bat.charging?', charging':'')};draw();bat.onlevelchange=draw;bat.onchargingchange=draw}).catch(()=>{});
+loadSys().then(()=>{if(SYS){clock24=SYS.clock24!==false;tick();net();if(!OSM()&&HX)$('#vol').closest('.slider').hidden=true;if(SYS.isWin)$('[data-t="bt"]').classList.remove('on');if(OSM()){$('#boot h2').textContent='NexusOS';setInterval(pollWindows,1500);pollWindows();installedApps();setTimeout(autoCheckUpdates,60000);setInterval(autoCheckUpdates,6*3600000)}}refreshDesktop();migrateOldFiles();boot()});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>NexusOS</vendor>
+  <action id="os.nexusos.update">
+    <description>Update NexusOS</description>
+    <message>Enter your password to install NexusOS updates.</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin_keep</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/nexusos/nexus-update</annotate>
+  </action>
+  <action id="os.nexusos.passwd">
+    <description>Change your password</description>
+    <message>Enter your current password to change it.</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_self</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/nexusos/nexus-passwd</annotate>
+  </action>
+  <action id="os.nexusos.system">
+    <description>Change NexusOS system settings</description>
+    <message>Enter your password to let NexusOS change system settings.</message>
+    <defaults><allow_any>no</allow_any><allow_inactive>no</allow_inactive><allow_active>auth_admin_keep</allow_active></defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/nexusos/nexus-system</annotate>
+  </action>
+</policyconfig>
