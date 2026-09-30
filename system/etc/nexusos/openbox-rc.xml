@@ -23,6 +23,7 @@
     <keybind key="W-Up"><action name="Maximize"/></keybind>
     <keybind key="W-Down"><action name="Unmaximize"/></keybind>
     <keybind key="C-A-t"><action name="Execute"><command>lxterminal</command></action></keybind>
+    <keybind key="XF86TouchpadToggle"><action name="Execute"><command>/opt/nexusos/nexusos --toggle-touchpad</command></action></keybind>
   </keyboard>
   <mouse>
     <dragThreshold>4</dragThreshold><doubleClickTime>300</doubleClickTime><screenEdgeWarpTime>0</screenEdgeWarpTime>

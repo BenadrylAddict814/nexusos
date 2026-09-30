@@ -41,6 +41,8 @@ command -v zramctl >/dev/null 2>&1 && [ -e /lib/systemd/system/zramswap.service 
 # 1.6: Nexa needs the Vulkan loader (her brain runs on the NVIDIA card through Vulkan) and bzip2 to unpack her voice
 dpkg -s libvulkan1 >/dev/null 2>&1 || need="$need libvulkan1"
 command -v bzip2 >/dev/null 2>&1 || need="$need bzip2"
+# 1.8: switching the touchpad on and off
+command -v xinput >/dev/null 2>&1 || need="$need xinput"
 if dpkg -s nvidia-driver >/dev/null 2>&1 && ! dpkg -s nvidia-vulkan-icd >/dev/null 2>&1; then need="$need nvidia-vulkan-icd"; fi
 if dpkg -l tlp 2>/dev/null | grep -q '^ii'; then need=$(echo "$need" | sed 's/ power-profiles-daemon//'); fi   # TLP and power-profiles-daemon don't mix
 if [ -n "$need" ]; then

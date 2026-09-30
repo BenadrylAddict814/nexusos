@@ -9,6 +9,9 @@ user=$(getent passwd "$PKEXEC_UID" | cut -d: -f1)
 [ -n "$user" ] || { echo "Unknown account." >&2; exit 1; }
 IFS= read -r pw || true
 case "$pw" in *:*|'') echo "That password can't be used." >&2; exit 1 ;; esac
-[ "$(printf %s "$pw" | wc -m)" -ge 8 ] || { echo "Use at least 8 characters." >&2; exit 1; }
+# a password of 8+ characters, or a PIN of 4+ digits
+if ! printf %s "$pw" | grep -Eq '^[0-9]{4,}$'; then
+  [ "$(printf %s "$pw" | wc -m)" -ge 8 ] || { echo "Use at least 8 characters, or a PIN of at least 4 digits." >&2; exit 1; }
+fi
 printf '%s:%s\n' "$user" "$pw" | chpasswd
 echo "Password changed."

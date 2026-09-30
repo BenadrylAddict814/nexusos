@@ -298,7 +298,7 @@ select.txt{max-width:100%} select.txt option{background:var(--surface-solid);col
 :root.light{--accent:#0095b3}
 
 /* ===== 1.4.3: NexusOS as separate windows ===== */
-.view-panel #wall,.view-panel #desk,.view-panel .panel,.view-popup #wall,.view-popup #desk,.view-popup #bar,.view-toasts #wall,.view-toasts #desk,.view-toasts #bar,.view-toasts .panel,.view-bubble #wall,.view-bubble #desk,.view-bubble #bar,.view-bubble .panel,
+.view-panel #wall,.view-panel #desk,.view-panel .panel,.view-popup #wall,.view-popup #desk,.view-popup #bar,.view-toasts #wall,.view-toasts #desk,.view-toasts #bar,.view-toasts .panel,.view-osd #wall,.view-osd #desk,.view-osd #bar,.view-osd .panel,.view-bubble #wall,.view-bubble #desk,.view-bubble #bar,.view-bubble .panel,
 .view-app #wall,.view-app #desk,.view-app #bar,.view-app .panel,.view-desktop #bar,.view-desktop .panel{display:none!important}
 .view-panel body{background:#080b11}
 .view-panel #bar{position:fixed;inset:0;transform:none;border-radius:0;justify-content:center;padding:0 10px;gap:6px;background:linear-gradient(180deg,#0c1119,#070a10);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--accent) 55%,transparent);border:0;backdrop-filter:none}
@@ -358,6 +358,17 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 .picrow{display:flex;gap:8px;flex-wrap:wrap} .pic{width:110px;height:68px;border-radius:6px;border:2px solid transparent;background:#000 center/cover no-repeat;cursor:pointer}
 .pic.on{border-color:var(--accent)}
 
+/* ===== 1.8: pats, pouts, on-screen indicator, gently moving picture ===== */
+.nov.hold{opacity:1}.nblush{transition:opacity .6s}
+.nstage.patting .navwrap{animation:npat .45s ease-in-out infinite alternate}@keyframes npat{from{transform:rotate(-1.2deg) scale(1.005,.995)}to{transform:rotate(1.2deg) translateY(2px) scale(.995,1.005)}}
+.nstage.pout .navwrap{animation:npout .5s ease-in-out 3}@keyframes npout{0%,100%{transform:none}30%{transform:translateX(-5px) rotate(-1deg)}70%{transform:translateX(5px) rotate(1deg)}}
+.nsay{position:absolute;left:50%;top:9%;transform:translate(-50%,6px) scale(.96);max-width:78%;padding:8px 12px;border-radius:14px;background:rgba(255,255,255,.93);color:#2a1830;font:600 13px var(--body);box-shadow:0 6px 20px rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;text-align:center}
+.nsay.on{opacity:1;transform:translate(-50%,0) scale(1)}
+.view-osd body{background:#0c1119;margin:0;overflow:hidden}
+#osdp{display:flex;align-items:center;gap:12px;height:56px;padding:0 18px;border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);box-sizing:border-box;color:#fff;font:600 15px var(--body);white-space:nowrap}
+#osdp svg{flex:none;color:var(--accent)}#osdp.pop{animation:bin .22s ease-out}
+html.picmotion #wallimg{inset:-2.5%;animation:wfloat 7s ease-in-out infinite}@keyframes wfloat{0%,100%{transform:translateY(-10px)}50%{transform:translateY(10px)}}
+html.covered.picmotion #wallimg{animation-play-state:paused}
 /* ===== 1.7: Nexa buddy, speech bubble, live wallpaper, themes ===== */
 #buddy{position:relative;width:40px;height:40px;padding:0;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 40%,rgba(255,95,162,.35),rgba(0,229,255,.12) 70%);border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);flex:none;animation:bbob 3.6s ease-in-out infinite}
 #buddy img{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}#buddy .bbl{opacity:0}#buddy.bl .bbl{opacity:1}
@@ -750,7 +761,11 @@ const PAGES={
  async keyboard(c){const s=sec(c,'Keyboard layout','Pick the layout printed on your keys.');let cur='gb';try{cur=(await HX.lx('keyboard')).layout}catch(e){}
    const sel=h('select',{class:'txt','aria-label':'Keyboard layout'},KB_LAYOUTS.map(([k,n])=>h('option',{value:k,selected:k===cur},n)));if(!KB_LAYOUTS.some(k=>k[0]===cur))sel.prepend(h('option',{value:cur,selected:true},cur));
    sel.onchange=()=>HX.lx('setKeyboard',sel.value).then(()=>toast('Keyboard layout changed',sel.selectedOptions[0].textContent)).catch(e=>toast('Layout not changed',errMsg(e)));
-   s.append(srow('Layout','',sel),h('input',{class:'txt',placeholder:'Type here to test your keys','aria-label':'Test keyboard'}))},
+   s.append(srow('Layout','',sel),h('input',{class:'txt',placeholder:'Type here to test your keys','aria-label':'Test keyboard'}));
+   if(HX.lockKeysOsd)HX.lockKeysOsd().then(v=>s.append(srow('Show Caps Lock and Num Lock on screen','A little note in the middle of the screen whenever you switch them on or off.',sswitch(v,async x=>HX.lockKeysOsd(x),'Lock keys note')))).catch(()=>{});
+   const tp=sec(c,'Touchpad','Turn it off when you’re using a mouse, so your palm can’t move the pointer. Shortcut: Ctrl + Windows key + T (or your laptop’s own touchpad key).');tp.append(busyEl());
+   HX.lx('touchpad').then(t=>{tp.lastChild.remove();if(!t.present){tp.append(h('p',{class:'hint'},'No touchpad found on this computer.'));return}
+     tp.append(srow('Touchpad',t.name,sswitch(t.on,async v=>(await HX.lx('setTouchpad',v)).on,'Touchpad')))}).catch(e=>tp.lastChild.replaceWith(errEl(e)))},
  appearance(c){const accents=['#00e5ff','#ff2e88','#7cff4f','#9b5cff','#ff8a00','#ff3b3b'];const S=store.get('nxset',NX_DEFAULT);
    const seg=h('div',{class:'seg'}),acc=h('div',{class:'row'}),wp=h('div',{class:'row'});
    const draw=()=>{seg.innerHTML='';['light','dark'].forEach(m=>seg.append(h('button',{class:S.mode===m?'on':'',on:{click:()=>{S.mode=m;apply(S);draw()}}},m[0].toUpperCase()+m.slice(1))));
@@ -769,7 +784,7 @@ const PAGES={
    sec(c,'Mode').append(seg);sec(c,'Accent colour').append(acc);sec(c,'Animated background','These move gently, and stop while you’re in a game.').append(wp);draw();
    if(HX&&HX.builtinWallpapers){const bs=sec(c,'NexusOS backgrounds'),brow=h('div',{class:'picrow'});bs.append(brow);
      HX.builtinWallpapers().then(list=>{for(const w of list)brow.append(h('button',{class:'pic big'+(w.on?' on':'')+(w.live?' live':''),title:w.name,'aria-label':w.name,style:`background-image:url("${w.thumb}")`,on:{click:async()=>{await HX.useBuiltinWallpaper(w.id);openSettings('appearance')}}}))}).catch(()=>{})}
-   if(HX&&HX.getWallpaper&&SYS){const ps=sec(c,'Picture background','Pick one of your pictures, or right-click any picture in Files and choose “Set as desktop background”.');const cur=h('div',{class:'row2'}),row=h('div',{class:'picrow'});ps.append(cur,row);
+   if(HX&&HX.getWallpaper&&SYS){const ps=sec(c,'Picture background','Pick one of your pictures, or right-click any picture in Files and choose “Set as desktop background”.');ps.append(srow('Gentle motion','Your picture slowly floats up and down. It holds still while a game or a full-screen window is open.',sswitch(S.picMotion!==false,async v=>{S.picMotion=v;apply(S);return v},'Gentle motion')));const cur=h('div',{class:'row2'}),row=h('div',{class:'picrow'});ps.append(cur,row);
      HX.getWallpaper().then(u=>{if(u)cur.append(h('div',{class:'pic on',style:`background-image:url("${u}")`,title:'Current background'}),h('button',{class:'pbtn',on:{click:async()=>{await HX.clearWallpaper();openSettings('appearance')}}},'Use the animated background'))});
      HX.list(SYS.drive+SYS.sep+'Pictures').then(async res=>{const imgs=res.entries.filter(f=>!f.dir&&IMG_RE.test(f.name)&&f.size<8e6).slice(0,12);if(!imgs.length){row.append(h('p',{class:'hint'},'No pictures in your Pictures folder yet.'));return}
        for(const f of imgs){const t=h('button',{class:'pic',title:f.name,'aria-label':f.name,on:{click:async()=>{await setAsBackground(f.path);openSettings('appearance')}}});row.append(t);HX.readDataUrl(f.path).then(u=>{t.style.backgroundImage=`url("${u}")`}).catch(()=>{})}}).catch(()=>{})}
@@ -800,7 +815,10 @@ const PAGES={
            try{await HX.lx('fixNvidia');lg.textContent='Done. Restart the computer to finish.'}catch(err){lg.textContent=errMsg(err);e.target.disabled=false}}}},'Fix the NVIDIA driver')))}
        if(!st.live&&((st.secureBoot===false)||(st.secureBoot&&st.nvidiaInstalled&&!st.nvidiaLoaded)))s.append(h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:()=>HX.lx('secureBootSetup').catch(e=>toast('Couldn’t start it',errMsg(e)))}},st.secureBoot?'Let Secure Boot trust the NVIDIA driver…':'Turn on Secure Boot with NVIDIA…')));
        if(st.live)s.append(h('p',{class:'hint'},'You’re running from the USB stick. Install NexusOS to get encryption and a password-protected account.'))}
-     const pw=sec(c,'Password','Your password protects your account, installs and settings changes.');const p1=h('input',{class:'txt',type:'password',placeholder:'New password','aria-label':'New password',autocomplete:'new-password'}),p2=h('input',{class:'txt',type:'password',placeholder:'Type it again','aria-label':'Repeat new password',autocomplete:'new-password'});
+     const si=sec(c,'Signing in');si.append(busyEl());HX.lx('signIn').then(st=>{si.lastChild.remove();if(st.live){si.append(h('p',{class:'hint'},'Install NexusOS to set up signing in.'));return}
+       si.append(srow('Ask for my password when NexusOS starts','Like Windows: every time the computer starts, you see the sign-in screen and type your password or PIN.',sswitch(!st.autologin,async v=>{const r=await HX.lx('setAutologin',!v);return !r.autologin},'Ask for password')),
+         srow('Guest account','A “Guest” sign-in with no password: just the basic NexusOS apps, none of your files or apps, and it’s wiped clean every time they sign out.',sswitch(st.guest,async v=>{const r=await HX.lx('setGuest',v);toast(v?'Guest account ready':'Guest account removed',v?'Choose “Guest” on the sign-in screen.':'');return r.guest},'Guest account')))}).catch(e=>si.lastChild.replaceWith(errEl(e)));
+     const pw=sec(c,'Password or PIN','Protects your account, installs and settings changes. Use 8+ characters, or a PIN of 4+ digits (quicker to type, but easier to guess).');const p1=h('input',{class:'txt',type:'password',placeholder:'New password or PIN','aria-label':'New password or PIN',autocomplete:'new-password'}),p2=h('input',{class:'txt',type:'password',placeholder:'Type it again','aria-label':'Repeat new password',autocomplete:'new-password'});
      const go=h('button',{class:'pbtn',on:{click:async()=>{if(p1.value!==p2.value){toast('Passwords don’t match','Type the same password twice.');return}go.disabled=true;try{await HX.lx('changePassword',p1.value);p1.value=p2.value='';toast('Password changed','Use it next time you sign in.')}catch(e){toast('Password not changed',errMsg(e))}go.disabled=false}}},'Change password');pw.append(p1,p2,h('p',{class:'hint'},'You’ll be asked for your current password first.'),h('div',{class:'row2'},go))}
    const hs=sec(c,'NexusOS’s own protections');[
      ['Browser in its own sandbox','Websites can’t reach your files or NexusOS’s system functions.'],
@@ -1487,9 +1505,10 @@ const APPS={
   const N=HX.nexa;let st=null,cfg=null,msgs=[],busy=false,reqId='',cur=null,sayBuf='',sayChain=Promise.resolve(),playQ=[],playing=null,rec=null,alive=true,ready=false;
   const img=h('img',{class:'navatar',alt:'',draggable:false}),glow=h('div',{class:'nglow'}),nm=h('b',{class:'nname'}),stat=h('span',{class:'nstat2'},'');
   // her face frames sit on top of the picture: a blink, and two mouth shapes for talking
-  const ov=k=>h('img',{class:'nov',alt:'',draggable:false,'data-k':k}),blinkI=ov('blink'),closedI=ov('closed'),midI=ov('mid');
-  const fx=h('div',{class:'nfx'}),av=h('div',{class:'navwrap',title:'Poke her'},img,blinkI,closedI,midI);
-  const stage=h('div',{class:'nstage idle'},glow,av,fx,h('div',{class:'nplate'},nm,stat));
+  const ov=k=>h('img',{class:'nov',alt:'',draggable:false,'data-k':k}),blinkI=ov('blink'),closedI=ov('closed'),midI=ov('mid'),blushI=h('img',{class:'nov nblush',alt:'',draggable:false,src:'nexa/nexa-blush.webp'});
+  const fx=h('div',{class:'nfx'}),av=h('div',{class:'navwrap',title:'Poke her, or hold the mouse on her head and rub to pat her'},img,blinkI,closedI,midI,blushI),sayB=h('div',{class:'nsay'});
+  const stage=h('div',{class:'nstage idle'},glow,av,fx,sayB,h('div',{class:'nplate'},nm,stat));
+  let sayT=0;const bubbleSay=t=>{sayB.textContent=t;sayB.classList.add('on');clearTimeout(sayT);sayT=setTimeout(()=>sayB.classList.remove('on'),3800)};
   const right=h('div',{class:'nright'});wrap.append(stage,right);
   const log=h('div',{class:'nlog'}),inp=h('textarea',{class:'ninp',rows:1,placeholder:'Say something…','aria-label':'Message'});
   const mic=h('button',{class:'nbtn',title:'Talk with your microphone','aria-label':'Talk'},svgI('<path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'));
@@ -1512,7 +1531,19 @@ const APPS={
   stage.addEventListener('mousemove',e=>{const r=stage.getBoundingClientRect();av.style.setProperty('--lx',(((e.clientX-r.left)/r.width-.5)*2).toFixed(2));av.style.setProperty('--ly',(((e.clientY-r.top)/r.height-.5)*2).toFixed(2))});
   stage.addEventListener('mouseleave',()=>{av.style.setProperty('--lx',0);av.style.setProperty('--ly',0)});
   const POKES=['Hey! That tickles!','Hehe, need something?','Boop! You found me.','I’m right here, you know.','Careful, I bite! Just kidding.','Ready when you are!'];
-  av.onclick=()=>{av.classList.remove('hop');void av.offsetWidth;av.classList.add('hop');burst('heart',6);if(!busy&&!playing&&cfg.speak){reqId='poke';say(POKES[Math.floor(Math.random()*POKES.length)])}};
+  av.onclick=()=>{if(patted){patted=false;return}av.classList.remove('hop');void av.offsetWidth;av.classList.add('hop');burst('heart',6);const l=POKES[Math.floor(Math.random()*POKES.length)];bubbleSay(l);if(!busy&&!playing&&cfg.speak){reqId='poke';say(l)}};
+  // ---- head pats: hold the mouse on her head and rub back and forth
+  const COZY=['Mmm~ that’s nice...','Ehehe... do that again~','I-I’m not blushing! ...okay, maybe a little.','Head pats are my favourite...','You’re gonna make me melt~','Hehe, you’re so sweet to me.'];
+  let pat=null,patted=false,patSaid=0,patHearts=0,blushT=0;
+  const onHead=e=>{const r=av.getBoundingClientRect();return (e.clientY-r.top)/r.height<.42&&(e.clientX-r.left)/r.width>.2&&(e.clientX-r.left)/r.width<.85};
+  av.addEventListener('pointermove',e=>{av.style.cursor=pat&&pat.on?'grabbing':onHead(e)?'grab':'pointer';if(!pat)return;const dx=e.clientX-pat.x;pat.x=e.clientX;pat.dist+=Math.abs(dx);const d=Math.sign(dx);if(d&&d!==pat.dir){if(pat.dir)pat.flips++;pat.dir=d}
+    if(!pat.on&&(pat.flips>=2||pat.dist>180)){pat.on=true;patStart()}});
+  av.addEventListener('pointerdown',e=>{if(e.button!==0||!onHead(e))return;pat={x:e.clientX,dir:0,flips:0,dist:0,on:false};try{av.setPointerCapture(e.pointerId)}catch(_){}});
+  const patStop=()=>{if(pat&&pat.on){patted=true;patEnd()}pat=null};av.addEventListener('pointerup',patStop);av.addEventListener('pointercancel',patStop);
+  function patStart(){clearTimeout(blushT);stage.classList.add('patting');blinkI.classList.add('hold');closedI.classList.add('hold');blushI.classList.add('hold');hush();
+    clearInterval(patHearts);patHearts=setInterval(()=>burst('heart',1),420);
+    setTimeout(()=>{if(!pat||!pat.on||Date.now()-patSaid<15000)return;patSaid=Date.now();const l=COZY[Math.floor(Math.random()*COZY.length)];bubbleSay(l);if(cfg.speak){reqId='pat';say(l)}},1200)}
+  function patEnd(){clearInterval(patHearts);stage.classList.remove('patting');setTimeout(()=>{blinkI.classList.remove('hold');closedI.classList.remove('hold')},500);blushT=setTimeout(()=>blushI.classList.remove('hold'),4500)}
   function bubble(role,text){const e=h('div',{class:'nmsg '+(role==='user'?'me':'her')},text||'');log.append(e);log.scrollTop=log.scrollHeight;return e}
   function chip(t){const e=h('div',{class:'nchip'},t);if(cur&&cur.isConnected&&!cur.textContent)log.insertBefore(e,cur);else log.append(e);log.scrollTop=log.scrollHeight;return e}
   const TOOL_LABEL={open_app:a=>'Opening '+(a.app||'an app'),list_steam_games:()=>'Checking your Steam games',launch_steam_game:a=>'Starting '+(a.name||'a game'),set_volume:a=>'Volume → '+a.percent+'%',set_brightness:a=>'Brightness → '+a.percent+'%',set_performance_mode:a=>'Performance mode → '+String(a.mode||'').replace('_',' '),save_clip:()=>'Saving a clip',set_wallpaper:()=>'Changing the background',system_status:()=>'Checking the computer',power:a=>'Asking you about: '+String(a.action||'').replace('_',' ')};
@@ -1575,6 +1606,7 @@ const APPS={
       (()=>{const r=h('input',{type:'range',min:-4,max:3,step:.5,value:cfg.pitch,'aria-label':'Voice depth'}),lab=h('small',{},'');const upd=()=>{const v=+r.value;lab.textContent=v===0?'Normal':v<0?(v<=-3?'Much deeper':v<=-1.5?'Deeper':'A little deeper'):'Higher'};upd();
         r.oninput=upd;r.onchange=async()=>{await save({pitch:+r.value});reqId='test';say('Is this better? I can go deeper, or higher, whatever you like.')};return srow('Voice depth','Lower makes her voice deeper.',r,lab)})(),
       srow('Speak her replies','',sswitch(cfg.speak,async v=>{await save({speak:v});return v},'Speak')),
+      (()=>{const sw=h('span');N.misses().then(v=>sw.append(sswitch(v,async x=>{await N.misses(x);return x},'Misses you'))).catch(()=>{});return srow('She misses you','When you haven’t talked for a while, she says so from the taskbar (never during games). Ignore her and she’ll sulk a little.',sw)})(),
       srow('Let her control NexusOS','Open apps and games, change volume, brightness, performance mode and background, save clips. Power actions always ask you first.',sswitch(cfg.control,async v=>{await save({control:v});return v},'Control')),
       h('div',{class:'row2 wrap'},h('button',{class:'pbtn',on:{click:async()=>{if(!await ask('Forget your chat?',cfg.name+' won’t remember anything you’ve said so far.','Forget',true))return;msgs=[];log.innerHTML='';N.history([]).catch(()=>{});ov.remove()}}},'Forget our chat'),
         h('button',{class:'pbtn danger',on:{click:async()=>{if(!await ask('Remove '+cfg.name+'’s downloads?','Frees about 2.9 GB. You can download her again any time.','Remove',true))return;await N.remove();ov.remove();ready=false;init()}}},'Remove downloads (2.9 GB)'),
@@ -1595,7 +1627,10 @@ const APPS={
     try{msgs=await N.history()}catch(e){msgs=[]}log.innerHTML='';for(const m of msgs.slice(-30))bubble(m.role,m.content);
     setStat('Waking up…','think');inp.focus();
     try{await N.start();if(!alive)return;ready=true;setStat('Here with you','idle');
-      burst('heart',5);if(!msgs.length){const hi=`Hi! I'm ${cfg.name}, your NexusOS buddy. Ask me anything, or tell me to open a game, turn up the volume, or switch to performance mode!`;reqId='hi';bubble('assistant',hi);say(hi)}}
+      let g=null;try{g=await N.greet()}catch(e){}
+      if(!msgs.length&&(!g||!g.text))g={kind:'hi',text:`Hi! I'm ${cfg.name}, your NexusOS buddy. Ask me anything, or tell me to open a game, turn up the volume, or switch to performance mode!`};
+      if(g&&g.text){if(g.kind==='sulk'){stage.classList.add('pout');setTimeout(()=>stage.classList.remove('pout'),2600);blushI.classList.add('hold');blushT=setTimeout(()=>blushI.classList.remove('hold'),3000)}else burst('heart',g.kind==='long'?14:5);
+        reqId='hi';bubble('assistant',g.text);bubbleSay(g.text);say(g.text);msgs.push({role:'assistant',content:g.text});N.history(msgs).catch(()=>{})}}
     catch(e){setStat('Couldn’t wake up','idle');chip('I couldn’t start: '+errMsg(e))}}
   init();
   api.onClose=()=>{alive=false;hush();if(rec)stopRec()}}},
@@ -1721,7 +1756,7 @@ function liveWall(skin){if(liveRun&&liveRun.skin===skin)return;if(liveRun)liveRu
   (function sm(){if(!alive)return;if(!cov()&&Math.random()<.5){smile.classList.add('on');setTimeout(()=>smile.classList.remove('on'),2500)}setTimeout(sm,9000+Math.random()*9000)})();
   (function sp(){if(!alive)return;if(!cov()){const r=fig.getBoundingClientRect();const e=h('span',{class:'lsp'},Math.random()<.35?'♥':'✦');e.style.left=(r.left+r.width*(.2+Math.random()*.6))+'px';e.style.top=(r.top+r.height*(.05+Math.random()*.35))+'px';el.append(e);setTimeout(()=>e.remove(),3100)}setTimeout(sp,3500+Math.random()*3000)})();
   liveRun={skin,stop(){alive=false;el.remove();liveRun=null}}}
-function apply(S,remote){const R=document.documentElement;R.classList.toggle('theme-sakura',S.theme==='sakura');R.classList.toggle('theme-neon',S.theme==='neon');if(VIEW==='desktop'||VIEW==='main')petals(S.theme==='sakura');R.classList.toggle('light',S.mode==='light');document.documentElement.style.setProperty('--accent',S.accent);wallIdx=S.wall;if(VIEW==='main'||VIEW==='desktop')paintWall(performance.now());store.set('nxset',S);if(!remote&&MW&&HX.changed)HX.changed('look').catch(()=>{})}
+function apply(S,remote){const R=document.documentElement;R.classList.toggle('theme-sakura',S.theme==='sakura');R.classList.toggle('theme-neon',S.theme==='neon');if(VIEW==='desktop'||VIEW==='main')petals(S.theme==='sakura');R.classList.toggle('light',S.mode==='light');R.classList.toggle('picmotion',S.picMotion!==false);document.documentElement.style.setProperty('--accent',S.accent);wallIdx=S.wall;if(VIEW==='main'||VIEW==='desktop')paintWall(performance.now());store.set('nxset',S);if(!remote&&MW&&HX.changed)HX.changed('look').catch(()=>{})}
 apply(store.get('nxset',NX_DEFAULT),true);
 
 /* ---------- desktop ---------- */
@@ -1741,7 +1776,7 @@ async function migrateOldFiles(){if(!HX||!SYS||store.get('migrated12',false))ret
   for(const folder of ['Documents','Downloads'])for(const f of (old[folder]||[])){if(f.t!=='txt'||!f.c)continue;if(f.n==='Welcome.txt'||f.n==='halcyon-release-notes.txt')continue;try{const p=await HX.unique(SYS.drive+SYS.sep+folder,f.n);await HX.writeText(p,f.c);n++}catch(e){}}
   if(n)toast('Your notes moved to the NexusOS drive',n+' file'+(n>1?'s are':' is')+' now in Documents and Downloads.')}
 
-function boot(){const bt=$('#boot');$('#boot h2').textContent='NexusOS';bt.classList.remove('done');if(OSM()&&HX.buddyCfg)HX.buddyCfg().then(c=>{if(c.on===false)return;$('#boot .bnexa').src='nexa/nexa-'+(c.skin==='tan'?'tan':'light')+'.webp';$('#boot .bsub').textContent='Welcome back, '+(SYS?SYS.user:'')+'!';bt.classList.add('wnexa')}).catch(()=>{});setTimeout(()=>{bt.classList.add('done');setTimeout(()=>{if(!Object.keys(wins).length){toast('Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+(SYS?SYS.user:'Xiaoming'),'Click the NexusOS logo in the taskbar to open Start.')}},400)},1400)}
+function boot(){const bt=$('#boot');$('#boot h2').textContent='NexusOS';bt.classList.remove('done');if(OSM()&&HX.buddyCfg)HX.buddyCfg().then(c=>{if(c.on===false)return;$('#boot .bnexa').src='nexa/nexa-'+(c.skin==='tan'?'tan':'light')+'.webp';$('#boot .bsub').textContent='Welcome back, '+(SYS?SYS.user:'')+'!';bt.classList.add('wnexa')}).catch(()=>{});setTimeout(()=>bt.classList.add('done'),1400)}
 /* ---------- real PC hooks ---------- */
 function loadSys(){if(!HX)return Promise.resolve();return HX.sysInfo().then(x=>{SYS=x;const n=x.user||'User';$('.me').lastChild.textContent=n;$('.avatar').textContent=n.slice(0,2).toUpperCase()}).catch(()=>{})}
 const wifi=$('[data-t="wifi"]');
@@ -1760,6 +1795,9 @@ if(HX){
   if(VIEW==='app')HX.onAppArg(a=>{if(mountAppView.ready)mountAppView.ready(a);else(mountAppView.queued=mountAppView.queued||[]).push(a)});
   HX.onJob(onJob);HX.onPermission(onPermission);HX.catalog().then(c=>{CAT=c}).catch(()=>{});
   if(VIEW==='main'){setInterval(loadSys,15000);HX.onOpenUrl(u=>openApp('web',u));HX.onDownload(onDownload);setInterval(refreshDesktop,4000)}
+  if(VIEW==='osd'){const ICON={caps:'<path d="M12 4 5 11h4v5h6v-5h4z"/><path d="M8 20h8"/>',num:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M10 9v6M8 9h2M14 9h2l-2 6"/>',touchpad:'<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 14h18M12 14v5"/>'};
+    HX.onOsd(d=>{let e=$('#osdp');if(e)e.remove();e=h('div',{id:'osdp',class:'pop',html:`<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[d.icon]||ICON.caps}</svg>`},h('span',{},d.text));document.body.append(e);
+      setTimeout(()=>HX.osdSize(Math.ceil(e.scrollWidth)+2),20)})}
   if(VIEW==='bubble'){let bub=null,actx=null;document.body.onclick=()=>HX.buddyOpenNexa();
     HX.onBubble((k,d)=>{if(k==='show'){if(bub)bub.remove();bub=h('div',{id:'bub'},h('img',{src:'nexa/buddy-'+(d.skin==='tan'?'tan':'light')+'.webp',alt:''}),h('div',{},h('b',{},d.name||'Nexa'),d.text));document.body.append(bub);setTimeout(()=>HX.bubbleSize(bub.offsetHeight),20)}
       if(k==='say'&&d&&d.wav){const u=URL.createObjectURL(new Blob([d.wav],{type:'audio/wav'}));const a=new Audio(u);a.preservesPitch=false;a.playbackRate=d.rate||1;a.onended=()=>URL.revokeObjectURL(u);a.play().catch(()=>{})}})}

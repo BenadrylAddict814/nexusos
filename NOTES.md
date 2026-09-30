@@ -1,4 +1,15 @@
-NexusOS 1.7.0: Nexa everywhere
+NexusOS 1.8.0
+
+- Sign-in like Windows: in Settings > Security & privacy, turn on "Ask for my password when NexusOS starts" and you'll see the sign-in screen every time the computer starts. You can now use a PIN (4+ digits) instead of a password.
+- Guest account: turn it on in the same place. Guest has no password, just the basic NexusOS apps, can't see your files or apps, and is wiped clean every time they sign out.
+- Caps Lock and Num Lock: a little note on screen tells you when you turn them on or off.
+- Touchpad on/off: Settings > Keyboard, or press Ctrl + Windows key + T (your laptop's own touchpad key works too). It also ignores accidental taps while you type.
+- Your picture background now floats gently up and down (switch it off in Settings > Appearance > Picture background). It holds still under games and full-screen windows.
+- Nexa is cuter and a little flirty now. Hold the mouse on her head and rub back and forth to give her head pats: she closes her eyes, blushes and gets cosy.
+- Nexa misses you: when you haven't talked for a while, she says so from the taskbar (never during games, and only when you're at the computer). Ignore her and she'll sulk a bit next time. Leave her for a day and she'll be very happy to see you. Turn it off in her settings.
+- The "click the NexusOS logo" tip at startup is gone.
+
+From 1.7.0: Nexa everywhere
 
 - Nexa lives on your taskbar: a little Nexa at the bottom right who blinks, hops and says something when you plug in a USB, save a clip, start or finish a Steam game, stay up gaming past midnight, plug in the charger or run low on battery. She stays quiet while you're in a game. Click her to talk; right-click to let her speak out loud or hide her.
 - Live Nexa wallpaper: she breathes, blinks, smiles now and then and sparkles. Pick "Nexa, live" in Settings > Appearance > NexusOS backgrounds (light or tan). She holds still while a game or a full-screen window is open, so it costs nothing while you play.

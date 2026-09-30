@@ -5,6 +5,8 @@
 #   fix-nvidia           make sure the NVIDIA driver (not nouveau) drives the GPU
 #   wifi-powersave on|off
 #   reboot-windows       restart straight into Windows, once (the next start is NexusOS again)
+#   autologin on|off     sign in automatically at startup, or ask for the password every time
+#   guest on|off         add or remove the Guest account (no password, fresh every time)
 set -euo pipefail
 export PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C.UTF-8
 umask 022
@@ -181,11 +183,54 @@ reboot_windows() {
   systemctl reboot
 }
 
+lightdm_confs() { ls /etc/lightdm/lightdm.conf /etc/lightdm/lightdm.conf.d/*.conf 2>/dev/null; }
+set_autologin() {
+  case "${1:-}" in
+    off)
+      for f in $(lightdm_confs); do sed -i 's/^\(autologin-user\(-timeout\)\{0,1\}=.*\)$/#nexusos-off# \1/' "$f"; done
+      say "NexusOS will ask for your password every time it starts." ;;
+    on)
+      local u; u=$(getent passwd "${PKEXEC_UID:-1000}" | cut -d: -f1); [ -n "$u" ] || die "Unknown account."
+      local restored=0
+      for f in $(lightdm_confs); do grep -q '^#nexusos-off# autologin-user=' "$f" && restored=1; sed -i 's/^#nexusos-off# //' "$f"; done
+      if [ "$restored" = 0 ] && ! grep -qh '^autologin-user=' $(lightdm_confs) 2>/dev/null; then
+        mkdir -p /etc/lightdm/lightdm.conf.d
+        printf '# NexusOS: sign in automatically (Settings > Security & privacy)\n[Seat:*]\nautologin-user=%s\nautologin-user-timeout=0\n' "$u" > /etc/lightdm/lightdm.conf.d/61-nexusos-autologin.conf
+      fi
+      getent group autologin >/dev/null && usermod -aG autologin "$u" 2>/dev/null || true
+      say "NexusOS will sign you in automatically." ;;
+    *) die "Use on or off." ;;
+  esac
+}
+set_guest() {
+  case "${1:-}" in
+    on)
+      if ! getent passwd guest >/dev/null; then
+        useradd -m -c "Guest" -s /bin/bash guest || die "Couldn't create the Guest account."
+      elif [ ! -f "$STATE/guest-account" ]; then die "There's already an account called guest that NexusOS didn't make."; fi
+      for g in audio video netdev plugdev bluetooth; do getent group "$g" >/dev/null && usermod -aG "$g" guest; done
+      passwd -d guest >/dev/null; chmod 700 /home/guest   # no password: pick Guest and press Log In
+      touch "$STATE/guest-account"
+      # nobody else's files are visible to the guest
+      for hdir in /home/*; do [ "$hdir" = /home/guest ] || chmod 700 "$hdir" 2>/dev/null || true; done
+      say "The Guest account is ready." ;;
+    off)
+      [ -f "$STATE/guest-account" ] || { say "There's no Guest account."; return 0; }
+      loginctl list-users --no-legend 2>/dev/null | awk '{print $2}' | grep -qx guest && die "Someone is signed in as Guest right now. Sign them out first."
+      userdel -r guest 2>/dev/null || userdel guest || true
+      rm -f "$STATE/guest-account"
+      say "The Guest account is gone." ;;
+    *) die "Use on or off." ;;
+  esac
+}
+
 case "${1:-}" in
   apply-update) [ -n "${2:-}" ] || die "Which update?"; apply_update "$2" ;;
   rollback) rollback ;;
   fix-nvidia) fix_nvidia ;;
   wifi-powersave) wifi_powersave "${2:-}" ;;
   reboot-windows) reboot_windows ;;
+  autologin) set_autologin "${2:-}" ;;
+  guest) set_guest "${2:-}" ;;
   *) die "Unknown command." ;;
 esac

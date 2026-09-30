@@ -1,0 +1,14 @@
+#!/bin/bash
+# NexusOS: gives the Guest account a fresh, empty home at every sign-in and sign-out.
+# LightDM runs this as root (session-setup-script and session-cleanup-script) for every session;
+# it only ever touches the "guest" account that NexusOS created.
+set -u
+[ "${USER:-}" = guest ] || exit 0
+[ -f /var/lib/nexusos/guest-account ] || exit 0
+home=$(getent passwd guest | cut -d: -f6); [ "$home" = /home/guest ] || exit 0
+pkill -KILL -u guest 2>/dev/null || true
+
+rm -rf --one-file-system /home/guest
+cp -a /etc/skel /home/guest 2>/dev/null || mkdir -p /home/guest
+chown -R guest:guest /home/guest; chmod 700 /home/guest
+exit 0
