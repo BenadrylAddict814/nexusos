@@ -298,7 +298,7 @@ select.txt{max-width:100%} select.txt option{background:var(--surface-solid);col
 :root.light{--accent:#0095b3}
 
 /* ===== 1.4.3: NexusOS as separate windows ===== */
-.view-panel #wall,.view-panel #desk,.view-panel .panel,.view-popup #wall,.view-popup #desk,.view-popup #bar,.view-toasts #wall,.view-toasts #desk,.view-toasts #bar,.view-toasts .panel,
+.view-panel #wall,.view-panel #desk,.view-panel .panel,.view-popup #wall,.view-popup #desk,.view-popup #bar,.view-toasts #wall,.view-toasts #desk,.view-toasts #bar,.view-toasts .panel,.view-bubble #wall,.view-bubble #desk,.view-bubble #bar,.view-bubble .panel,
 .view-app #wall,.view-app #desk,.view-app #bar,.view-app .panel,.view-desktop #bar,.view-desktop .panel{display:none!important}
 .view-panel body{background:#080b11}
 .view-panel #bar{position:fixed;inset:0;transform:none;border-radius:0;justify-content:center;padding:0 10px;gap:6px;background:linear-gradient(180deg,#0c1119,#070a10);box-shadow:inset 0 1px 0 color-mix(in srgb,var(--accent) 55%,transparent);border:0;backdrop-filter:none}
@@ -329,7 +329,7 @@ select.txt{max-width:100%} select.txt option{background:var(--surface-solid);col
 .dicon.drop{background:color-mix(in srgb,var(--accent) 35%,transparent);outline:2px solid var(--accent)}
 .dicon .dname{max-width:84px;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;text-align:center;word-break:break-word}
 .band{position:absolute;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 15%,transparent);pointer-events:none;z-index:4}
-#wallimg{position:fixed;inset:0;background:#000 center/cover no-repeat}.pic.big{width:192px;height:108px}.picwall .dicon,.picwall .dicon *{color:#fff;text-shadow:0 0 2px #000,0 1px 3px #000,0 0 6px rgba(0,0,0,.8)}
+#wallimg{position:fixed;inset:0;background:#000 center/cover no-repeat}.pic.big{width:192px;height:108px;position:relative}.pic.live::after{content:'LIVE ✦';position:absolute;right:6px;top:6px;font:700 10px var(--body);letter-spacing:.08em;color:#fff;background:#ff5fa2;border-radius:6px;padding:2px 6px}.picwall .dicon,.picwall .dicon *{color:#fff;text-shadow:0 0 2px #000,0 1px 3px #000,0 0 6px rgba(0,0,0,.8)}
 .picwall #wall{display:none}
 .files li.drop{background:color-mix(in srgb,var(--accent) 25%,transparent)}
 dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 10px;font-size:13px} dl.props dt{color:var(--muted)} dl.props dd{margin:0;overflow-wrap:anywhere;user-select:text}
@@ -358,6 +358,32 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 .picrow{display:flex;gap:8px;flex-wrap:wrap} .pic{width:110px;height:68px;border-radius:6px;border:2px solid transparent;background:#000 center/cover no-repeat;cursor:pointer}
 .pic.on{border-color:var(--accent)}
 
+/* ===== 1.7: Nexa buddy, speech bubble, live wallpaper, themes ===== */
+#buddy{position:relative;width:40px;height:40px;padding:0;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 40%,rgba(255,95,162,.35),rgba(0,229,255,.12) 70%);border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);flex:none;animation:bbob 3.6s ease-in-out infinite}
+#buddy img{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}#buddy .bbl{opacity:0}#buddy.bl .bbl{opacity:1}
+#buddy.hop{animation:bhop .6s cubic-bezier(.3,1.7,.5,1),bbob 3.6s ease-in-out .6s infinite}
+@keyframes bbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}@keyframes bhop{0%{transform:translateY(0) scale(1)}35%{transform:translateY(-7px) scale(1.08);box-shadow:0 0 14px var(--accent)}70%{transform:translateY(1px) scale(.97)}100%{transform:none;box-shadow:none}}
+.view-bubble body{background:#140f1d;margin:0;overflow:hidden;cursor:pointer}
+#bub{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(255,95,162,.55);background:linear-gradient(135deg,#1d1128,#101826);color:#fff;font:13.5px var(--body);line-height:1.35;animation:bin .28s cubic-bezier(.3,1.5,.5,1)}
+#bub img{width:40px;height:40px;border-radius:50%;flex:none;background:rgba(255,95,162,.25)}#bub b{display:block;font-size:12px;color:#ff8fc0;margin-bottom:1px}
+@keyframes bin{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+#livewall{position:fixed;inset:0;overflow:hidden;background:#fafafa}#livewall .lbg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#livewall .lfig{position:absolute;left:46.77%;bottom:0;width:34.53%;transform-origin:50% 100%;animation:lbreath 4.6s ease-in-out infinite}
+#livewall .lfig img{position:absolute;left:0;top:0;width:100%;height:auto}#livewall .lfig img:first-child{position:relative;display:block}
+#livewall .lov{opacity:0}#livewall .lov.on{opacity:1}
+@keyframes lbreath{0%,100%{transform:scale(1,1) translateY(0)}50%{transform:scale(1.004,1.008) translateY(-2px)}}
+#livewall .lsp{position:absolute;color:#fff;font-size:18px;text-shadow:0 0 8px #ff5fa2,0 0 16px #00e5ff;opacity:0;animation:lsp 3s ease-in-out forwards}
+@keyframes lsp{0%{opacity:0;transform:scale(.3) rotate(0)}30%{opacity:1}100%{opacity:0;transform:translateY(-40px) scale(1) rotate(60deg)}}
+#petals{position:fixed;inset:0;pointer-events:none;z-index:0}
+html.covered #livewall .lfig,html.covered #buddy{animation-play-state:paused}
+html.theme-sakura{--accent:#ff7eb6}
+html.theme-sakura.view-panel #bar{background:linear-gradient(180deg,#1a0f18,#0d0810)}
+html.theme-neon.view-panel #bar{box-shadow:inset 0 1px 0 #00e5ff,0 -1px 18px rgba(0,229,255,.35),inset 0 -1px 0 rgba(255,46,136,.5)}
+html.theme-neon #start,html.theme-neon #quick,html.theme-neon #trayp{box-shadow:inset 0 0 0 1px rgba(0,229,255,.7),inset 0 0 28px rgba(0,229,255,.18),inset 0 -12px 40px rgba(255,46,136,.14)}
+.themes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.theme{border:2px solid var(--line);border-radius:12px;padding:0;overflow:hidden;background:none;color:var(--fg);cursor:pointer;text-align:left;font:13px var(--body)}
+.theme.on{border-color:var(--accent)}.theme i{display:block;height:64px}.theme span{display:block;padding:7px 10px}
+#boot .bnexa{display:none;width:150px;margin:0 auto -8px;-webkit-mask-image:linear-gradient(#000 75%,transparent);mask-image:linear-gradient(#000 75%,transparent)}
+#boot.wnexa .bnexa{display:block;animation:bin .6s cubic-bezier(.3,1.4,.5,1)}#boot.wnexa .mark{display:none}#boot .bsub{margin:6px 0 0;color:#ff8fc0;font:15px var(--body);min-height:1.2em}
 /* ===== 1.6: Nexa ===== */
 .nexa{display:grid;grid-template-columns:minmax(260px,38%) 1fr;height:100%;overflow:hidden;position:relative;background:radial-gradient(120% 90% at 0% 100%,rgba(255,95,162,.16),transparent 60%),radial-gradient(90% 80% at 100% 0%,rgba(0,229,255,.12),transparent 60%)}
 .nstage{position:relative;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;border-right:1px solid var(--line);background:linear-gradient(transparent 0 97%,rgba(127,160,180,.10) 97%) 0 0/100% 32px,linear-gradient(90deg,transparent 0 97%,rgba(127,160,180,.10) 97%) 0 0/32px 100%}
@@ -468,7 +494,7 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 
 <div id="boot"><div class="in">
   <svg class="mark" viewBox="0 0 40 40"><defs><linearGradient id="ng2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00e5ff"/><stop offset="1" stop-color="#ff2e88"/></linearGradient></defs><path d="M20 3 35 11.5v17L20 37 5 28.5v-17z" fill="none" stroke="url(#ng2)" stroke-width="2.6" stroke-linejoin="round"/><path d="M13.5 26V14l13 12V14" fill="none" stroke="url(#ng2)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13.5" cy="14" r="2.3" fill="#00e5ff"/><circle cx="26.5" cy="26" r="2.3" fill="#ff2e88"/></svg>
-  <h2>NexusOS</h2><div class="ring"></div>
+  <img class="bnexa" alt=""><h2>NexusOS</h2><p class="bsub"></p><div class="ring"></div>
 </div></div>
 
 <script>
@@ -730,9 +756,19 @@ const PAGES={
    const draw=()=>{seg.innerHTML='';['light','dark'].forEach(m=>seg.append(h('button',{class:S.mode===m?'on':'',on:{click:()=>{S.mode=m;apply(S);draw()}}},m[0].toUpperCase()+m.slice(1))));
      acc.innerHTML='';accents.forEach(a=>acc.append(h('button',{class:'acc'+(a===S.accent?' on':''),style:'background:'+a,'aria-label':'Accent '+a,on:{click:()=>{S.accent=a;apply(S);draw()}}})));
      wp.innerHTML='';WALLS.forEach((w,i)=>wp.append(h('button',{class:'wp'+(i===S.wall?' on':''),style:`background:linear-gradient(135deg,${w.c.join(',')})`,'aria-label':w.n,title:w.n,on:{click:()=>{S.wall=i;apply(S);if(HX&&HX.clearWallpaper)HX.clearWallpaper().catch(()=>{});draw()}}})))};
+   const TH=[['default','NexusOS','linear-gradient(135deg,#05060a,#0b0f2a 60%,#00e5ff)'],['sakura','Sakura','linear-gradient(135deg,#1a0f18,#ff7eb6 70%,#ffd1e4)'],['neon','Neon Night','linear-gradient(135deg,#070312,#9b5cff 55%,#00e5ff)']];
+   const th=h('div',{class:'themes'});const drawTh=()=>{th.innerHTML='';for(const [k,n,g] of TH)th.append(h('button',{class:'theme'+((S.theme||'default')===k?' on':''),on:{click:async()=>{S.theme=k;
+       if(k==='sakura'){S.accent='#ff7eb6';S.mode='dark';if(HX&&HX.useBuiltinWallpaper)HX.useBuiltinWallpaper('nexa-live').catch(()=>{})}
+       if(k==='neon'){S.accent='#00e5ff';S.mode='dark';S.wall=0;if(HX&&HX.clearWallpaper)HX.clearWallpaper().catch(()=>{})}
+       if(k==='default'){S.accent='#00e5ff'}
+       apply(S);draw();drawTh()}}},h('i',{style:'background:'+g}),h('span',{},n)))};drawTh();
+   sec(c,'Theme','Sakura: pink, falling petals and live Nexa. Neon Night: glowing edges and the animated grid.').append(th);
+   if(HX&&HX.buddyCfg&&OSM()){const bs=sec(c,'Desktop buddy');HX.buddyCfg().then(b=>{bs.append(srow(b.name+' on the taskbar','She reacts to USB drives, clips, games and your battery. Click her to talk.',sswitch(b.on,async v=>{await HX.buddyCfg({on:v});return v},'Buddy')),
+     srow('Speak her reactions','Uses her voice (download her in the Nexa app first).',sswitch(b.speak,async v=>{await HX.buddyCfg({speak:v});return v},'Buddy voice')))}).catch(()=>{})}
+   if(HX&&HX.uiSounds&&OSM())HX.uiSounds().then(v=>sec(c,'Sounds').append(srow('Cute interface sounds','A soft pop for Start, chimes for notifications, a jingle when you log in.',sswitch(v,async x=>HX.uiSounds(x),'Interface sounds')))).catch(()=>{});
    sec(c,'Mode').append(seg);sec(c,'Accent colour').append(acc);sec(c,'Animated background','These move gently, and stop while you’re in a game.').append(wp);draw();
    if(HX&&HX.builtinWallpapers){const bs=sec(c,'NexusOS backgrounds'),brow=h('div',{class:'picrow'});bs.append(brow);
-     HX.builtinWallpapers().then(list=>{for(const w of list)brow.append(h('button',{class:'pic big'+(w.on?' on':''),title:w.name,'aria-label':w.name,style:`background-image:url("${w.thumb}")`,on:{click:async()=>{await HX.useBuiltinWallpaper(w.id);openSettings('appearance')}}}))}).catch(()=>{})}
+     HX.builtinWallpapers().then(list=>{for(const w of list)brow.append(h('button',{class:'pic big'+(w.on?' on':'')+(w.live?' live':''),title:w.name,'aria-label':w.name,style:`background-image:url("${w.thumb}")`,on:{click:async()=>{await HX.useBuiltinWallpaper(w.id);openSettings('appearance')}}}))}).catch(()=>{})}
    if(HX&&HX.getWallpaper&&SYS){const ps=sec(c,'Picture background','Pick one of your pictures, or right-click any picture in Files and choose “Set as desktop background”.');const cur=h('div',{class:'row2'}),row=h('div',{class:'picrow'});ps.append(cur,row);
      HX.getWallpaper().then(u=>{if(u)cur.append(h('div',{class:'pic on',style:`background-image:url("${u}")`,title:'Current background'}),h('button',{class:'pbtn',on:{click:async()=>{await HX.clearWallpaper();openSettings('appearance')}}},'Use the animated background'))});
      HX.list(SYS.drive+SYS.sep+'Pictures').then(async res=>{const imgs=res.entries.filter(f=>!f.dir&&IMG_RE.test(f.name)&&f.size<8e6).slice(0,12);if(!imgs.length){row.append(h('p',{class:'hint'},'No pictures in your Pictures folder yet.'));return}
@@ -1033,8 +1069,9 @@ async function refreshBinIcon(){if(!OSM())return;try{const r=await HX.binList();
 // picture backgrounds
 let wallImg=null;
 async function loadWallpaper(){if(!HX||!HX.getWallpaper)return;const u=await HX.getWallpaper().catch(()=>null);
+  if(u&&u.startsWith('live:')){if(wallImg){wallImg.remove();wallImg=null}document.documentElement.classList.add('picwall');wc.width=wc.height=1;liveWall(u.slice(5));return}liveWall(null);
   if(u){if(!wallImg){wallImg=h('div',{id:'wallimg'});document.body.prepend(wallImg)}wallImg.style.backgroundImage=`url("${u}")`;document.documentElement.classList.add('picwall');wc.width=wc.height=1}
-  else{document.documentElement.classList.remove('picwall');if(wallImg){wallImg.remove();wallImg=null}}}
+  else{document.documentElement.classList.remove('picwall');if(wallImg){wallImg.remove();wallImg=null}paintWall(performance.now())}}
 
 /* ---------- 1.4.3: the taskbar as its own always-on-top bar ---------- */
 let PINS=[],WINLIST=[],popupOpen=null;
@@ -1664,8 +1701,28 @@ const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
 if(VIEW==='main'||VIEW==='desktop')(function loop(t){if(!(typeof extWins!=='undefined'&&extWins.length)&&!document.documentElement.classList.contains('picwall'))paintWall(t);if(!reduce)setTimeout(()=>requestAnimationFrame(loop),66)})();
 addEventListener('resize',()=>{if(VIEW==='main'||VIEW==='desktop')paintWall(performance.now())});
 
-function apply(S){document.documentElement.classList.toggle('light',S.mode==='light');document.documentElement.style.setProperty('--accent',S.accent);wallIdx=S.wall;if(VIEW==='main'||VIEW==='desktop')paintWall(performance.now());store.set('nxset',S)}
-apply(store.get('nxset',NX_DEFAULT));
+// ---- 1.7: falling sakura petals (desktop only; they stop while anything else is in front)
+let petalRun=null;
+function petals(on){if(!on){if(petalRun){petalRun.stop();petalRun=null}return}if(petalRun)return;
+  const c=h('canvas',{id:'petals'});const wl=$('#desk');(wl?wl.parentNode:document.body).insertBefore(c,wl||null);const x=c.getContext('2d');let W=0,H=0,t0=0,raf=0,stopped=false;
+  const P=Array.from({length:26},()=>({x:Math.random(),y:Math.random(),s:.6+Math.random()*.8,v:.02+Math.random()*.03,w:Math.random()*6.28,r:Math.random()*6.28}));
+  const size=()=>{W=c.width=innerWidth;H=c.height=innerHeight};size();addEventListener('resize',size);
+  function draw(t){if(stopped)return;raf=setTimeout(()=>requestAnimationFrame(draw),33);if(document.documentElement.classList.contains('covered'))return;const dt=Math.min(.1,(t-(t0||t))/1000);t0=t;x.clearRect(0,0,W,H);
+    for(const p of P){p.y+=p.v*dt*3;p.w+=dt*1.3;p.r+=dt*.8;p.x+=Math.sin(p.w)*.0006;if(p.y>1.05){p.y=-.05;p.x=Math.random()}
+      x.save();x.translate(p.x*W,p.y*H);x.rotate(p.r);x.scale(p.s,p.s*(.6+.4*Math.abs(Math.sin(p.w))));x.fillStyle='rgba(255,170,205,.85)';x.beginPath();x.moveTo(0,-7);x.bezierCurveTo(7,-7,8,3,0,8);x.bezierCurveTo(-8,3,-7,-7,0,-7);x.fill();x.restore()}}
+  requestAnimationFrame(draw);petalRun={stop(){stopped=true;clearTimeout(raf);c.remove();removeEventListener('resize',size)}}}
+// ---- 1.7: Nexa as a live wallpaper: she breathes, blinks and smiles now and then
+let liveRun=null;
+function liveWall(skin){if(liveRun&&liveRun.skin===skin)return;if(liveRun)liveRun.stop();if(!skin)return;
+  const b='wallpapers/live/fig-'+(skin==='tan'?'tan':'light');const im=(src,cls)=>h('img',{src,class:cls||'',alt:'',draggable:false});
+  const blink=im(b+'-blink.webp','lov'),smile=im(b+'-closed.webp','lov'),fig=h('div',{class:'lfig'},im(b+'.webp'),blink,smile);
+  const el=h('div',{id:'livewall'},im('wallpapers/live/bg.webp','lbg'),fig);document.body.prepend(el);let alive=true;const cov=()=>document.documentElement.classList.contains('covered');
+  (function bl(){if(!alive)return;if(!cov()){blink.classList.add('on');setTimeout(()=>blink.classList.remove('on'),140)}setTimeout(bl,2500+Math.random()*4000)})();
+  (function sm(){if(!alive)return;if(!cov()&&Math.random()<.5){smile.classList.add('on');setTimeout(()=>smile.classList.remove('on'),2500)}setTimeout(sm,9000+Math.random()*9000)})();
+  (function sp(){if(!alive)return;if(!cov()){const r=fig.getBoundingClientRect();const e=h('span',{class:'lsp'},Math.random()<.35?'♥':'✦');e.style.left=(r.left+r.width*(.2+Math.random()*.6))+'px';e.style.top=(r.top+r.height*(.05+Math.random()*.35))+'px';el.append(e);setTimeout(()=>e.remove(),3100)}setTimeout(sp,3500+Math.random()*3000)})();
+  liveRun={skin,stop(){alive=false;el.remove();liveRun=null}}}
+function apply(S,remote){const R=document.documentElement;R.classList.toggle('theme-sakura',S.theme==='sakura');R.classList.toggle('theme-neon',S.theme==='neon');if(VIEW==='desktop'||VIEW==='main')petals(S.theme==='sakura');R.classList.toggle('light',S.mode==='light');document.documentElement.style.setProperty('--accent',S.accent);wallIdx=S.wall;if(VIEW==='main'||VIEW==='desktop')paintWall(performance.now());store.set('nxset',S);if(!remote&&MW&&HX.changed)HX.changed('look').catch(()=>{})}
+apply(store.get('nxset',NX_DEFAULT),true);
 
 /* ---------- desktop ---------- */
 const DESK=['web','files','store','notes','calc','term','paint','mines','settings','about'];
@@ -1684,13 +1741,13 @@ async function migrateOldFiles(){if(!HX||!SYS||store.get('migrated12',false))ret
   for(const folder of ['Documents','Downloads'])for(const f of (old[folder]||[])){if(f.t!=='txt'||!f.c)continue;if(f.n==='Welcome.txt'||f.n==='halcyon-release-notes.txt')continue;try{const p=await HX.unique(SYS.drive+SYS.sep+folder,f.n);await HX.writeText(p,f.c);n++}catch(e){}}
   if(n)toast('Your notes moved to the NexusOS drive',n+' file'+(n>1?'s are':' is')+' now in Documents and Downloads.')}
 
-function boot(){const bt=$('#boot');$('#boot h2').textContent='NexusOS';bt.classList.remove('done');setTimeout(()=>{bt.classList.add('done');setTimeout(()=>{if(!Object.keys(wins).length){toast('Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+(SYS?SYS.user:'Xiaoming'),'Click the NexusOS logo in the taskbar to open Start.')}},400)},1400)}
+function boot(){const bt=$('#boot');$('#boot h2').textContent='NexusOS';bt.classList.remove('done');if(OSM()&&HX.buddyCfg)HX.buddyCfg().then(c=>{if(c.on===false)return;$('#boot .bnexa').src='nexa/nexa-'+(c.skin==='tan'?'tan':'light')+'.webp';$('#boot .bsub').textContent='Welcome back, '+(SYS?SYS.user:'')+'!';bt.classList.add('wnexa')}).catch(()=>{});setTimeout(()=>{bt.classList.add('done');setTimeout(()=>{if(!Object.keys(wins).length){toast('Good '+(new Date().getHours()<12?'morning':new Date().getHours()<18?'afternoon':'evening')+', '+(SYS?SYS.user:'Xiaoming'),'Click the NexusOS logo in the taskbar to open Start.')}},400)},1400)}
 /* ---------- real PC hooks ---------- */
 function loadSys(){if(!HX)return Promise.resolve();return HX.sysInfo().then(x=>{SYS=x;const n=x.user||'User';$('.me').lastChild.textContent=n;$('.avatar').textContent=n.slice(0,2).toUpperCase()}).catch(()=>{})}
 const wifi=$('[data-t="wifi"]');
 function net(){$('#tray svg').style.opacity=navigator.onLine?1:.35;if(OSM()){if(VIEW!=='panel')refreshQuick();return}if(HX&&SYS&&SYS.isWin){wifi.classList.toggle('on',navigator.onLine);wifi.lastChild.textContent=navigator.onLine?'Online':'Offline';return}wifi.classList.toggle('on',navigator.onLine);wifi.lastChild.textContent=navigator.onLine?'Online':'Offline'}
 function battery(){if(navigator.getBattery)navigator.getBattery().then(bat=>{const svg=$('#tray svg:nth-of-type(2)');const rect=svg.querySelector('rect[fill]');const draw=()=>{rect.setAttribute('width',Math.max(1,11*bat.level));svg.parentNode.title='Battery '+Math.round(bat.level*100)+'%'+(bat.charging?', charging':'')};draw();bat.onlevelchange=draw;bat.onchargingchange=draw}).catch(()=>{})}
-addEventListener('storage',e=>{if(e.key==='hx.nxset')apply(store.get('nxset',NX_DEFAULT))});
+addEventListener('storage',e=>{if(e.key==='hx.nxset')apply(store.get('nxset',NX_DEFAULT),true)});
 function mountAppView(){const q=new URLSearchParams(location.search),key=q.get('app'),A=APPS[key];if(!A)return;let arg;try{const r=q.get('arg');arg=r?JSON.parse(r):undefined}catch(e){}
   if(arg===null)arg=undefined;const body=h('div',{class:'body appbody'});document.body.append(body);document.title=A.name;
   const api={el:document.body,body,setTitle:t=>{document.title=t},close:()=>window.close()};
@@ -1703,12 +1760,17 @@ if(HX){
   if(VIEW==='app')HX.onAppArg(a=>{if(mountAppView.ready)mountAppView.ready(a);else(mountAppView.queued=mountAppView.queued||[]).push(a)});
   HX.onJob(onJob);HX.onPermission(onPermission);HX.catalog().then(c=>{CAT=c}).catch(()=>{});
   if(VIEW==='main'){setInterval(loadSys,15000);HX.onOpenUrl(u=>openApp('web',u));HX.onDownload(onDownload);setInterval(refreshDesktop,4000)}
+  if(VIEW==='bubble'){let bub=null,actx=null;document.body.onclick=()=>HX.buddyOpenNexa();
+    HX.onBubble((k,d)=>{if(k==='show'){if(bub)bub.remove();bub=h('div',{id:'bub'},h('img',{src:'nexa/buddy-'+(d.skin==='tan'?'tan':'light')+'.webp',alt:''}),h('div',{},h('b',{},d.name||'Nexa'),d.text));document.body.append(bub);setTimeout(()=>HX.bubbleSize(bub.offsetHeight),20)}
+      if(k==='say'&&d&&d.wav){const u=URL.createObjectURL(new Blob([d.wav],{type:'audio/wav'}));const a=new Audio(u);a.preservesPitch=false;a.playbackRate=d.rate||1;a.onended=()=>URL.revokeObjectURL(u);a.play().catch(()=>{})}})}
   if(VIEW==='toasts'){const tb=h('div',{id:'toastbox'});document.body.append(tb);tb.append(dlBox);HX.onToast(d=>toastView(d.t,d.s));HX.onDownload(onDownload)}
   if(HX.onChanged)HX.onChanged(w=>{
     if(w==='files'){Object.values(wins).forEach(x=>{if(x.key==='files'&&x.api.refresh)x.api.refresh()});if(VIEW==='desktop'){buildDesktop.sig=null;buildDesktop()}}
     if(w==='bin'){refreshBinIcon();Object.values(wins).forEach(x=>{if(x.key==='bin'&&x.api.refresh)x.api.refresh()})}
     if(w==='wallpaper'&&(VIEW==='desktop'||VIEW==='main'))loadWallpaper();
     if(w==='pins'&&VIEW==='panel')loadPins();
+    if(w==='buddy'&&VIEW==='panel'&&window.budCfg)window.budCfg();
+    if(w==='look')apply(store.get('nxset',NX_DEFAULT),true);
     if(w==='clock')HX.clock24().then(v=>{clock24=v;tick()})});
 }else{legacyDesktop();renderBar()}
 if(!MW){addEventListener('online',()=>{net();toast('Back online','Your internet connection is working again.')});addEventListener('offline',()=>{net();toast('You’re offline','NexusOS lost its internet connection.')});net();battery()}
@@ -1717,12 +1779,22 @@ if(VIEW!=='main'&&VIEW!=='desktop')$('#boot').remove();
 loadSys().then(()=>{
   if(SYS){clock24=SYS.clock24!==false;tick();if(!OSM()&&HX&&!MW)$('#vol').closest('.slider').hidden=true;if(SYS.isWin)$('[data-t="bt"]').classList.remove('on')}
   if(VIEW==='main'){if(HX){setupDesktop();refreshDesktop();loadWallpaper()}renderBar();net();migrateOldFiles();boot();if(OSM()){setInterval(pollWindows,1500);pollWindows();installedApps();setTimeout(autoCheckUpdates,60000);setInterval(autoCheckUpdates,6*3600000)}}
-  else if(VIEW==='desktop'){setupDesktop();refreshDesktop();loadWallpaper();setInterval(refreshDesktop,4000);HX.onWindows(l=>{extWins=l.filter(w=>w.active)});boot();migrateOldFiles();installedApps();setTimeout(autoCheckUpdates,60000);setInterval(autoCheckUpdates,6*3600000)}
+  else if(VIEW==='desktop'){setupDesktop();refreshDesktop();loadWallpaper();setInterval(refreshDesktop,4000);HX.onWindows(l=>{extWins=l.filter(w=>w.active);document.documentElement.classList.toggle('covered',l.some(w=>w.active&&w.big)||l.some(w=>/^steam_app_\d+/i.test(w.cls||'')))});boot();migrateOldFiles();installedApps();setTimeout(autoCheckUpdates,60000);setInterval(autoCheckUpdates,6*3600000)}
   else if(VIEW==='panel'){setInterval(loadSys,60000);loadPins();HX.onWindows(l=>{WINLIST=l;renderPanel()});HX.windows().then(l=>{WINLIST=l;renderPanel()}).catch(()=>{});
     HX.onPopupState(w=>{$('#startBtn').classList.toggle('on',w==='start');$('#tray').classList.toggle('on',w==='quick');const a=$('#trayArrow');if(a)a.classList.toggle('on',w==='tray')});net();setInterval(net,20000);
     const rb=h('div',{id:'rightbox'}),arrow=h('button',{id:'trayArrow',class:'tb',hidden:true,'aria-label':'Show hidden icons',html:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>',
       on:{click:()=>{const r=arrow.getBoundingClientRect();HX.popup('tray',Math.round(r.left+r.width/2))}}});
     $('#tray').before(rb);rb.append(arrow,$('#tray'));
+    // 1.7: Nexa, sitting on the taskbar
+    const bud=h('button',{id:'buddy',hidden:true,'aria-label':'Nexa'},h('img',{class:'bb',alt:''}),h('img',{class:'bbl',alt:''}));rb.prepend(bud);
+    const budPos=()=>{const r=bud.getBoundingClientRect();if(r.width)HX.buddyAt(Math.round(window.screenX+r.left+r.width/2)).catch(()=>{})};
+    window.budCfg=async()=>{const c=await HX.buddyCfg().catch(()=>({on:false}));bud.hidden=c.on===false;const b='nexa/buddy-'+(c.skin==='tan'?'tan':'light');bud.children[0].src=b+'.webp';bud.children[1].src=b+'-blink.webp';bud.title=(c.name||'Nexa')+': click to talk, right-click for options';setTimeout(budPos,50)};
+    budCfg();new ResizeObserver(budPos).observe(rb);
+    (function bl(){if(!bud.hidden&&!document.documentElement.classList.contains('covered')){bud.classList.add('bl');setTimeout(()=>bud.classList.remove('bl'),140)}setTimeout(bl,2600+Math.random()*4200)})();
+    HX.onBuddy(()=>{budPos();bud.classList.remove('hop');void bud.offsetWidth;bud.classList.add('hop')});
+    bud.onclick=()=>HX.buddyOpenNexa();
+    bud.oncontextmenu=async e=>{e.preventDefault();const c=await HX.buddyCfg();const k=await menu([{id:'talk',label:'Talk to '+c.name},{id:'speak',label:c.speak?'Stop speaking her reactions':'Speak her reactions out loud'},{type:'separator'},{id:'hide',label:'Hide '+c.name+' from the taskbar'}]);
+      if(k==='talk')HX.buddyOpenNexa();if(k==='speak')HX.buddyCfg({speak:!c.speak});if(k==='hide'){await HX.buddyCfg({on:false});toast(c.name+' is hidden','Bring her back in Settings › Appearance.')}};
     HX.onTray(l=>{TRAY=l;updateTrayArrow()});HX.trayList().then(l=>{TRAY=l;updateTrayArrow()}).catch(()=>{});
     const sd=h('button',{id:'showdesk',title:'Show desktop','aria-label':'Show desktop',on:{click:()=>HX.lx('showDesktop').catch(()=>{})}});$('#bar').append(sd);
     $('#bar').addEventListener('contextmenu',async e=>{if(e.target.closest('.tb'))return;e.preventDefault();const k=await menu([{id:'tm',label:'Task Manager'},{id:'set',label:'Taskbar settings'}]);if(k==='tm')openApp('taskmgr');if(k==='set')openSettings('appearance')})}

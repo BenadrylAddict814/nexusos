@@ -828,8 +828,10 @@ function createWindow() {
   };
   // (if the desktop's process ever restarts, its child windows go with it: open them again)
   let reopen = [];
+  let firstLoad = true;
   desktopWin.webContents.on('did-finish-load', () => {
     desktopLoaded = true;
+    if (firstLoad) { firstLoad = false; uiSound('startup'); setTimeout(() => buddy('login'), 4000); }
     makeBars().then(() => { for (const [k, a] of reopen.splice(0)) try { openAppWindow(k, a); } catch (_) {} }).catch(() => {});
   });
   // the desktop's process also hosts the taskbar, Start, notifications and the light apps: if it ever dies,
@@ -902,7 +904,7 @@ function showPopup(which, at) {
   const ax = Number(at) || 0;
   const x = which === 'quick' ? d.x + d.width - w - 12 : which === 'tray' ? Math.max(d.x + 8, Math.min(d.x + d.width - w - 8, d.x + Math.round(ax - w / 2))) : Math.round(d.x + (d.width - w) / 2);
   popupWin.setBounds({ x, y: d.y + d.height - PANEL_H - h - 8, width: w, height: h });
-  popupWhich = which; popupPrevActive = activeX;
+  popupWhich = which; popupPrevActive = activeX; uiSound('pop');
   sendTo(popupWin, 'popup', which);
   popupWin.show(); popupWin.focus();
   sendTo(panelWin, 'popup-state', which);
@@ -958,21 +960,23 @@ function wmClassMap() {   // StartupWMClass / app-id -> flatpak app, from instal
 }
 let lastWinSig = '', activeX = 0, watchTimer = null, lastWinList = [];
 async function listWindows() {
-  const out = await run('wmctrl', ['-lpx'], { timeout: 4000 }).catch(() => '');
+  const out = await run('wmctrl', ['-lpxG'], { timeout: 4000 }).catch(() => '');
+  const sb = screen.getPrimaryDisplay().bounds, big = (w, h) => w * h >= sb.width * sb.height * 0.7;   // covers most of the screen (maximized, full screen)
   const act = await run('xprop', ['-root', '_NET_ACTIVE_WINDOW'], { timeout: 3000 }).catch(() => '');
   const am = /window id # (0x[0-9a-f]+)/i.exec(act); activeX = am ? parseInt(am[1], 16) : 0;
   const own = new Map(); for (const a of appWins.values()) if (!a.win.isDestroyed()) own.set(xid(a.win), a);
   const skip = new Set([desktopWin, panelWin, popupWin, toastWin].filter((w) => w && !w.isDestroyed()).map(xid));
   const map = wmClassMap(); const res = [];
   for (const l of out.trim().split('\n').filter(Boolean)) {
-    const m = /^(0x[0-9a-f]+)\s+(-?\d+)\s+(\d+)\s+(\S+)\s+\S+\s?(.*)$/i.exec(l); if (!m) continue;
+    const g = /^(0x[0-9a-f]+)\s+(-?\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+\S+\s?(.*)$/i.exec(l); if (!g) continue;
+    const m = [g[0], g[1], g[2], g[3], g[8], g[9]]; const isBig = big(+g[6], +g[7]);
     const x = parseInt(m[1], 16), desk = +m[2]; if (skip.has(x) || desk < 0) continue;
     const a = own.get(x); const cls = m[4];
-    if (a) { res.push({ id: m[1], key: a.key, title: a.win.getTitle(), own: true, active: x === activeX }); continue; }
+    if (a) { res.push({ id: m[1], key: a.key, title: a.win.getTitle(), own: true, active: x === activeX, big: isBig }); continue; }
     if (/^(nexusos|halcyon)\./i.test(cls)) continue;
     const [inst, klass] = cls.split('.'); const hit = map.get((klass || '').toLowerCase()) || map.get((inst || '').toLowerCase());
     const steamGame = /^steam_app_\d+/i.test(inst || '');
-    res.push({ id: m[1], app: hit && !steamGame ? hit.id : null, appName: hit && !steamGame ? hit.name : null, group: hit && !steamGame ? hit.id : (inst || cls).toLowerCase(), title: m[5], cls, active: x === activeX });
+    res.push({ id: m[1], app: hit && !steamGame ? hit.id : null, appName: hit && !steamGame ? hit.name : null, group: hit && !steamGame ? hit.id : (inst || cls).toLowerCase(), title: m[5], cls, active: x === activeX, big: isBig });
   }
   return res;
 }
@@ -980,7 +984,7 @@ async function pushWindows(force) {
   if (!panelWin || panelWin.isDestroyed()) return;
   const list = await listWindows();
   const sig = JSON.stringify(list);
-  lastWinList = list;
+  lastWinList = list; watchGames(list);
   if (force || sig !== lastWinSig) { lastWinSig = sig; sendTo(panelWin, 'windows', list); sendTo(desktopWin, 'windows', list); }
   // hide Start if the person clicked into another window
   // (only when a different window than before Start opened becomes active, so a slow focus change can't close it)
@@ -1247,7 +1251,7 @@ handle('win:popup', (which, at) => { if (!['start', 'quick', 'tray'].includes(wh
 handle('win:popupHide', () => { hidePopup(); return true; });
 handle('win:list', () => listWindows());
 handle('win:act', (id, action) => { if (!['activate', 'minimize', 'close', 'toggle'].includes(action)) throw new Error('Unknown action'); return windowAction(id, action); });
-handle('toast', (t, s) => { toastSend('toast', { t: String(t || '').slice(0, 120), s: String(s || '').slice(0, 300) }); return true; });
+handle('toast', (t, s) => { uiSound(/^(Couldn|That didn|Not |No |The download stopped)/.test(String(t || '')) ? 'error' : 'notify'); toastSend('toast', { t: String(t || '').slice(0, 120), s: String(s || '').slice(0, 300) }); return true; });
 handle('toast:size', (h) => { toastH = Math.max(0, Math.min(2000, Number(h) || 0)); placeToasts(); return true; });
 handle('dlg:confirm', async (title, text, ok) => {
   const r = await dialog.showMessageBox(null, { type: 'question', title: 'NexusOS', message: String(title || '').slice(0, 120), detail: String(text || '').slice(0, 400), buttons: [String(ok || 'OK').slice(0, 30), 'Cancel'], defaultId: 1, cancelId: 1, noLink: true });
@@ -1359,9 +1363,10 @@ handle('wall:set', async (p) => {
   config.wallpaper = path.basename(to); saveConfig(); broadcast('sys-changed', 'wallpaper'); return true;
 });
 // 1.4.5: backgrounds that come with NexusOS (app/wallpapers). A fresh install starts on the first one.
-const BUILTIN_WALLS = { 'nexus-hoodie': 'NexusOS hoodie', 'nexus-hoodie-tan': 'NexusOS hoodie (tan)' };
+const BUILTIN_WALLS = { 'nexus-hoodie': 'NexusOS hoodie', 'nexus-hoodie-tan': 'NexusOS hoodie (tan)', 'nexa-live': 'Nexa, live (she moves)', 'nexa-live-tan': 'Nexa, live (tan)' };
+const LIVE_WALLS = { 'nexa-live': ['light', 'nexus-hoodie'], 'nexa-live-tan': ['tan', 'nexus-hoodie-tan'] };
 const curWall = () => (config.wallpaper === undefined ? 'builtin:nexus-hoodie' : config.wallpaper);
-handle('wall:builtins', () => Object.entries(BUILTIN_WALLS).map(([id, name]) => ({ id, name, url: `wallpapers/${id}.jpg`, thumb: `wallpapers/${id}-thumb.jpg`, on: curWall() === 'builtin:' + id })));
+handle('wall:builtins', () => Object.entries(BUILTIN_WALLS).map(([id, name]) => { const lv = LIVE_WALLS[id]; return { id, name, live: !!lv, url: `wallpapers/${lv ? lv[1] : id}.jpg`, thumb: `wallpapers/${lv ? lv[1] : id}-thumb.jpg`, on: curWall() === 'builtin:' + id }; }));
 handle('wall:useBuiltin', async (id) => {
   if (!Object.prototype.hasOwnProperty.call(BUILTIN_WALLS, id)) throw new Error('Unknown background');
   if (config.wallpaper && !String(config.wallpaper).startsWith('builtin:')) await fs.promises.rm(path.join(WALL_DIR(), path.basename(config.wallpaper)), { force: true });
@@ -1369,7 +1374,7 @@ handle('wall:useBuiltin', async (id) => {
 });
 handle('wall:get', async () => {
   const w = curWall(); if (!w) return null;
-  if (String(w).startsWith('builtin:')) { const id = String(w).slice(8); return Object.prototype.hasOwnProperty.call(BUILTIN_WALLS, id) && fs.existsSync(path.join(__dirname, 'wallpapers', id + '.jpg')) ? `wallpapers/${id}.jpg` : null; }
+  if (String(w).startsWith('builtin:')) { const id = String(w).slice(8); if (LIVE_WALLS[id]) return 'live:' + LIVE_WALLS[id][0]; return Object.prototype.hasOwnProperty.call(BUILTIN_WALLS, id) && fs.existsSync(path.join(__dirname, 'wallpapers', id + '.jpg')) ? `wallpapers/${id}.jpg` : null; }
   const p = path.join(WALL_DIR(), path.basename(config.wallpaper));
   const mime = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp' }[path.extname(p).toLowerCase()];
   try { return `data:${mime};base64,` + (await fs.promises.readFile(p)).toString('base64'); } catch (_) { return null; }
@@ -1511,7 +1516,8 @@ async function usbFire() {
   if (kind === 'in' && added.length) {
     const d = (await LX.drives().catch(() => [])).find((x) => x.path === added[0]);
     toastSend('toast', { t: 'USB drive connected', s: `${(d && d.label) || 'USB drive'} is ready. Open it from Files.` });
-  }
+    buddy('usbDrive', { drive: (d && d.label) || 'USB drive' });
+  } else buddy(kind === 'in' ? 'usbIn' : 'usbOut');
 }
 handle('app:usbSound', (v) => { if (v !== undefined) { config.usbSound = !!v; saveConfig(); } return config.usbSound !== false; });
 
@@ -1638,6 +1644,7 @@ function startClipWatch() {
         try { await fs.promises.rename(f, to); } catch (_) { to = f; }
         const c = clipCfg();
         playSound('clip');
+        buddy('clip');
         if (c.notify) toastSend('toast', { t: 'Clip saved', s: `Last ${c.seconds} seconds · ${path.basename(to, '.mp4')}` });
         broadcast('clips-saved', path.basename(to));
       };
@@ -1819,7 +1826,7 @@ const NEXA_TOOLS = [
   { name: 'set_brightness', description: 'Set the screen brightness, 5-100.', parameters: { type: 'object', properties: { percent: { type: 'integer' } }, required: ['percent'] } },
   { name: 'set_performance_mode', description: 'Switch the performance profile.', parameters: { type: 'object', properties: { mode: { type: 'string', enum: ['battery_saver', 'balanced', 'performance'] } }, required: ['mode'] } },
   { name: 'save_clip', description: 'Save a clip of the last moments of gameplay (Clips must be running).', parameters: { type: 'object', properties: {} } },
-  { name: 'set_wallpaper', description: 'Change the desktop background.', parameters: { type: 'object', properties: { which: { type: 'string', enum: ['hoodie', 'hoodie_tan', 'animated'] } }, required: ['which'] } },
+  { name: 'set_wallpaper', description: 'Change the desktop background. "live" shows you (Nexa) moving on the desktop.', parameters: { type: 'object', properties: { which: { type: 'string', enum: ['hoodie', 'hoodie_tan', 'live', 'live_tan', 'animated'] } }, required: ['which'] } },
   { name: 'system_status', description: 'Battery, memory, CPU/GPU load and temperature, performance mode.', parameters: { type: 'object', properties: {} } },
   { name: 'power', description: 'Sleep, restart, shut down, or restart into Windows. The user is always asked to confirm.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['sleep', 'restart', 'shutdown', 'restart_windows'] } }, required: ['action'] } },
 ];
@@ -1851,7 +1858,7 @@ async function nexaTool(name, a, wc) {
     case 'save_clip': { try { clipsSave(); return 'Saved a clip.'; } catch (e) { return errMsgOf(e); } }
     case 'set_wallpaper': {
       if (a.which === 'animated') { config.wallpaper = null; saveConfig(); broadcast('sys-changed', 'wallpaper'); return 'Switched to the animated background.'; }
-      const id = a.which === 'hoodie_tan' ? 'nexus-hoodie-tan' : 'nexus-hoodie'; config.wallpaper = 'builtin:' + id; saveConfig(); broadcast('sys-changed', 'wallpaper'); return 'Background changed.';
+      const id = { hoodie_tan: 'nexus-hoodie-tan', live: 'nexa-live', live_tan: 'nexa-live-tan' }[a.which] || 'nexus-hoodie'; config.wallpaper = 'builtin:' + id; saveConfig(); broadcast('sys-changed', 'wallpaper'); return 'Background changed.';
     }
     case 'system_status': {
       const [b, g, pf] = await Promise.all([LX.battery().catch(() => null), readGpu().catch(() => null), LX.perfProfile().catch(() => null)]);
@@ -1960,6 +1967,9 @@ function nexaRun(bin, args, timeout) {
 }
 handleS('nexa:speak', async (wc, text, voice) => {
   if (!isNexaPage(wc)) throw new Error('Not allowed.');
+  return nexaTTS(text, voice);
+});
+async function nexaTTS(text, voice) {
   const t = String(text || '').replace(/[*_`#>~]/g, '').replace(/\p{Extended_Pictographic}/gu, '').replace(/\s+/g, ' ').trim().slice(0, 600);
   if (!t || !/[\p{L}\p{N}]/u.test(t)) return null;
   const c = nexaCfg(); const v = NEXA_VOICES[voice] || NEXA_VOICES[c.voice];
@@ -1970,7 +1980,7 @@ handleS('nexa:speak', async (wc, text, voice) => {
   await nexaRun('sherpa-onnx-offline-tts', [`--kokoro-model=${vd}/model.int8.onnx`, `--kokoro-voices=${vd}/voices.bin`, `--kokoro-tokens=${vd}/tokens.txt`, `--kokoro-data-dir=${vd}/espeak-ng-data`,
     `--kokoro-lexicon=${vd}/lexicon-us-en.txt`, `--kokoro-length-scale=${rate.toFixed(4)}`, `--sid=${v[0]}`, `--num-threads=${Math.max(2, Math.min(8, os.cpus().length - 2))}`, `--output-filename=${out}`, t], 120000);
   try { return { wav: await fs.promises.readFile(out), rate }; } finally { fs.promises.rm(out, { force: true }).catch(() => {}); }
-});
+}
 // ---- her ears: a short recording from the microphone (16 kHz WAV made in her window) turned into text
 handleS('nexa:hear', async (wc, bytes) => {
   if (!isNexaPage(wc)) throw new Error('Not allowed.');
@@ -2024,3 +2034,85 @@ function sweepLeftovers() {
     } catch (_) {}
   }
 }
+
+
+/* ---------------------------------------------------------------- 1.7: cute sounds, and Nexa as a desktop buddy on the taskbar */
+const uiSound = (n) => { if (config.uiSounds !== false) playSound(n); };
+handle('app:uiSounds', (v) => { if (v !== undefined) { config.uiSounds = !!v; saveConfig(); } return config.uiSounds !== false; });
+const buddyCfg = () => ({ on: true, speak: false, ...(config.buddy || {}), skin: nexaCfg().skin, name: nexaCfg().name });
+const BUDDY_LINES = {
+  login: ['Welcome back, {user}! Ready to game?', 'Hiii {user}! I missed you.', 'You’re back! What are we playing today?', 'Good {daypart}, {user}! Let’s have fun.'],
+  usbIn: ['Ooh, something got plugged in!', 'New gadget? Nice!', 'Beep boop, I see a USB thing!'],
+  usbDrive: ['A USB drive! {drive} is ready in Files.', '{drive} is here! Want to peek inside?'],
+  usbOut: ['Bye bye, USB!', 'Unplugged! See you later.'],
+  clip: ['Clipped! That was a good one.', 'Saved it! Show your friends.', 'Nice play, I clipped it!'],
+  lowBattery: ['Battery’s at {pct}%... plug me in, please?', 'Uh oh, {pct}% battery left! Charger time?'],
+  charging: ['Charging! Thanks~', 'Mmm, power. Much better.'],
+  gameStart: ['{game} time! Good luck!', 'Go get ’em in {game}!', 'Ooh, {game}! Don’t lose, okay?'],
+  lateNight: ['It’s {time}... one more match, then sleep, okay?', '{game} at {time}? You’re a true gamer. Don’t stay up too late!'],
+  gameEnd: ['GG! How did it go?', 'Game over? I hope you won!', 'Back already? That was fun to watch.'],
+};
+let buddyLast = 0, bubbleWin = null, bubbleMaking = false, bubbleX = 0, bubbleT = null; const bubbleQueue = [];
+handle('buddy:cfg', (o) => {
+  if (o && typeof o === 'object') { const c = { ...(config.buddy || {}) }; for (const k of ['on', 'speak']) if (typeof o[k] === 'boolean') c[k] = o[k]; config.buddy = c; saveConfig(); broadcast('sys-changed', 'buddy'); }
+  return buddyCfg();
+});
+handle('buddy:at', (x) => { if (Number.isFinite(x)) bubbleX = Math.round(x); return true; });
+handle('buddy:bubbleSize', (h) => {
+  if (!bubbleWin || bubbleWin.isDestroyed() || !Number.isFinite(h)) return false;
+  const d = screen.getPrimaryDisplay().bounds, W = 300, H = Math.max(40, Math.min(200, Math.round(h)));
+  const x = Math.max(d.x + 8, Math.min(d.x + d.width - W - 8, (bubbleX || d.x + d.width - 200) - W + 40));
+  bubbleWin.setBounds({ x, y: d.y + d.height - PANEL_H - H - 6, width: W, height: H });
+  if (!bubbleWin.isVisible()) bubbleWin.showInactive();
+  clearTimeout(bubbleT); bubbleT = setTimeout(() => { if (bubbleWin && !bubbleWin.isDestroyed()) bubbleWin.hide(); }, 5500);
+  return true;
+});
+handle('buddy:bubbleHide', () => { clearTimeout(bubbleT); if (bubbleWin && !bubbleWin.isDestroyed()) bubbleWin.hide(); return true; });
+handle('buddy:openNexa', () => { if (bubbleWin && !bubbleWin.isDestroyed()) bubbleWin.hide(); openAppWindow('nexa'); return true; });
+function bubbleSend(ch, data) {
+  if ((!bubbleWin || bubbleWin.isDestroyed()) && !bubbleMaking) {
+    bubbleMaking = true;
+    makeChild({ type: 'notification', frame: false, width: 300, height: 60, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false, backgroundColor: '#140f1d' }, { view: 'bubble' }).then((w) => {
+      bubbleWin = w; bubbleMaking = false;
+      const ready = () => { for (const [c, x] of bubbleQueue.splice(0)) sendTo(w, c, x); };
+      if (!w.webContents.isLoading() && w.webContents.getURL()) ready(); else w.webContents.once('did-finish-load', ready);
+      w.on('closed', () => { if (bubbleWin === w) bubbleWin = null; });
+    });
+  }
+  if (bubbleWin && !bubbleWin.isDestroyed() && !bubbleWin.webContents.isLoading()) sendTo(bubbleWin, ch, data); else bubbleQueue.push([ch, data]);
+}
+// her reactions: a hop on the taskbar, a little speech bubble (never on top of a game), and her voice if you want it
+function buddy(kind, vars = {}) {
+  const c = buddyCfg(); if (!OS_MODE || c.on === false) return;
+  const now = Date.now(); if (now - buddyLast < 5000 && kind !== 'clip') return; buddyLast = now;
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const h = new Date().getHours();
+  const text = pick(BUDDY_LINES[kind] || ['Hi!']).replace(/\{(\w+)\}/g, (_m, k) => ({ user: os.userInfo().username, daypart: h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening',
+    time: new Date().toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }), ...vars })[k] ?? '');
+  sendTo(panelWin, 'buddy', { kind, text });
+  const act = lastWinList.find((w) => w.active);
+  const inGame = act && (/^steam_app_\d+/i.test(act.cls || '') || gameWins.size > 0 && kind !== 'gameEnd');
+  if (inGame && kind !== 'gameStart' && kind !== 'lateNight') return;
+  playSound('buddy');
+  bubbleSend('bubble', { text, name: c.name, skin: c.skin, kind });
+  if (c.speak && fs.existsSync(path.join(NEXA_DIR(), 'voice2', 'model.int8.onnx'))) nexaTTS(text).then((r) => bubbleSend('bubble-say', r)).catch(() => {});
+}
+// games: a Steam game's window appearing or going away
+const gameWins = new Map();
+function watchGames(list) {
+  const now = new Map(list.filter((w) => /^steam_app_\d+/i.test(w.cls || '')).map((w) => [w.cls.split('.')[0].toLowerCase(), w.title]));
+  for (const [k, t] of now) if (!gameWins.has(k)) { const h = new Date().getHours(); setTimeout(() => buddy(h >= 0 && h < 5 ? 'lateNight' : 'gameStart', { game: t || 'Game' }), 1500); }
+  if (gameWins.size && !now.size) setTimeout(() => buddy('gameEnd'), 1500);
+  gameWins.clear(); for (const [k, t] of now) gameWins.set(k, t);
+}
+// battery: low, and plugged in
+let battPrev = null, battWarned = false;
+setInterval(async () => {
+  if (!OS_MODE || !desktopWin) return;
+  const b = await LX.battery().catch(() => null); if (!b || !b.present) return;
+  const charging = /charging|fully-charged|pending-charge/.test(b.state) && b.state !== 'discharging';
+  if (battPrev && !battPrev.charging && charging) { buddy('charging'); battWarned = false; }
+  if (!charging && b.percent <= 15 && !battWarned) { battWarned = true; buddy('lowBattery', { pct: Math.round(b.percent) }); }
+  if (charging) battWarned = false;
+  battPrev = { charging };
+}, 60000);

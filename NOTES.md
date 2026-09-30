@@ -1,4 +1,13 @@
-NexusOS 1.6.2: lighter
+NexusOS 1.7.0: Nexa everywhere
+
+- Nexa lives on your taskbar: a little Nexa at the bottom right who blinks, hops and says something when you plug in a USB, save a clip, start or finish a Steam game, stay up gaming past midnight, plug in the charger or run low on battery. She stays quiet while you're in a game. Click her to talk; right-click to let her speak out loud or hide her.
+- Live Nexa wallpaper: she breathes, blinks, smiles now and then and sparkles. Pick "Nexa, live" in Settings > Appearance > NexusOS backgrounds (light or tan). She holds still while a game or a full-screen window is open, so it costs nothing while you play.
+- Themes in Settings > Appearance: Sakura (pink, falling cherry petals, live Nexa) and Neon Night (glowing taskbar and Start, animated neon grid).
+- Cute sounds: a soft pop for Start, chimes for notifications, a jingle when you log in (turn them off in Settings > Appearance > Sounds).
+- Nexa says "Welcome back" while NexusOS starts, and the login screen shows the NexusOS hoodie background.
+- Fixed: going back to an animated background from a picture could leave the desktop black until you clicked it.
+
+From 1.6.2: lighter
 
 - The taskbar, Start, notifications and NexusOS's own apps (Files, Settings, Task Manager, Clips and the rest) now share one process instead of each starting their own. The desktop uses about 30 MB less on its own and about 80 MB less with a few apps open. The Browser and Nexa keep their own process because they do heavy work.
 - Nexa uses about half as much graphics memory for her conversation memory, leaving more for games when she's open.
