@@ -358,6 +358,8 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 .picrow{display:flex;gap:8px;flex-wrap:wrap} .pic{width:110px;height:68px;border-radius:6px;border:2px solid transparent;background:#000 center/cover no-repeat;cursor:pointer}
 .pic.on{border-color:var(--accent)}
 
+/* ===== 1.8.2: Task Manager temperatures ===== */
+.tmcard.tmwarm{border-color:#ff9f43}.tmcard.tmwarm b{color:#ffb86b}.tmcard.tmhot{border-color:#ff4d5e}.tmcard.tmhot b{color:#ff6b78}
 /* ===== 1.8: pats, pouts, on-screen indicator, gently moving picture ===== */
 .nov.hold{opacity:1}.nblush{transition:opacity .6s}
 .nstage.patting .navwrap{animation:npat .45s ease-in-out infinite alternate}@keyframes npat{from{transform:rotate(-1.2deg) scale(1.005,.995)}to{transform:rotate(1.2deg) translateY(2px) scale(.995,1.005)}}
@@ -1486,8 +1488,13 @@ const APPS={
   function card(title,big,sub,svg){return h('div',{class:'tmcard'},h('small',{},title),h('b',{},big),h('small',{},sub),svg?h('div',{class:'spark',html:svg}):null)}
   async function tickTm(reuse){let s;if(reuse&&last)s=last;else{try{s=await HX.lx('procs')}catch(e){cards.innerHTML='';cards.append(errEl(e));return}last=s}if(!reuse){
     const push=(k,v)=>{hist[k].push(v);if(hist[k].length>40)hist[k].shift()};push('cpu',s.cpu);push('mem',s.memUsed/s.memTotal*100);if(s.gpu)push('gpu',s.gpu.util);push('net',s.netRx+s.netTx)}
-    cards.innerHTML='';cards.append(card('CPU',Math.round(s.cpu)+'%',s.cores+' threads',spark(hist.cpu,100)),card('Memory',fmtSize(s.memUsed),'of '+fmtSize(s.memTotal),spark(hist.mem,100)),
+    const hot=t=>t==null?'':t>=95?' tmhot':t>=85?' tmwarm':'';
+    const fanTxt=s.fans&&s.fans.length?s.fans.map(f=>f.rpm.toLocaleString('en-GB')+' RPM').join(' · '):s.gpu&&s.gpu.fan!=null?s.gpu.fan+'%':s.fanLevels&&s.fanLevels.length?s.fanLevels.map(x=>x+'%').join(' · '):'—';
+    const fanSub=s.fans&&s.fans.length?s.fans.map(f=>f.label).join(' · '):s.gpu&&s.gpu.fan!=null?'GPU fan':s.fanLevels&&s.fanLevels.length?'How hard the fans are working':'Not reported by this laptop';
+    cards.innerHTML='';cards.append(card('CPU',Math.round(s.cpu)+'%',s.cores+' threads'+(s.cpuTemp!=null?' · '+s.cpuTemp+'°C':''),spark(hist.cpu,100)),card('Memory',fmtSize(s.memUsed),'of '+fmtSize(s.memTotal),spark(hist.mem,100)),
       s.gpu?card('GPU · NVIDIA',s.gpu.util+'%',fmtSize(s.gpu.memUsed)+' of '+fmtSize(s.gpu.memTotal)+' · '+s.gpu.temp+'°C',spark(hist.gpu,100)):card('GPU','—','NVIDIA driver not running'),
+      h('div',{class:'tmcard'+hot(Math.max(s.cpuTemp||0,s.gpu?s.gpu.temp:0))},h('small',{},'Temperatures'),h('b',{},[s.cpuTemp!=null?'CPU '+s.cpuTemp+'°C':null,s.gpu?'GPU '+s.gpu.temp+'°C':null].filter(Boolean).join(' · ')||'—'),h('small',{},s.cpuTemp==null&&!s.gpu?'Not available':Math.max(s.cpuTemp||0,s.gpu?s.gpu.temp:0)>=95?'Very hot: slowing down to cool off':Math.max(s.cpuTemp||0,s.gpu?s.gpu.temp:0)>=85?'Warm: normal while gaming':'Fine')),
+      card('Fans',fanTxt,fanSub),
       card('Disk',rate(s.diskR+s.diskW),'read '+rate(s.diskR)+' · write '+rate(s.diskW)),card('Network',rate(s.netRx+s.netTx),'↓ '+rate(s.netRx)+' · ↑ '+rate(s.netTx),spark(hist.net,Math.max(...hist.net,1))));
     const rows=s.groups.slice().sort((a,b)=>sort==='name'?a.name.localeCompare(b.name):sort==='mem'?b.mem-a.mem:(b.cpu-a.cpu)||(b.mem-a.mem));
     tbl.innerHTML='';const hd=h('div',{class:'tmrow tmhead'},...[['name','Name'],['cpu','CPU'],['mem','Memory'],['n','Processes']].map(([k,l])=>h('button',{class:sort===k?'on':'',on:{click:()=>{if(k!=='n'){sort=k;tickTm(true)}}}},l)));tbl.append(hd);

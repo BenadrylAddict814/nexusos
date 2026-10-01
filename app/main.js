@@ -549,9 +549,9 @@ function readDisk() { let r = 0, w = 0; try { for (const l of fs.readFileSync('/
 async function readGpu() {
   if (!nvidiaPresent()) return null;
   if (Date.now() - gpuCache.t < 1800) return gpuCache.v;
-  const out = await run('nvidia-smi', ['--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw', '--format=csv,noheader,nounits'], { timeout: 4000 }).catch(() => '');
+  const out = await run('nvidia-smi', ['--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,fan.speed', '--format=csv,noheader,nounits'], { timeout: 4000 }).catch(() => '');
   const f = out.trim().split('\n')[0]; let v = null;
-  if (f) { const [name, util, mu, mt, temp, pw] = f.split(',').map((x) => x.trim()); v = { name, util: +util || 0, memUsed: (+mu || 0) * 1048576, memTotal: (+mt || 0) * 1048576, temp: +temp || 0, power: parseFloat(pw) || 0 }; }
+  if (f) { const [name, util, mu, mt, temp, pw, fan] = f.split(',').map((x) => x.trim()); v = { name, util: +util || 0, memUsed: (+mu || 0) * 1048576, memTotal: (+mt || 0) * 1048576, temp: +temp || 0, power: parseFloat(pw) || 0, fan: /^\d+$/.test(fan || '') ? +fan : null }; }
   gpuCache = { t: Date.now(), v }; return v;
 }
 function groupOf(pid, comm, cmd) {
@@ -561,6 +561,37 @@ function groupOf(pid, comm, cmd) {
   if (cmd.startsWith(process.execPath) || comm === 'nexusos') return { id: 'nexusos', name: 'NexusOS desktop' };
   if (KEEP_ALIVE.test(comm)) return { id: 'sys:' + comm, name: comm + ' (system)' };
   return { id: 'proc:' + comm, name: comm };
+}
+// 1.8.2: temperatures and fan speeds from the kernel's sensor drivers (no extra programs needed)
+function readSensors() {
+  const rd = (f) => { try { return fs.readFileSync(f, 'utf8').trim(); } catch (_) { return null; } };
+  let cpuTemp = null; const fans = [];
+  let hw = []; try { hw = fs.readdirSync('/sys/class/hwmon'); } catch (_) {}
+  for (const h of hw) {
+    const d = '/sys/class/hwmon/' + h, name = rd(d + '/name') || ''; let files = []; try { files = fs.readdirSync(d); } catch (_) {}
+    if (/^(coretemp|k10temp|zenpower)$/.test(name)) {
+      const temps = files.filter((f) => /^temp\d+_input$/.test(f)).map((f) => ({ v: +rd(d + '/' + f) / 1000, label: rd(d + '/' + f.replace('_input', '_label')) || '' })).filter((t) => t.v > 0 && t.v < 130);
+      const main = temps.find((t) => /package|tctl|tdie/i.test(t.label)) || temps.sort((a, b) => b.v - a.v)[0];
+      if (main && (cpuTemp == null || main.v > cpuTemp)) cpuTemp = Math.round(main.v);
+    }
+    for (const f of files.filter((x) => /^fan\d+_input$/.test(x))) {
+      const rpm = +rd(d + '/' + f); if (!Number.isFinite(rpm) || rpm < 0 || rpm > 20000) continue;
+      fans.push({ label: rd(d + '/' + f.replace('_input', '_label')) || (f.startsWith('fan1') ? 'CPU fan' : f.startsWith('fan2') ? 'GPU fan' : 'Fan ' + f.slice(3, -6)), rpm });
+    }
+  }
+  if (cpuTemp == null) {   // no CPU driver: the firmware's own thermal zones
+    let zs = []; try { zs = fs.readdirSync('/sys/class/thermal').filter((z) => z.startsWith('thermal_zone')); } catch (_) {}
+    const z = zs.map((z) => ({ type: rd(`/sys/class/thermal/${z}/type`) || '', v: +rd(`/sys/class/thermal/${z}/temp`) / 1000 })).filter((z) => z.v > 0 && z.v < 130);
+    const best = z.find((x) => /x86_pkg_temp|cpu/i.test(x.type)) || z.find((x) => /acpitz/i.test(x.type));
+    if (best) cpuTemp = Math.round(best.v);
+  }
+  let fanLevels = [];
+  if (!fans.length) {   // some laptops only say how hard the fans are working (a level), not their speed
+    let cds = []; try { cds = fs.readdirSync('/sys/class/thermal').filter((c) => c.startsWith('cooling_device')); } catch (_) {}
+    fanLevels = cds.map((c) => ({ type: rd(`/sys/class/thermal/${c}/type`) || '', cur: +rd(`/sys/class/thermal/${c}/cur_state`), max: +rd(`/sys/class/thermal/${c}/max_state`) }))
+      .filter((c) => /^fan$/i.test(c.type) && c.max > 0).map((c) => Math.round(c.cur / c.max * 100));
+  }
+  return { cpuTemp, fans, fanLevels };
 }
 async function taskSnapshot() {
   const now = Date.now(), cpu = readCpu(), net = readNet(), disk = readDisk(), me = os.userInfo().uid;
@@ -585,7 +616,7 @@ async function taskSnapshot() {
     cores, cpuName: (os.cpus()[0] || {}).model || '', memUsed: memTotal - memAvail, memTotal,
     netRx: dt ? Math.max(0, (net.rx - tmPrev.net.rx) / dt) : 0, netTx: dt ? Math.max(0, (net.tx - tmPrev.net.tx) / dt) : 0,
     diskR: dt ? Math.max(0, (disk.r - tmPrev.disk.r) / dt) : 0, diskW: dt ? Math.max(0, (disk.w - tmPrev.disk.w) / dt) : 0,
-    gpu: await readGpu(), uptime: os.uptime(),
+    gpu: await readGpu(), uptime: os.uptime(), ...readSensors(),
     groups: [...groups.values()].map((g) => ({ ...g, cpu: Math.round(g.cpu * 10) / 10 })).sort((a, b) => (b.cpu - a.cpu) || (b.mem - a.mem)),
   };
   tmPrev = { t: now, cpuTotal: cpu.total, cpuIdle: cpu.idle, procs: ticks, net, disk };

@@ -1,4 +1,8 @@
-NexusOS 1.8.1
+NexusOS 1.8.2
+
+- Task Manager shows CPU and GPU temperatures (orange when warm, red when very hot) and fan speeds, if your laptop reports them. Many laptops' fans are run by the laptop itself and don't report their speed to Linux; they still speed up and slow down automatically.
+
+From 1.8.1:
 
 - Your own picture background is static again (no more floating). The live backgrounds that come with NexusOS ("Nexa, live") still move.
 
