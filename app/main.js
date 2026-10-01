@@ -176,7 +176,7 @@ const LX = {
       const [inUse, ssid, signal, security] = splitTerse(line);
       if (!ssid) continue;
       const cur = best.get(ssid); const s = Number(signal) || 0;
-      if (!cur || s > cur.signal || inUse === '*') best.set(ssid, { ssid, signal: s, secure: !!security && security !== '--', security, active: inUse === '*' || (cur && cur.active), saved: saved.has(ssid) });
+      if (!cur || s > cur.signal || inUse === '*') best.set(ssid, { ssid, signal: s, secure: !!security && security !== '--', security, enterprise: /802\.1X|EAP/i.test(security || ''), active: inUse === '*' || (cur && cur.active), saved: saved.has(ssid) });
     }
     return [...best.values()].sort((a, b) => (b.active - a.active) || (b.signal - a.signal));
   },
@@ -192,6 +192,39 @@ const LX = {
       if (!had) await run('nmcli', ['connection', 'delete', 'id', ssid]).catch(() => {});
       if (/secrets were required|802-1X|psk|password/i.test(e.message)) throw new Error('That password didn’t work. Check it and try again.');
       if (/No network with SSID/i.test(e.message)) throw new Error('That network isn’t in range any more.');
+      throw e;
+    }
+    return true;
+  },
+  // 1.8.3: WPA-Enterprise (802.1X) networks like eduroam sign in with a username and password instead of one shared key
+  async wifiConnectEnterprise(ssid, o = {}) {
+    ssid = String(ssid || '').slice(0, 64); if (!ssid) throw new Error('Choose a network first.');
+    const identity = String(o.identity || '').trim().slice(0, 256), password = String(o.password || '');
+    if (!identity) throw new Error('Type your username. For eduroam that’s usually your full uni email.');
+    if (!password) throw new Error('Type your password.');
+    if (/[\n\r]/.test(identity + password)) throw new Error('That username or password has a line break in it.');
+    const eap = o.eap === 'ttls' ? 'ttls' : 'peap';
+    const phase2 = o.phase2 === 'pap' && eap === 'ttls' ? 'pap' : 'mschapv2';
+    const anon = String(o.anon || '').trim().slice(0, 256), domain = String(o.domain || '').trim().replace(/^\.+/, '').slice(0, 253);
+    if (domain && !/^[A-Za-z0-9.-]+$/.test(domain)) throw new Error('The server domain should look like uni.ac.uk.');
+    const st = await LX.netStatus().catch(() => ({}));
+    const names = (await run('nmcli', ['-t', '-f', 'NAME', 'connection', 'show']).catch(() => '')).split('\n').map((l) => splitTerse(l)[0]);
+    if (names.includes(ssid)) await run('nmcli', ['connection', 'delete', 'id', ssid]).catch(() => {});
+    const args = ['connection', 'add', 'type', 'wifi', 'con-name', ssid, 'ssid', ssid];
+    if (st.wifiDevice) args.push('ifname', st.wifiDevice);
+    args.push('wifi-sec.key-mgmt', 'wpa-eap', '802-1x.eap', eap, '802-1x.phase2-auth', phase2, '802-1x.identity', identity, '802-1x.password', password, '802-1x.password-flags', '0');
+    if (anon) args.push('802-1x.anonymous-identity', anon);
+    // with a domain we check the university's server certificate properly; without one we connect like most phones do on first join
+    if (domain) args.push('802-1x.ca-cert', '/etc/ssl/certs/ca-certificates.crt', '802-1x.domain-suffix-match', domain);
+    args.push('connection.autoconnect', 'yes');
+    try {
+      await run('nmcli', args, { timeout: 20000 });
+      await run('nmcli', ['-w', '50', 'connection', 'up', 'id', ssid], { timeout: 60000 });
+    } catch (e) {
+      await run('nmcli', ['connection', 'delete', 'id', ssid]).catch(() => {});
+      e.message = String(e.message).split(password).join('••••'); // never show the password back, even in an error
+      if (/secrets were required|802-1X|authentication|supplicant|timed? ?out|password/i.test(e.message)) throw new Error('The network didn’t accept that sign-in. Check your email and password, or open More options (your uni may need a domain or TTLS).');
+      if (/No network with SSID|not found|not available/i.test(e.message)) throw new Error('That network isn’t in range any more.');
       throw e;
     }
     return true;

@@ -1,4 +1,8 @@
-NexusOS 1.8.2
+NexusOS 1.8.3
+
+- University and work Wi-Fi (eduroam and other "WPA2 Enterprise" networks): pick the network in Settings > Wi-Fi and sign in with your username (for eduroam, your full uni email) and password. "More options" has the sign-in method and server domain if your uni's IT page lists them.
+
+From 1.8.2:
 
 - Task Manager shows CPU and GPU temperatures (orange when warm, red when very hot) and fan speeds, if your laptop reports them. Many laptops' fans are run by the laptop itself and don't report their speed to Linux; they still speed up and slow down automatically.
 

@@ -234,6 +234,7 @@ select.txt{max-width:100%} select.txt option{background:var(--surface-solid);col
 .sig{display:inline-flex;color:var(--fg)} .lock{display:inline-flex;color:var(--muted)}
 .tag{font-size:12px;color:var(--accent)} .tag.dim{color:var(--muted)}
 .sbody{padding:4px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.wmore{display:flex;flex-direction:column;gap:8px}.wmore summary{cursor:pointer;opacity:.8;font-size:13px;margin-bottom:6px}.wmore[open]>*+*{margin-top:8px}.wmore .txt{width:100%;box-sizing:border-box}
 .busy{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:6px 0}
 .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -691,10 +692,22 @@ const PAGES={
    const nets=sec(c,'Networks');const refresh=h('button',{class:'pbtn',on:{click:()=>load(true)}},'Refresh');nets.querySelector('h3').append(refresh);const box=h('div',{class:'slist'});nets.append(box);
    async function load(rescan){box.innerHTML='';box.append(busyEl(rescan?'Looking for networks…':'Loading…'));let list;try{list=await HX.lx('wifiList',rescan)}catch(e){box.innerHTML='';box.append(errEl(e));return}box.innerHTML='';
      if(!list.length)box.append(h('p',{class:'hint'},'No networks found. Press Refresh to look again.'));
-     for(const n of list){const item=h('div',{class:'sitem'+(n.active?' act':'')});const head=h('button',{class:'shead'},h('span',{class:'sig',html:SIG(n.signal)}),h('span',{class:'sname'},n.ssid),n.secure?h('span',{class:'lock',title:'Needs a password',html:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'}):null,n.active?h('small',{class:'tag'},'Connected'):n.saved?h('small',{class:'tag dim'},'Saved'):null);
+     for(const n of list){const item=h('div',{class:'sitem'+(n.active?' act':'')});const head=h('button',{class:'shead'},h('span',{class:'sig',html:SIG(n.signal)}),h('span',{class:'sname'},n.ssid),n.secure?h('span',{class:'lock',title:n.enterprise?'Sign in with a username and password':'Needs a password',html:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'}):null,n.active?h('small',{class:'tag'},'Connected'):n.saved?h('small',{class:'tag dim'},'Saved'):null);
        const body=h('div',{class:'sbody',hidden:true});item.append(head,body);head.onclick=()=>{const open=body.hidden;box.querySelectorAll('.sbody').forEach(b=>b.hidden=true);body.hidden=!open;if(open)fill()};
        function fill(){body.innerHTML='';
          if(n.active)body.append(h('div',{class:'row2'},h('button',{class:'pbtn',on:{click:async()=>{await act(()=>HX.lx('wifiDisconnect'),'Disconnected')}}},'Disconnect'),h('button',{class:'pbtn danger',on:{click:async()=>{await act(()=>HX.lx('wifiForget',n.ssid),'Network forgotten')}}},'Forget')));
+         else if(n.enterprise&&!n.saved){const edu=/eduroam/i.test(n.ssid);
+           const id=h('input',{class:'txt',type:'email',placeholder:edu?'Uni email (e.g. you@uni.ac.uk)':'Username',autocomplete:'off',spellcheck:'false','aria-label':'Username'}),pw=h('input',{class:'txt',type:'password',placeholder:'Password',autocomplete:'off','aria-label':'Password'});
+           const sel=(lbl,opts)=>h('select',{class:'txt','aria-label':lbl},...opts.map(([v,t])=>h('option',{value:v},t)));
+           const eap=sel('Sign-in method',[['peap','PEAP (most unis)'],['ttls','TTLS']]),ph2=sel('Inner sign-in',[['mschapv2','MSCHAPv2 (most unis)'],['pap','PAP']]);
+           const anon=h('input',{class:'txt',placeholder:'Anonymous identity (optional, e.g. anonymous@uni.ac.uk)',autocomplete:'off',spellcheck:'false','aria-label':'Anonymous identity'}),dom=h('input',{class:'txt',placeholder:'Server domain to check (optional, e.g. uni.ac.uk)',autocomplete:'off',spellcheck:'false','aria-label':'Server domain'});
+           const more=h('details',{class:'wmore'},h('summary',{},'More options'),h('p',{class:'hint'},'Only needed if your uni’s IT page says so. Adding the server domain makes NexusOS check it’s really your uni’s network before sending your password.'),eap,ph2,anon,dom);
+           const go=h('button',{class:'pbtn pri'},'Sign in');
+           body.append(h('p',{class:'hint'},edu?'eduroam signs in with your uni account: your full uni email and its password.':'This network signs in with a username and password.'),id,pw,more,h('div',{class:'row2'},go));
+           let err=null;const doIt=async()=>{if(go.disabled)return;go.disabled=true;go.textContent='Signing in…';if(err){err.remove();err=null}
+             try{await HX.lx('wifiConnectEnterprise',n.ssid,{identity:id.value,password:pw.value,eap:eap.value,phase2:ph2.value,anon:anon.value,domain:dom.value});toast('Connected to '+n.ssid,'');openSettings('wifi')}
+             catch(e){err=errEl(e);body.prepend(err);go.disabled=false;go.textContent='Sign in'}};
+           go.onclick=doIt;[id,pw].forEach(x=>x.addEventListener('keydown',e=>{if(e.key==='Enter')doIt()}));setTimeout(()=>id.focus(),30)}
          else{const pw=h('input',{class:'txt',type:'password',placeholder:'Password',autocomplete:'off','aria-label':'Wi-Fi password'});const go=h('button',{class:'pbtn pri'},'Connect');
            const need=n.secure&&!n.saved;if(need)body.append(pw);body.append(h('div',{class:'row2'},go,n.saved?h('button',{class:'pbtn danger',on:{click:()=>act(()=>HX.lx('wifiForget',n.ssid),'Network forgotten')}},'Forget'):null));
            const doIt=()=>act(()=>HX.lx('wifiConnect',n.ssid,need?pw.value:''),'Connected to '+n.ssid);go.onclick=doIt;pw.addEventListener('keydown',e=>{if(e.key==='Enter')doIt()});if(need)setTimeout(()=>pw.focus(),30)}}
