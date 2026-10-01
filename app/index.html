@@ -367,8 +367,6 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 .view-osd body{background:#0c1119;margin:0;overflow:hidden}
 #osdp{display:flex;align-items:center;gap:12px;height:56px;padding:0 18px;border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);box-sizing:border-box;color:#fff;font:600 15px var(--body);white-space:nowrap}
 #osdp svg{flex:none;color:var(--accent)}#osdp.pop{animation:bin .22s ease-out}
-html.picmotion #wallimg{inset:-2.5%;animation:wfloat 7s ease-in-out infinite}@keyframes wfloat{0%,100%{transform:translateY(-10px)}50%{transform:translateY(10px)}}
-html.covered.picmotion #wallimg{animation-play-state:paused}
 /* ===== 1.7: Nexa buddy, speech bubble, live wallpaper, themes ===== */
 #buddy{position:relative;width:40px;height:40px;padding:0;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 40%,rgba(255,95,162,.35),rgba(0,229,255,.12) 70%);border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);flex:none;animation:bbob 3.6s ease-in-out infinite}
 #buddy img{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}#buddy .bbl{opacity:0}#buddy.bl .bbl{opacity:1}
@@ -784,7 +782,7 @@ const PAGES={
    sec(c,'Mode').append(seg);sec(c,'Accent colour').append(acc);sec(c,'Animated background','These move gently, and stop while you’re in a game.').append(wp);draw();
    if(HX&&HX.builtinWallpapers){const bs=sec(c,'NexusOS backgrounds'),brow=h('div',{class:'picrow'});bs.append(brow);
      HX.builtinWallpapers().then(list=>{for(const w of list)brow.append(h('button',{class:'pic big'+(w.on?' on':'')+(w.live?' live':''),title:w.name,'aria-label':w.name,style:`background-image:url("${w.thumb}")`,on:{click:async()=>{await HX.useBuiltinWallpaper(w.id);openSettings('appearance')}}}))}).catch(()=>{})}
-   if(HX&&HX.getWallpaper&&SYS){const ps=sec(c,'Picture background','Pick one of your pictures, or right-click any picture in Files and choose “Set as desktop background”.');ps.append(srow('Gentle motion','Your picture slowly floats up and down. It holds still while a game or a full-screen window is open.',sswitch(S.picMotion!==false,async v=>{S.picMotion=v;apply(S);return v},'Gentle motion')));const cur=h('div',{class:'row2'}),row=h('div',{class:'picrow'});ps.append(cur,row);
+   if(HX&&HX.getWallpaper&&SYS){const ps=sec(c,'Picture background','Pick one of your pictures, or right-click any picture in Files and choose “Set as desktop background”.');const cur=h('div',{class:'row2'}),row=h('div',{class:'picrow'});ps.append(cur,row);
      HX.getWallpaper().then(u=>{if(u)cur.append(h('div',{class:'pic on',style:`background-image:url("${u}")`,title:'Current background'}),h('button',{class:'pbtn',on:{click:async()=>{await HX.clearWallpaper();openSettings('appearance')}}},'Use the animated background'))});
      HX.list(SYS.drive+SYS.sep+'Pictures').then(async res=>{const imgs=res.entries.filter(f=>!f.dir&&IMG_RE.test(f.name)&&f.size<8e6).slice(0,12);if(!imgs.length){row.append(h('p',{class:'hint'},'No pictures in your Pictures folder yet.'));return}
        for(const f of imgs){const t=h('button',{class:'pic',title:f.name,'aria-label':f.name,on:{click:async()=>{await setAsBackground(f.path);openSettings('appearance')}}});row.append(t);HX.readDataUrl(f.path).then(u=>{t.style.backgroundImage=`url("${u}")`}).catch(()=>{})}}).catch(()=>{})}
@@ -1756,7 +1754,7 @@ function liveWall(skin){if(liveRun&&liveRun.skin===skin)return;if(liveRun)liveRu
   (function sm(){if(!alive)return;if(!cov()&&Math.random()<.5){smile.classList.add('on');setTimeout(()=>smile.classList.remove('on'),2500)}setTimeout(sm,9000+Math.random()*9000)})();
   (function sp(){if(!alive)return;if(!cov()){const r=fig.getBoundingClientRect();const e=h('span',{class:'lsp'},Math.random()<.35?'♥':'✦');e.style.left=(r.left+r.width*(.2+Math.random()*.6))+'px';e.style.top=(r.top+r.height*(.05+Math.random()*.35))+'px';el.append(e);setTimeout(()=>e.remove(),3100)}setTimeout(sp,3500+Math.random()*3000)})();
   liveRun={skin,stop(){alive=false;el.remove();liveRun=null}}}
-function apply(S,remote){const R=document.documentElement;R.classList.toggle('theme-sakura',S.theme==='sakura');R.classList.toggle('theme-neon',S.theme==='neon');if(VIEW==='desktop'||VIEW==='main')petals(S.theme==='sakura');R.classList.toggle('light',S.mode==='light');R.classList.toggle('picmotion',S.picMotion!==false);document.documentElement.style.setProperty('--accent',S.accent);wallIdx=S.wall;if(VIEW==='main'||VIEW==='desktop')paintWall(performance.now());store.set('nxset',S);if(!remote&&MW&&HX.changed)HX.changed('look').catch(()=>{})}
+function apply(S,remote){const R=document.documentElement;R.classList.toggle('theme-sakura',S.theme==='sakura');R.classList.toggle('theme-neon',S.theme==='neon');if(VIEW==='desktop'||VIEW==='main')petals(S.theme==='sakura');R.classList.toggle('light',S.mode==='light');document.documentElement.style.setProperty('--accent',S.accent);wallIdx=S.wall;if(VIEW==='main'||VIEW==='desktop')paintWall(performance.now());store.set('nxset',S);if(!remote&&MW&&HX.changed)HX.changed('look').catch(()=>{})}
 apply(store.get('nxset',NX_DEFAULT),true);
 
 /* ---------- desktop ---------- */

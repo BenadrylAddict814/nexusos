@@ -1,10 +1,13 @@
-NexusOS 1.8.0
+NexusOS 1.8.1
+
+- Your own picture background is static again (no more floating). The live backgrounds that come with NexusOS ("Nexa, live") still move.
+
+From 1.8.0:
 
 - Sign-in like Windows: in Settings > Security & privacy, turn on "Ask for my password when NexusOS starts" and you'll see the sign-in screen every time the computer starts. You can now use a PIN (4+ digits) instead of a password.
 - Guest account: turn it on in the same place. Guest has no password, just the basic NexusOS apps, can't see your files or apps, and is wiped clean every time they sign out.
 - Caps Lock and Num Lock: a little note on screen tells you when you turn them on or off.
 - Touchpad on/off: Settings > Keyboard, or press Ctrl + Windows key + T (your laptop's own touchpad key works too). It also ignores accidental taps while you type.
-- Your picture background now floats gently up and down (switch it off in Settings > Appearance > Picture background). It holds still under games and full-screen windows.
 - Nexa is cuter and a little flirty now. Hold the mouse on her head and rub back and forth to give her head pats: she closes her eyes, blushes and gets cosy.
 - Nexa misses you: when you haven't talked for a while, she says so from the taskbar (never during games, and only when you're at the computer). Ignore her and she'll sulk a bit next time. Leave her for a day and she'll be very happy to see you. Turn it off in her settings.
 - The "click the NexusOS logo" tip at startup is gone.
