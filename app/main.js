@@ -905,7 +905,7 @@ function createWindow() {
     const d = screen.getPrimaryDisplay().bounds;
     if (!panelWin || panelWin.isDestroyed()) {
       panelWin = await makeChild({ type: 'dock', frame: false, x: d.x, y: d.y + d.height - PANEL_H, width: d.width, height: PANEL_H, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false }, { view: 'panel' });
-      panelWin.once('ready-to-show', () => panelWin.showInactive());
+      barHidden = false; panelWin.once('ready-to-show', () => panelWin.showInactive());
       const pw = panelWin; pw.on('closed', () => { if (panelWin === pw) panelWin = null; });
     }
     if (!popupWin || popupWin.isDestroyed()) {
@@ -1068,13 +1068,40 @@ async function listWindows() {
     if (/^(nexusos|halcyon)\./i.test(cls)) continue;
     const [inst, klass] = cls.split('.'); const hit = map.get((klass || '').toLowerCase()) || map.get((inst || '').toLowerCase());
     const steamGame = /^steam_app_\d+/i.test(inst || '');
+    // 1.9.2: games (Steam games, and windows that aren't one of your installed apps, like Heroic or Minecraft games)
+    winGeo.set(x, { x: +g[4], y: +g[5], w: +g[6], h: +g[7], game: steamGame || (/^steam\./i.test(cls) && /Big Picture/i.test(m[5])) || (!hit && !SYSTEM_WIN_RE.test(cls) && !APP_WIN_RE.test(cls)) });
     res.push({ id: m[1], app: hit && !steamGame ? hit.id : null, appName: hit && !steamGame ? hit.name : null, group: hit && !steamGame ? hit.id : (inst || cls).toLowerCase(), title: m[5], cls, active: x === activeX, big: isBig });
   }
   return res;
 }
+const winGeo = new Map();
+const APP_WIN_RE = /^(firefox|navigator|librewolf|discord|vesktop|webcord|chromium|google-chrome|brave|microsoft-edge|opera|vivaldi|spotify|obs|code|telegram|vlc|mpv|libreoffice|soffice|gimp|blender|krita|thunderbird|signal|slack|zoom|teams|steam\.|steamwebhelper|heroic|prismlauncher|lutris|bottles)/i;
+const SYSTEM_WIN_RE = /^(lxterminal|lxpolkit|polkit|xterm|pavucontrol|blueman|nm-|gpu-screen-recorder|mangohud|openbox)/i;
+// 1.9.2: like Windows, a full-screen game covers the taskbar; switch to anything else and the taskbar is back.
+// Discord, Firefox and your other apps never hide it.
+let barHidden = false; const madeFull = new Set();
+async function gameBar(list) {
+  if (!panelWin || panelWin.isDestroyed()) return;
+  const a = list.find((w) => w.active && !w.own); const x = a ? parseInt(a.id, 16) : 0; const g = x && winGeo.get(x);
+  let hide = false;
+  if (g && g.game) {
+    const d = screen.getPrimaryDisplay(), sf = d.scaleFactor || 1, SW = Math.round(d.bounds.width * sf), SH = Math.round(d.bounds.height * sf);
+    const covers = g.x <= 0 && g.y <= 0 && g.x + g.w >= SW && g.y + g.h >= SH;
+    const st = await run('xprop', ['-id', a.id, '_NET_WM_STATE'], { timeout: 2000 }).catch(() => '');
+    if (covers || /_NET_WM_STATE_FULLSCREEN/.test(st)) hide = true;
+    // a borderless game that asked for the whole screen but was kept above the taskbar: make it properly full screen (once)
+    else if (g.x <= 0 && g.y <= 0 && g.w >= SW && SH - (g.y + g.h) > 0 && SH - (g.y + g.h) <= PANEL_H + 8 && !/MAXIMIZED/.test(st) && !madeFull.has(x)) {
+      madeFull.add(x); await run('wmctrl', ['-ir', a.id, '-b', 'add,fullscreen']).catch(() => {}); hide = true;
+    }
+  }
+  if (madeFull.size > 50) madeFull.clear();
+  if (hide !== barHidden) { barHidden = hide; if (hide) panelWin.hide(); else panelWin.showInactive(); }
+}
 async function pushWindows(force) {
   if (!panelWin || panelWin.isDestroyed()) return;
+  winGeo.clear();
   const list = await listWindows();
+  gameBar(list).catch(() => {});
   const sig = JSON.stringify(list);
   lastWinList = list; watchGames(list);
   if (force || sig !== lastWinSig) { lastWinSig = sig; sendTo(panelWin, 'windows', list); sendTo(desktopWin, 'windows', list); }

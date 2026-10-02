@@ -1,4 +1,8 @@
-NexusOS 1.9.1
+NexusOS 1.9.2
+
+- Full-screen games now cover the whole screen, taskbar included, like on Windows. Switch to another window (Alt+Tab, Discord, Firefox…) and the taskbar is back. Other apps, even full screen, never hide it.
+
+From 1.9.1:
 
 - Fixed: "Open" and "Show in folder" did nothing in Firefox and other apps. Folders now open in Files, text files in Notes and pictures in the picture viewer. Any other file opens Files with it selected.
 
