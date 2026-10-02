@@ -1,4 +1,8 @@
-NexusOS 1.9.0
+NexusOS 1.9.1
+
+- Fixed: "Open" and "Show in folder" did nothing in Firefox and other apps. Folders now open in Files, text files in Notes and pictures in the picture viewer. Any other file opens Files with it selected.
+
+From 1.9.0:
 
 - Sound effects, like SteelSeries Sonar (Settings > Sound):
   - Equaliser for your headphones or speakers: 10 bands, with presets for Bass boost, Footsteps (gaming), Clear voices, Music and Treble boost. Sliders change the sound live.

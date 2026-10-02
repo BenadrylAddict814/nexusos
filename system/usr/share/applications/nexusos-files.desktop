@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=NexusOS Files
+Comment=Open folders, text files and pictures in NexusOS
+Exec=/opt/nexusos/nexusos %U
+Icon=nexusos
+NoDisplay=true
+Terminal=false
+MimeType=inode/directory;text/plain;text/markdown;text/csv;application/json;image/png;image/jpeg;image/gif;image/webp;image/bmp;image/svg+xml;image/avif;

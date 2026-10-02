@@ -1154,11 +1154,33 @@ function setupDownloads() {
 
 /* ---------------------------------------------------------------- startup */
 function urlFromArgs(argv) { return (argv || []).find((a) => /^https?:\/\//i.test(a)) || null; }
+// 1.9.1: files and folders other apps ask NexusOS to open (Firefox's "Open" and "Show in folder", for example)
+const OPEN_TEXT = /\.(txt|md|log|ini|conf|cfg|json|csv|xml|ya?ml|toml|srt|nfo)$/i, OPEN_IMG = /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/i;
+function pathsFromArgs(argv) {
+  const out = [];
+  for (const a of (argv || []).slice(1)) {
+    let p = null;
+    if (/^file:\/\//i.test(a)) { try { p = require('url').fileURLToPath(a); } catch (_) {} }
+    else if (a.startsWith('/') && !a.startsWith('//')) p = a;
+    if (p && fs.existsSync(p) && !out.includes(p) && p !== process.execPath && !p.startsWith(path.dirname(process.execPath)) && p !== app.getAppPath()) out.push(p);
+  }
+  return out;
+}
+function openFromArgs(p) {
+  let st; try { st = fs.statSync(p); } catch (_) { return; }
+  const name = path.basename(p);
+  if (st.isDirectory()) return openAppWindow('files', { dir: p });
+  if (OPEN_TEXT.test(name)) return openAppWindow('notes', { real: p, n: name });
+  if (OPEN_IMG.test(name)) return openAppWindow('paint', { real: p, n: name, t: 'img' });
+  // anything else: show it in Files, selected, so it can be opened from there
+  return openAppWindow('files', { dir: path.dirname(p), select: name });
+}
 function handleArgs(argv) {
   const url = urlFromArgs(argv);
   const open = ((argv || []).find((a) => /^--open=[a-z]+$/.test(a)) || '').slice(7);
   if (OS_MODE) {
     if (url) openUrl(url);
+    for (const p of pathsFromArgs(argv).slice(0, 5)) { try { openFromArgs(p); } catch (_) {} }
     if (open && Object.prototype.hasOwnProperty.call(APP_TITLES, open)) openAppWindow(open);
     if ((argv || []).includes('--toggle-touchpad')) toggleTouchpad();
     if ((argv || []).includes('--toggle-start')) { if (popupWin && popupWin.isVisible()) hidePopup(); else showPopup('start'); }

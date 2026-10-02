@@ -2,3 +2,16 @@
 x-scheme-handler/http=nexusos-url.desktop
 x-scheme-handler/https=nexusos-url.desktop
 text/html=nexusos-url.desktop
+# 1.9.1: folders ("Show in folder"), text files and pictures open in NexusOS's own apps
+inode/directory=nexusos-files.desktop
+text/plain=nexusos-files.desktop
+text/markdown=nexusos-files.desktop
+text/csv=nexusos-files.desktop
+application/json=nexusos-files.desktop
+image/png=nexusos-files.desktop
+image/jpeg=nexusos-files.desktop
+image/gif=nexusos-files.desktop
+image/webp=nexusos-files.desktop
+image/bmp=nexusos-files.desktop
+image/svg+xml=nexusos-files.desktop
+image/avif=nexusos-files.desktop
