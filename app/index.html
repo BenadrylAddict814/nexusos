@@ -416,6 +416,7 @@ html.theme-neon #start,html.theme-neon #quick,html.theme-neon #trayp{box-shadow:
 .nstage.listen .nglow{opacity:1;background:radial-gradient(circle,rgba(0,229,255,.5),rgba(255,95,162,.15) 55%,transparent 70%)}
 .nplate{position:absolute;left:14px;top:14px;display:flex;flex-direction:column;gap:2px;background:rgba(10,12,20,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 12px;color:#fff}
 .nstage.aura .nglow{background:radial-gradient(circle at 50% 42%,rgba(255,110,170,.38),rgba(255,110,170,.08) 45%,transparent 65%)!important;animation:auraP 3.2s ease-in-out infinite}@keyframes auraP{0%,100%{opacity:.75}50%{opacity:1}}
+.ngames{flex:1;display:flex;flex-direction:column;gap:12px;padding:16px;min-height:0;overflow:auto}.nghead{display:flex;align-items:center;gap:12px}.nghead b{font-size:16px}.ngscore{margin-left:auto;font-family:Rajdhani,sans-serif;font-weight:600;font-size:18px;opacity:.9}.ngpicks{display:grid;gap:10px}.ngpick{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:var(--raised);color:var(--fg);cursor:pointer;font:inherit}.ngpick:hover{border-color:#ff5fa2}.ngpick b{font-size:16px}.ngpick small{opacity:.7}.ngcv{width:100%;max-width:560px;aspect-ratio:4/3;border-radius:12px;border:1px solid var(--line);align-self:center;outline:none;cursor:pointer}
 .naff{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px}.naff[hidden]{display:none}.naffh{color:#ff6fa8;font-size:13px;line-height:1;transition:transform .3s}.naffbar{width:96px;height:6px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden}.naffbar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#ff8fc0,#ff4f93);transition:width .8s cubic-bezier(.2,.8,.2,1)}.naff small{opacity:.9;white-space:nowrap}.naff.up .naffh{animation:affpop 1.2s ease 2}@keyframes affpop{0%,100%{transform:scale(1)}40%{transform:scale(1.7)}}
 .nplate .nname{font-size:18px;letter-spacing:.3px;border:0;background:none;padding:0;margin:0;box-shadow:none}.nstat2{font-size:12px;opacity:.8}
 .nright{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -1567,7 +1568,8 @@ const APPS={
   const sendB=h('button',{class:'nbtn pri',title:'Send','aria-label':'Send'},svgI('<path d="M4 12h14M12 5l7 7-7 7"/>'));
   const spk=h('button',{class:'nbtn',title:'Her voice on or off','aria-label':'Voice'},'');
   const gear=h('button',{class:'nbtn',title:'Settings','aria-label':'Settings'},svgI('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'));
-  const bar=h('div',{class:'nbar'},mic,inp,sendB,spk,gear);
+  const playB=h('button',{class:'nbtn',title:'Play a game with her','aria-label':'Games'},'');
+  const bar=h('div',{class:'nbar'},mic,inp,sendB,playB,spk,gear);
   function svgI(p){return h('span',{html:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`})}
   const setStat=(t,mode)=>{stat.textContent=t;stage.className='nstage '+(mode||'idle')+(affLv>=4?' aura':'')};
   const drawSpk=()=>{spk.innerHTML='';spk.append(svgI(cfg.speak?'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>':'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>'));spk.classList.toggle('off',!cfg.speak)};
@@ -1646,6 +1648,94 @@ const APPS={
     let o=44;for(const c of r.chunks)for(let i=0;i<c.length;i++,o+=2)v.setInt16(o,Math.max(-1,Math.min(1,c[i]))*32767,true);
     setStat('Listening…','think');try{const t=await N.hear(new Uint8Array(buf));if(t)send(t);else{setStat('Here with you','idle');toast('I didn’t catch that','Try again a bit closer to the microphone.')}}catch(e){setStat('Here with you','idle');toast('Couldn’t hear you',errMsg(e))}}
   mic.onclick=startRec;
+  // ---- 1.9.5: games to play together (Pong, Plinko, Connect Four). She plays against you and reacts as you go.
+  playB.append(svgI('<rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3M15.5 12h.01M18 13.5h.01"/>'));
+  const GL={start:['Okay, let’s go! Don’t cry when I win~','Game on! I’m not going easy on you.','Ehehe, ready? Let’s play!'],
+    me:['Point for me! Hehe~','Ha! Did you see that?','Yesss! I’m on fire!','Too slow~'],you:['Hey! Lucky shot...','Okay okay, that was good.','Hmph. Not bad.','Wait, how did you do that?!'],
+    meWin:['I win! Ehehe~ rematch?','Victory! You were close though... kinda.','Yay! I won! Wanna try again?'],youWin:['Nooo, you won! Okay... you’re really good.','You beat me! I’ll get you next time, hmph!','Wow, you won! I’m a little impressed~'],tie:['A tie! We’re perfectly matched, huh?','Draw! Again, again!']};
+  let gSaid=0;const gsay=(k,force)=>{const l=GL[k][Math.floor(Math.random()*GL[k].length)];bubbleSay(l);if(cfg.speak&&!busy&&(force||Date.now()-gSaid>6000)){gSaid=Date.now();reqId='game';say(l)}};
+  const gEnd=(res)=>{gsay(res==='me'?'meWin':res==='you'?'youWin':'tie',true);if(res==='me'){av.classList.remove('hop');void av.offsetWidth;av.classList.add('hop');burst('spark',10)}else{burst('heart',res==='you'?12:6);if(res==='you'){blushI.classList.add('hold');clearTimeout(blushT);blushT=setTimeout(()=>blushI.classList.remove('hold'),3500)}}
+    N.affection('play').then(affUp).catch(()=>{})};
+  let gStop=null;
+  playB.onclick=()=>openGames();
+  function openGames(){if(gStop){gStop();gStop=null}right.innerHTML='';const panel=h('div',{class:'ngames'});right.append(panel);
+    const back=h('button',{class:'pbtn',on:{click:()=>{if(gStop){gStop();gStop=null}right.innerHTML='';right.append(log,bar);log.scrollTop=log.scrollHeight;inp.focus()}}},'← Back to chat');
+    const pick=(t,d,fn)=>h('button',{class:'ngpick',on:{click:()=>fn()}},h('b',{},t),h('small',{},d));
+    panel.append(h('div',{class:'nghead'},back,h('b',{},'Play with '+cfg.name)),h('div',{class:'ngpicks'},
+      pick('Pong','First to 5. Mouse or ↑ ↓ to move.',()=>runGame(pong)),pick('Plinko','5 balls each. Click where to drop yours.',()=>runGame(plinko)),pick('Connect Four','Get four in a row before she does.',()=>runGame(c4))))}
+  function runGame(g){if(gStop){gStop();gStop=null}right.innerHTML='';const panel=h('div',{class:'ngames'});right.append(panel);
+    const score=h('span',{class:'ngscore'},''),cv=h('canvas',{class:'ngcv',width:560,height:420,tabindex:0});
+    panel.append(h('div',{class:'nghead'},h('button',{class:'pbtn',on:{click:openGames}},'← Games'),h('b',{},g.title),score),cv);
+    gsay('start',true);gStop=g(cv,score);cv.focus()}
+  const sleepG=ms=>new Promise(r=>setTimeout(r,ms));
+  const CP='#ff5fa2',CY='#3fd0b4',BG='#0d1018';
+  // Pong: she's on the left
+  function pong(cv,score){pong.title='Pong';const x=cv.getContext('2d'),W=cv.width,H=cv.height,PH=70;let me=0,you=0,raf=0,on=true,keys={};
+    let ay=H/2,py=H/2,b,serveT=0,mistake=0;const serve=d=>{b={x:W/2,y:H/2,vx:d*4.2,vy:(Math.random()*2-1)*3};serveT=40};serve(Math.random()<.5?1:-1);
+    const mv=e=>{const r=cv.getBoundingClientRect();py=(e.clientY-r.top)*(H/r.height)};cv.addEventListener('mousemove',mv);
+    const kd=e=>{keys[e.key]=e.type==='keydown';if(/Arrow(Up|Down)/.test(e.key))e.preventDefault()};cv.addEventListener('keydown',kd);cv.addEventListener('keyup',kd);
+    const draw=()=>{x.fillStyle=BG;x.fillRect(0,0,W,H);x.setLineDash([6,10]);x.strokeStyle='rgba(255,255,255,.15)';x.beginPath();x.moveTo(W/2,0);x.lineTo(W/2,H);x.stroke();x.setLineDash([]);
+      x.fillStyle=CP;x.fillRect(14,ay-PH/2,10,PH);x.fillStyle=CY;x.fillRect(W-24,py-PH/2,10,PH);x.fillStyle='#fff';x.beginPath();x.arc(b.x,b.y,7,0,7);x.fill();
+      x.font='600 34px Rajdhani,sans-serif';x.textAlign='center';x.fillStyle=CP;x.fillText(me,W/2-50,46);x.fillStyle=CY;x.fillText(you,W/2+50,46)};
+    const step=()=>{if(!on)return;if(keys.ArrowUp)py-=7;if(keys.ArrowDown)py+=7;py=Math.max(PH/2,Math.min(H-PH/2,py));
+      // her paddle: follows the ball with a speed limit and the odd misjudgement, so she can be beaten
+      if(b.vx<0){const target=b.y+mistake;ay+=Math.max(-4.6,Math.min(4.6,(target-ay)*.12))}else ay+=(H/2-ay)*.02;ay=Math.max(PH/2,Math.min(H-PH/2,ay));
+      if(serveT>0)serveT--;else{b.x+=b.vx;b.y+=b.vy;if(b.y<7||b.y>H-7){b.vy*=-1;b.y=Math.max(7,Math.min(H-7,b.y))}
+        if(b.vx<0&&b.x<31&&b.x>14&&Math.abs(b.y-ay)<PH/2+6){b.vx=Math.min(11,-b.vx*1.06);b.vy+=(b.y-ay)*.09;mistake=(Math.random()-.5)*(PH*1.5)}
+        if(b.vx>0&&b.x>W-31&&b.x<W-14&&Math.abs(b.y-py)<PH/2+6){b.vx=Math.max(-11,-b.vx*1.06);b.vy+=(b.y-py)*.09;mistake=(Math.random()-.5)*(PH*(.6+Math.random()*1.4))}
+        if(b.x<-10){you++;score.textContent=me+' – '+you;if(you>=5)return end('you');gsay('you');serve(-1)}
+        if(b.x>W+10){me++;score.textContent=me+' – '+you;if(me>=5)return end('me');gsay('me');serve(1)}}
+      draw();raf=requestAnimationFrame(step)};
+    const end=r=>{on=false;draw();x.fillStyle='rgba(0,0,0,.5)';x.fillRect(0,0,W,H);x.fillStyle='#fff';x.font='600 30px Rajdhani,sans-serif';x.textAlign='center';x.fillText(r==='you'?'You win!':'She wins!',W/2,H/2);x.font='15px Figtree,sans-serif';x.fillText('Click to play again',W/2,H/2+30);
+      gEnd(r);cv.onclick=()=>runGame(pong)};
+    score.textContent='0 – 0';step();return()=>{on=false;cancelAnimationFrame(raf)}}
+  // Plinko: take turns dropping 5 balls each
+  function plinko(cv,score){plinko.title='Plinko';const x=cv.getContext('2d'),W=cv.width,H=cv.height;const pegs=[],SL=[1,3,5,10,5,3,1],sw=W/SL.length;let on=true,raf=0,ball=null,turn='you',left={you:5,me:5},tot={you:0,me:0},hover=W/2;
+    for(let r=0;r<9;r++){if(r%2)for(let i=0;i<7;i++)pegs.push({x:sw/2+i*sw,y:70+r*34});else for(let i=0;i<=7;i++)pegs.push({x:i*sw,y:70+r*34})}
+    const upd=()=>{score.textContent='You '+tot.you+' – '+tot.me+' '+cfg.name};upd();
+    const drop=(px,who)=>{ball={x:Math.max(10,Math.min(W-10,px+(Math.random()-.5)*4)),y:24,vx:0,vy:0,who}};
+    cv.onmousemove=e=>{const r=cv.getBoundingClientRect();hover=(e.clientX-r.left)*(W/r.width)};
+    cv.onclick=e=>{if(!on||ball||turn!=='you'||!left.you)return;const r=cv.getBoundingClientRect();left.you--;drop((e.clientX-r.left)*(W/r.width),'you')};
+    const herTurn=async()=>{await sleepG(900);if(!on)return;left.me--;drop(W*(.25+Math.random()*.5),'me')};
+    const draw=()=>{x.fillStyle=BG;x.fillRect(0,0,W,H);for(const p of pegs){x.fillStyle='rgba(255,255,255,.55)';x.beginPath();x.arc(p.x,p.y,4,0,7);x.fill()}
+      SL.forEach((v,i)=>{x.fillStyle=v>=10?'rgba(255,95,162,.35)':v>=5?'rgba(63,208,180,.25)':'rgba(255,255,255,.08)';x.fillRect(i*sw+2,H-46,sw-4,44);x.fillStyle='#fff';x.font='600 20px Rajdhani,sans-serif';x.textAlign='center';x.fillText(v,i*sw+sw/2,H-17)});
+      if(!ball&&turn==='you'&&on&&left.you){x.globalAlpha=.5;x.fillStyle=CY;x.beginPath();x.arc(hover,24,8,0,7);x.fill();x.globalAlpha=1}
+      if(ball){x.fillStyle=ball.who==='you'?CY:CP;x.beginPath();x.arc(ball.x,ball.y,8,0,7);x.fill()}
+      x.fillStyle='rgba(255,255,255,.7)';x.font='13px Figtree,sans-serif';x.textAlign='left';x.fillText(turn==='you'?'Your turn ('+left.you+' left)':cfg.name+'’s turn ('+left.me+' left)',10,18)};
+    const step=()=>{if(!on)return;if(ball){ball.vy+=.25;ball.x+=ball.vx;ball.y+=ball.vy;if(ball.x<8||ball.x>W-8){ball.vx*=-.6;ball.x=Math.max(8,Math.min(W-8,ball.x))}
+        for(const p of pegs){const dx=ball.x-p.x,dy=ball.y-p.y,d=Math.hypot(dx,dy);if(d<12&&d>0){const nx=dx/d,ny=dy/d,dot=ball.vx*nx+ball.vy*ny;if(dot<0){ball.vx-=1.5*dot*nx;ball.vy-=1.5*dot*ny;ball.vx+=(Math.random()-.5)*.6}ball.x=p.x+nx*12;ball.y=p.y+ny*12}}
+        if(ball.y>H-50){const v=SL[Math.max(0,Math.min(SL.length-1,Math.floor(ball.x/sw)))];tot[ball.who]+=v;const who=ball.who;ball=null;upd();
+          if(v>=10)gsay(who==='me'?'me':'you');
+          if(!left.you&&!left.me){draw();return end(tot.me>tot.you?'me':tot.you>tot.me?'you':'tie')}
+          turn=who==='you'&&left.me?'me':left.you?'you':'me';if(turn==='me')herTurn()}}
+      draw();raf=requestAnimationFrame(step)};
+    const end=r=>{on=false;x.fillStyle='rgba(0,0,0,.5)';x.fillRect(0,0,W,H);x.fillStyle='#fff';x.font='600 30px Rajdhani,sans-serif';x.textAlign='center';x.fillText(r==='you'?'You win!':r==='me'?'She wins!':'A tie!',W/2,H/2);x.font='15px Figtree,sans-serif';x.fillText('Click to play again',W/2,H/2+30);
+      gEnd(r);setTimeout(()=>{cv.onclick=()=>runGame(plinko)},300)};
+    step();return()=>{on=false;cancelAnimationFrame(raf)}}
+  // Connect Four: you're teal, she's pink
+  function c4(cv,score){c4.title='Connect Four';const x=cv.getContext('2d'),W=cv.width,H=cv.height,C=7,R=6,cs=Math.min(W/C,(H-30)/R),ox=(W-cs*C)/2,oy=26;let g=[...Array(R)].map(()=>Array(C).fill(0)),on=true,turn=1,hov=-1;
+    score.textContent='You go first';
+    const drop=(b,c,p)=>{for(let r=R-1;r>=0;r--)if(!b[r][c]){b[r][c]=p;return r}return -1};
+    const win=(b,p)=>{for(let r=0;r<R;r++)for(let c=0;c<C;c++)for(const[dr,dc]of[[0,1],[1,0],[1,1],[1,-1]]){let k=0;for(;k<4;k++){const rr=r+dr*k,cc=c+dc*k;if(rr<0||rr>=R||cc<0||cc>=C||b[rr][cc]!==p)break}if(k===4)return true}return false};
+    const full=b=>b[0].every(v=>v);const cp=b=>b.map(r=>r.slice());const ok=c=>!g[0][c];
+    const herMove=()=>{const cols=[...Array(C).keys()].filter(ok);
+      for(const c of cols){const b=cp(g);drop(b,c,2);if(win(b,2))return c}            // win if she can
+      for(const c of cols){const b=cp(g);drop(b,c,1);if(win(b,1))return Math.random()<.9?c:cols[Math.floor(Math.random()*cols.length)]}   // block (usually)
+      const safe=cols.filter(c=>{const b=cp(g);drop(b,c,2);return !cols.some(c2=>{if(b[0][c2])return false;const b2=cp(b);drop(b2,c2,1);return win(b2,1)})});
+      const pool=safe.length?safe:cols;pool.sort((a,b)=>Math.abs(a-3)-Math.abs(b-3)+(Math.random()-.5)*2.2);return pool[0]};
+    const draw=()=>{x.fillStyle=BG;x.fillRect(0,0,W,H);x.fillStyle='#1b2340';x.fillRect(ox,oy,cs*C,cs*R);
+      for(let r=0;r<R;r++)for(let c=0;c<C;c++){x.fillStyle=g[r][c]===1?CY:g[r][c]===2?CP:'#0b0e16';x.beginPath();x.arc(ox+c*cs+cs/2,oy+r*cs+cs/2,cs*.38,0,7);x.fill()}
+      if(on&&turn===1&&hov>=0&&ok(hov)){x.globalAlpha=.6;x.fillStyle=CY;x.beginPath();x.arc(ox+hov*cs+cs/2,13,10,0,7);x.fill();x.globalAlpha=1}};
+    cv.onmousemove=e=>{const r=cv.getBoundingClientRect();hov=Math.floor(((e.clientX-r.left)*(W/r.width)-ox)/cs);draw()};
+    cv.onclick=async e=>{if(!on||turn!==1)return;const r=cv.getBoundingClientRect();const c=Math.floor(((e.clientX-r.left)*(W/r.width)-ox)/cs);if(c<0||c>=C||!ok(c))return;
+      drop(g,c,1);draw();if(win(g,1))return end('you');if(full(g))return end('tie');turn=2;score.textContent=cfg.name+' is thinking…';await sleepG(700+Math.random()*600);if(!on)return;
+      const hc=herMove();drop(g,hc,2);draw();if(win(g,2))return end('me');if(full(g))return end('tie');
+      const threat=[...Array(C).keys()].filter(ok).some(c2=>{const b=cp(g);drop(b,c2,2);return win(b,2)});if(threat&&Math.random()<.5)bubbleSay('Ehehe~ watch out...');
+      turn=1;score.textContent='Your turn'};
+    const end=r=>{on=false;draw();x.fillStyle='rgba(0,0,0,.45)';x.fillRect(0,0,W,H);x.fillStyle='#fff';x.font='600 30px Rajdhani,sans-serif';x.textAlign='center';x.fillText(r==='you'?'You win!':r==='me'?'She wins!':'A draw!',W/2,H/2);x.font='15px Figtree,sans-serif';x.fillText('Click to play again',W/2,H/2+30);
+      score.textContent='';gEnd(r);setTimeout(()=>{cv.onclick=()=>runGame(c4)},300)};
+    draw();return()=>{on=false}}
+  pong.title='Pong';plinko.title='Plinko';c4.title='Connect Four';
   // ---- settings
   gear.onclick=async()=>{try{st=await N.state()}catch(e){}openSet()};
   function openSet(){const ov=h('div',{class:'nset'});const box=h('div',{class:'nsetbox'});ov.append(box);wrap.append(ov);ov.onclick=e=>{if(e.target===ov)ov.remove()};
@@ -1689,7 +1779,7 @@ const APPS={
         reqId='hi';bubble('assistant',g.text);bubbleSay(g.text);say(g.text);msgs.push({role:'assistant',content:g.text});N.history(msgs).catch(()=>{})}}
     catch(e){setStat('Couldn’t wake up','idle');chip('I couldn’t start: '+errMsg(e))}}
   init();
-  api.onClose=()=>{alive=false;hush();if(rec)stopRec()}}},
+  api.onClose=()=>{alive=false;hush();if(rec)stopRec();if(gStop){gStop();gStop=null}}}},
  clips:{name:'Clips',w:960,h:640,mount(b,api){
   const wrap=h('div',{class:'clips'});b.append(wrap);
   if(!HX||!OSM()||!HX.clips){wrap.append(h('p',{class:'hint',style:'padding:20px'},'Clips works on NexusOS.'));return}

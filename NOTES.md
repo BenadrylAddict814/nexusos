@@ -1,4 +1,12 @@
-NexusOS 1.9.4
+NexusOS 1.9.5
+
+- Play games with Nexa: press the gamepad button next to her chat box.
+  - Pong: first to 5, move with the mouse or arrow keys. She's beatable but not easy.
+  - Plinko: 5 balls each, take turns, highest total wins.
+  - Connect Four: she'll block you and set traps.
+  She cheers, teases and blushes as you play, and every game you finish raises her affection a little (a few games a day count).
+
+From 1.9.4:
 
 - Rewards for getting closer to Nexa:
   - Close friends: pink hoodie

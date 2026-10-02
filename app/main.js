@@ -2382,7 +2382,7 @@ const NEXA_OUTFITS = { default: { name: 'White hoodie', level: 0 }, pink: { name
 const AFF_UNLOCK = { 2: 'I got a new pink hoodie! Pick it in my settings~', 3: 'And look, a midnight hoodie! It’s in my settings. Do I look cool?', 4: 'Also... I’ll glow a little when you’re around now. D-don’t make it weird!', 5: 'I saved my lavender hoodie for this. It’s in my settings, just for you~' };
 const pick2 = (a) => a[Math.floor(Math.random() * a.length)];
 const AFF_LEVELS = [[0, 'Just met'], [15, 'Friends'], [35, 'Close friends'], [55, 'Besties'], [75, 'Crushing on you'], [92, 'Inseparable']];
-const AFF_GAIN = { chat: [1, 8], pat: [2, 6], hi: [3, 3], reply: [2, 2] };   // points each time, most per day
+const AFF_GAIN = { chat: [1, 8], pat: [2, 6], hi: [3, 3], reply: [2, 2], play: [2, 6] };   // points each time, most per day
 const AFF_UP_LINES = { 1: ['We’re friends now! Ehehe, I’m really happy~'], 2: ['Close friends! You actually like spending time with me, huh?'], 3: ['Besties!!! Okay, you’re officially my favourite person.'],
   4: ['W-wait... my heart’s doing a weird thing when you’re here. D-don’t look at me like that!'], 5: ['Inseparable~ I don’t know what I’d do without you. Ehehe.'] };
 function affLevel(v) { let i = 0; AFF_LEVELS.forEach(([min], k) => { if (v >= min) i = k; }); return i; }
@@ -2413,7 +2413,7 @@ function affAway(awayMs) {
   const m = mood(); if (typeof m.aff !== 'number') return;
   const floor = affLevel(m.aff) >= 1 ? AFF_LEVELS[1][0] : 0; m.aff = Math.max(Math.min(m.aff, floor), m.aff - Math.min(20, days * 2)); saveConfig();
 }
-handle('nexa:affection', (kind) => (kind === 'pat' ? affAdd('pat') : affInfo()));
+handle('nexa:affection', (kind) => (kind === 'pat' || kind === 'play' ? affAdd(kind) : affInfo()));
 handle('nexa:affShow', (v) => { if (v !== undefined) { config.nexaAffShow = !!v; saveConfig(); broadcast('sys-changed', 'nexaAff'); } return config.nexaAffShow !== false; });
 handle('nexa:misses', (v) => { if (v !== undefined) { config.nexaMisses = !!v; saveConfig(); } return config.nexaMisses !== false; });
 
