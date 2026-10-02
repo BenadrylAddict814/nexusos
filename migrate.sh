@@ -61,4 +61,7 @@ if ! ls /dev/cdc-wdm* /dev/wwan* >/dev/null 2>&1 && ! ls -d /sys/class/net/wwan*
   systemctl list-unit-files ModemManager.service >/dev/null 2>&1 && systemctl disable --now ModemManager.service >/dev/null 2>&1 || true
 fi
 systemctl restart systemd-journald >/dev/null 2>&1 || true
+# 1.8.4: anyone whose saved session is plain Openbox gets NexusOS again
+for d in /home/*; do f="$d/.dmrc"; [ -f "$f" ] && grep -qi '^Session=openbox' "$f" && sed -i 's/^Session=.*/Session=nexusos/I' "$f" || true; done
+for f in /var/lib/AccountsService/users/*; do [ -f "$f" ] && grep -qi '^XSession=openbox' "$f" && sed -i 's/^XSession=.*/XSession=nexusos/I' "$f" || true; done
 exit 0

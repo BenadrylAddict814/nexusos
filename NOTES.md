@@ -1,4 +1,8 @@
-NexusOS 1.8.3
+NexusOS 1.8.4
+
+- Fixed: after typing your password, the sign-in screen could start a bare "Openbox" session (just the background, nothing else) instead of NexusOS. NexusOS is now the only choice there, and anyone stuck on Openbox is switched back.
+
+From 1.8.3:
 
 - University and work Wi-Fi (eduroam and other "WPA2 Enterprise" networks): pick the network in Settings > Wi-Fi and sign in with your username (for eduroam, your full uni email) and password. "More options" has the sign-in method and server domain if your uni's IT page lists them.
 

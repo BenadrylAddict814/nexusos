@@ -5,6 +5,8 @@ export XDG_SESSION_DESKTOP=nexusos
 export GTK_THEME=Adwaita:dark
 
 xsetroot -solid '#05060a' 2>/dev/null
+# remember NexusOS as this account's session (the sign-in screen reads it next time)
+printf '[Desktop]\nSession=nexusos\n' > "$HOME/.dmrc" 2>/dev/null || true
 # screen off after 10 minutes of no activity
 xset s 600 600 2>/dev/null; xset +dpms 2>/dev/null; xset dpms 600 900 1200 2>/dev/null
 
