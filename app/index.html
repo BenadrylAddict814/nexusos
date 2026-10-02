@@ -417,6 +417,7 @@ html.theme-neon #start,html.theme-neon #quick,html.theme-neon #trayp{box-shadow:
 .nplate{position:absolute;left:14px;top:14px;display:flex;flex-direction:column;gap:2px;background:rgba(10,12,20,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 12px;color:#fff}
 .nstage.aura .nglow{background:radial-gradient(circle at 50% 42%,rgba(255,110,170,.38),rgba(255,110,170,.08) 45%,transparent 65%)!important;animation:auraP 3.2s ease-in-out infinite}@keyframes auraP{0%,100%{opacity:.75}50%{opacity:1}}
 .ngames{flex:1;display:flex;flex-direction:column;gap:12px;padding:16px;min-height:0;overflow:auto}.nghead{display:flex;align-items:center;gap:12px}.nghead b{font-size:16px}.ngscore{margin-left:auto;font-family:Rajdhani,sans-serif;font-weight:600;font-size:18px;opacity:.9}.ngpicks{display:grid;gap:10px}.ngpick{display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;padding:14px 16px;border-radius:12px;border:1px solid var(--line);background:var(--raised);color:var(--fg);cursor:pointer;font:inherit}.ngpick:hover{border-color:#ff5fa2}.ngpick b{font-size:16px}.ngpick small{opacity:.7}.ngcv{width:100%;max-width:560px;aspect-ratio:4/3;border-radius:12px;border:1px solid var(--line);align-self:center;outline:none;cursor:pointer}
+.ngdom{display:flex;flex-direction:column;gap:16px;align-items:center;padding:20px 0}.rpsshow{display:flex;align-items:center;gap:28px}.rpsside{display:flex;flex-direction:column;align-items:center;gap:6px}.rpsside small{opacity:.75}.rpsbig{font-size:72px;line-height:1;width:110px;height:110px;display:grid;place-items:center;border-radius:20px;background:var(--raised);border:2px solid #3fd0b4}.rpsside.her .rpsbig{border-color:#ff5fa2;transform:scaleX(-1)}.rpsvs{opacity:.6;font-size:18px}.rpsbig.shake{animation:rpsS .38s ease}@keyframes rpsS{0%,100%{translate:0 0}50%{translate:0 -18px}}.rpsbtns{display:flex;gap:12px}.rpsbtn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:var(--raised);color:var(--fg);cursor:pointer;font:inherit}.rpsbtn span{font-size:38px;line-height:1}.rpsbtn:hover:not(:disabled){border-color:#ff5fa2}.rpsbtn:disabled{opacity:.5}
 .naff{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px}.naff[hidden]{display:none}.naffh{color:#ff6fa8;font-size:13px;line-height:1;transition:transform .3s}.naffbar{width:96px;height:6px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden}.naffbar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#ff8fc0,#ff4f93);transition:width .8s cubic-bezier(.2,.8,.2,1)}.naff small{opacity:.9;white-space:nowrap}.naff.up .naffh{animation:affpop 1.2s ease 2}@keyframes affpop{0%,100%{transform:scale(1)}40%{transform:scale(1.7)}}
 .nplate .nname{font-size:18px;letter-spacing:.3px;border:0;background:none;padding:0;margin:0;box-shadow:none}.nstat2{font-size:12px;opacity:.8}
 .nright{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -1662,9 +1663,9 @@ const APPS={
     const back=h('button',{class:'pbtn',on:{click:()=>{if(gStop){gStop();gStop=null}right.innerHTML='';right.append(log,bar);log.scrollTop=log.scrollHeight;inp.focus()}}},'← Back to chat');
     const pick=(t,d,fn)=>h('button',{class:'ngpick',on:{click:()=>fn()}},h('b',{},t),h('small',{},d));
     panel.append(h('div',{class:'nghead'},back,h('b',{},'Play with '+cfg.name)),h('div',{class:'ngpicks'},
-      pick('Pong','First to 5. Mouse or ↑ ↓ to move.',()=>runGame(pong)),pick('Plinko','5 balls each. Click where to drop yours.',()=>runGame(plinko)),pick('Connect Four','Get four in a row before she does.',()=>runGame(c4))))}
+      pick('Pong','First to 5. Mouse or ↑ ↓ to move.',()=>runGame(pong)),pick('Plinko','5 balls each. Click where to drop yours.',()=>runGame(plinko)),pick('Connect Four','Get four in a row before she does.',()=>runGame(c4)),pick('Tic-tac-toe','Three in a row. You’re X and go first.',()=>runGame(ttt)),pick('Rock, paper, scissors','Best of five. Can you read her mind?',()=>runGame(rps))))}
   function runGame(g){if(gStop){gStop();gStop=null}right.innerHTML='';const panel=h('div',{class:'ngames'});right.append(panel);
-    const score=h('span',{class:'ngscore'},''),cv=h('canvas',{class:'ngcv',width:560,height:420,tabindex:0});
+    const score=h('span',{class:'ngscore'},''),cv=g.dom?h('div',{class:'ngdom'}):h('canvas',{class:'ngcv',width:560,height:420,tabindex:0});
     panel.append(h('div',{class:'nghead'},h('button',{class:'pbtn',on:{click:openGames}},'← Games'),h('b',{},g.title),score),cv);
     gsay('start',true);gStop=g(cv,score);cv.focus()}
   const sleepG=ms=>new Promise(r=>setTimeout(r,ms));
@@ -1735,7 +1736,36 @@ const APPS={
     const end=r=>{on=false;draw();x.fillStyle='rgba(0,0,0,.45)';x.fillRect(0,0,W,H);x.fillStyle='#fff';x.font='600 30px Rajdhani,sans-serif';x.textAlign='center';x.fillText(r==='you'?'You win!':r==='me'?'She wins!':'A draw!',W/2,H/2);x.font='15px Figtree,sans-serif';x.fillText('Click to play again',W/2,H/2+30);
       score.textContent='';gEnd(r);setTimeout(()=>{cv.onclick=()=>runGame(c4)},300)};
     draw();return()=>{on=false}}
-  pong.title='Pong';plinko.title='Plinko';c4.title='Connect Four';
+  // Tic-tac-toe: she plays well, but sometimes gets distracted
+  function ttt(cv,score){const x=cv.getContext('2d'),W=cv.width,H=cv.height,S=Math.min(W,H)-60,ox=(W-S)/2,oy=(H-S)/2,c=S/3;let b=Array(9).fill(0),on=true,turn=1;
+    const L=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];const won=(bd,p)=>L.find(l=>l.every(i=>bd[i]===p));const full=bd=>bd.every(v=>v);
+    const mm=(bd,p)=>{if(won(bd,2))return 1;if(won(bd,1))return -1;if(full(bd))return 0;let best=p===2?-2:2;for(let i=0;i<9;i++)if(!bd[i]){bd[i]=p;const v=mm(bd,3-p);bd[i]=0;best=p===2?Math.max(best,v):Math.min(best,v)}return best};
+    const herMove=()=>{const free=[...Array(9).keys()].filter(i=>!b[i]);if(Math.random()<.22)return free[Math.floor(Math.random()*free.length)];let bv=-2,bm=[];for(const i of free){b[i]=2;const v=mm(b,1);b[i]=0;if(v>bv){bv=v;bm=[i]}else if(v===bv)bm.push(i)}return bm[Math.floor(Math.random()*bm.length)]};
+    const draw=(line)=>{x.fillStyle=BG;x.fillRect(0,0,W,H);x.strokeStyle='rgba(255,255,255,.25)';x.lineWidth=4;for(let i=1;i<3;i++){x.beginPath();x.moveTo(ox+i*c,oy+8);x.lineTo(ox+i*c,oy+S-8);x.stroke();x.beginPath();x.moveTo(ox+8,oy+i*c);x.lineTo(ox+S-8,oy+i*c);x.stroke()}
+      x.lineWidth=9;x.lineCap='round';b.forEach((v,i)=>{const cx=ox+(i%3)*c+c/2,cy=oy+Math.floor(i/3)*c+c/2,r=c*.28;if(v===1){x.strokeStyle=CY;x.beginPath();x.moveTo(cx-r,cy-r);x.lineTo(cx+r,cy+r);x.moveTo(cx+r,cy-r);x.lineTo(cx-r,cy+r);x.stroke()}else if(v===2){x.strokeStyle=CP;x.beginPath();x.arc(cx,cy,r,0,7);x.stroke()}});
+      if(line){const p=i=>[ox+(i%3)*c+c/2,oy+Math.floor(i/3)*c+c/2];const[a1,a2]=p(line[0]),[b1,b2]=p(line[2]);x.strokeStyle='#fff';x.lineWidth=5;x.beginPath();x.moveTo(a1,a2);x.lineTo(b1,b2);x.stroke()}};
+    const end=(r,line)=>{on=false;draw(line);setTimeout(()=>{x.fillStyle='rgba(0,0,0,.45)';x.fillRect(0,0,W,H);x.fillStyle='#fff';x.font='600 30px Rajdhani,sans-serif';x.textAlign='center';x.fillText(r==='you'?'You win!':r==='me'?'She wins!':'A draw!',W/2,H/2);x.font='15px Figtree,sans-serif';x.fillText('Click to play again',W/2,H/2+30);cv.onclick=()=>runGame(ttt)},700);score.textContent='';gEnd(r)};
+    cv.onclick=async e=>{if(!on||turn!==1)return;const r=cv.getBoundingClientRect(),px=(e.clientX-r.left)*(W/r.width)-ox,py=(e.clientY-r.top)*(H/r.height)-oy;if(px<0||py<0||px>=S||py>=S)return;const i=Math.floor(py/c)*3+Math.floor(px/c);if(b[i])return;
+      b[i]=1;draw();let l=won(b,1);if(l)return end('you',l);if(full(b))return end('tie');turn=2;score.textContent=cfg.name+' is thinking…';await sleepG(500+Math.random()*500);if(!on)return;
+      b[herMove()]=2;draw();l=won(b,2);if(l)return end('me',l);if(full(b))return end('tie');turn=1;score.textContent='Your turn'};
+    score.textContent='Your turn';draw();return()=>{on=false}}
+  // Rock, paper, scissors: best of five. She has habits you can learn... or can she read you?
+  function rps(box,score){const N3=['rock','paper','scissors'],ICON={rock:'✊',paper:'✋',scissors:'✌️'},beats={rock:'scissors',paper:'rock',scissors:'paper'};let me=0,you=0,on=true,hist=[];
+    const show=h('div',{class:'rpsshow'},h('div',{class:'rpsside'},h('small',{},'You'),h('span',{class:'rpsbig'},'?')),h('b',{class:'rpsvs'},'vs'),h('div',{class:'rpsside her'},h('small',{},cfg.name),h('span',{class:'rpsbig'},'?')));
+    const msg=h('p',{class:'hint',style:'text-align:center;margin:0'},'Pick one!'),btns=h('div',{class:'rpsbtns'});
+    const [yb,hb]=show.querySelectorAll('.rpsbig');const upd=()=>score.textContent=you+' – '+me;upd();
+    const herPick=()=>{// 40% of the time she counters your most common pick, otherwise random
+      if(hist.length>=2&&Math.random()<.4){const cnt={};hist.forEach(v=>cnt[v]=(cnt[v]||0)+1);const fav=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];return N3.find(k=>beats[k]===fav)}return N3[Math.floor(Math.random()*3)]};
+    const play=async k=>{if(!on)return;on=false;btns.querySelectorAll('button').forEach(b=>b.disabled=true);const her=herPick();hist.push(k);
+      for(const t of ['Rock…','Paper…','Scissors…']){msg.textContent=t;yb.textContent='✊';hb.textContent='✊';yb.classList.add('shake');hb.classList.add('shake');await sleepG(380);yb.classList.remove('shake');hb.classList.remove('shake');await sleepG(60)}
+      yb.textContent=ICON[k];hb.textContent=ICON[her];
+      if(k===her){msg.textContent='Same! Go again.'}else if(beats[k]===her){you++;msg.textContent='You win this round!';gsay('you')}else{me++;msg.textContent=cfg.name+' wins this round!';gsay('me')}upd();
+      if(you>=3||me>=3){msg.textContent=you>me?'You win the match!':cfg.name+' wins the match!';gEnd(you>me?'you':'me');btns.innerHTML='';btns.append(h('button',{class:'pbtn pri',on:{click:()=>runGame(rps)}},'Play again'));return}
+      on=true;btns.querySelectorAll('button').forEach(b=>b.disabled=false)};
+    N3.forEach(k=>btns.append(h('button',{class:'rpsbtn',title:k,on:{click:()=>play(k)}},h('span',{},ICON[k]),h('small',{},k[0].toUpperCase()+k.slice(1)))));
+    box.append(show,msg,btns);return()=>{on=false}}
+  rps.dom=true;
+  pong.title='Pong';plinko.title='Plinko';c4.title='Connect Four';ttt.title='Tic-tac-toe';rps.title='Rock, paper, scissors';
   // ---- settings
   gear.onclick=async()=>{try{st=await N.state()}catch(e){}openSet()};
   function openSet(){const ov=h('div',{class:'nset'});const box=h('div',{class:'nsetbox'});ov.append(box);wrap.append(ov);ov.onclick=e=>{if(e.target===ov)ov.remove()};

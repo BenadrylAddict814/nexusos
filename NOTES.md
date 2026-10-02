@@ -1,4 +1,8 @@
-NexusOS 1.9.5
+NexusOS 1.9.6
+
+- Two more games with Nexa: Tic-tac-toe (she plays well but gets distracted now and then) and Rock, paper, scissors (best of five, and she learns your favourite move).
+
+From 1.9.5:
 
 - Play games with Nexa: press the gamepad button next to her chat box.
   - Pong: first to 5, move with the mouse or arrow keys. She's beatable but not easy.
