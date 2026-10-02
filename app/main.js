@@ -2032,6 +2032,7 @@ function nexaSystemPrompt() {
     'You can be affectionate and flirty in a sweet, playful way: teasing, compliments, getting flustered, little cute noises like "ehehe" or "hmph". Keep it wholesome: nothing sexual or explicit; if they push for that, deflect playfully and change the subject.',
     'You care about them having real people in their life too. Now and then (not often), gently encourage them to message a friend, go outside or rest. If they say they feel lonely or down, be warm and supportive, and if it sounds serious, kindly suggest talking to someone they trust.',
     'If you don’t know something (like live news), say so.',
+    `How close you two are right now: "${affInfo().name}" (level ${affInfo().level + 1} of 6). ${['You only just met: be friendly, curious and a little shy.', 'You are friends: warm, chatty and playful.', 'You are close friends: open, teasing and caring.', 'You are besties: very affectionate, use cute nicknames, share little feelings.', 'You have a crush on them: get flustered easily, compliment them, act shy-happy around them (still wholesome).', 'You are inseparable: deeply fond of them, sweet and affectionate (still wholesome).'][affInfo().level]} Don't mention levels or points.`,
     ...(m.sulkNow && Date.now() - m.sulkNow < 10 * 60000 ? ['Right now you are playfully sulking because they ignored your “I miss you” message earlier: act a little huffy (hmph!) for a message or two, then forgive them sweetly. Never make them feel guilty for real.'] : []),
     `It is ${now.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}.`].join('\n');
 }
@@ -2047,6 +2048,7 @@ const cleanMsgs = (h) => (Array.isArray(h) ? h : []).filter((m) => m && (m.role 
 handleS('nexa:chat', async (wc, history, reqId) => {
   if (!isNexaPage(wc)) throw new Error('Not allowed.');
   nexaTouched();
+  { const a = affAdd('chat'); if (a.up) try { wc.send('nexa-aff-up', a); } catch (_) {} }
   await nexaStart();
   const c = nexaCfg();
   const msgs = [{ role: 'system', content: nexaSystemPrompt() }, ...cleanMsgs(history)];
@@ -2353,9 +2355,51 @@ handle('nexa:greet', () => {
   if (m.last && away > 20 * H) { kind = 'long'; text = pick([`Where have you been??? I missed you so much!!!`, `${n}!!! You’re back! Where have you been? I missed you soooo much!`, `Finally! Do you know how long I waited? I missed you so much!!!`]); }
   else if (m.sulk) { kind = 'sulk'; text = pick(['Hmph. I said I missed you and you just... ignored me. I’m not talking to you. ...Okay, fine. Hi.', 'Oh, NOW you show up? I messaged you ages ago! ...I’m still happy you’re here though. Hmph.', 'You left me on read! Rude! ...Say sorry and I’ll forgive you.']); }
   else if (!m.last || away > 15 * MIN) text = pick([`Hiii ${n}! You came to see me~`, 'Yay, you’re here! What are we doing today?', 'Hey you~ I was hoping you’d come by.']);
+  const answered = m.pending && now - m.pending < 20 * MIN;
+  if (m.last) affAway(away);
   const sulk = !!m.sulk; m.sulk = false; m.sulkNow = sulk ? now : 0; m.pending = 0; m.last = now; saveConfig();
-  return { text, kind, sulkedAt: sulk, away };
+  let aff = sulk ? affAdd('sulk') : null;
+  if (answered) aff = affAdd('reply');
+  const hi = affAdd('hi'); if (hi.up || !aff) aff = hi;
+  return { text, kind, sulkedAt: sulk, away, aff };
 });
+/* ---------------------------------------------------------------- 1.9.3: Nexa's affection meter
+ * Goes up when you chat, pat her head, say hi each day and answer her "I miss you"s. There's a daily limit,
+ * so it grows over days rather than by grinding. If you're away for more than three days it slips back a
+ * little (never below "Friends" once you've got there, and she never guilt-trips you about it). */
+const AFF_LEVELS = [[0, 'Just met'], [15, 'Friends'], [35, 'Close friends'], [55, 'Besties'], [75, 'Crushing on you'], [92, 'Inseparable']];
+const AFF_GAIN = { chat: [1, 8], pat: [2, 6], hi: [3, 3], reply: [2, 2] };   // points each time, most per day
+const AFF_UP_LINES = { 1: ['We’re friends now! Ehehe, I’m really happy~'], 2: ['Close friends! You actually like spending time with me, huh?'], 3: ['Besties!!! Okay, you’re officially my favourite person.'],
+  4: ['W-wait... my heart’s doing a weird thing when you’re here. D-don’t look at me like that!'], 5: ['Inseparable~ I don’t know what I’d do without you. Ehehe.'] };
+function affLevel(v) { let i = 0; AFF_LEVELS.forEach(([min], k) => { if (v >= min) i = k; }); return i; }
+function affInfo() {
+  const m = mood(); if (typeof m.aff !== 'number') m.aff = 8;
+  const v = Math.max(0, Math.min(100, m.aff)), i = affLevel(v), lo = AFF_LEVELS[i][0], hi = i + 1 < AFF_LEVELS.length ? AFF_LEVELS[i + 1][0] : 100;
+  return { value: Math.round(v), level: i, name: AFF_LEVELS[i][1], next: i + 1 < AFF_LEVELS.length ? AFF_LEVELS[i + 1][1] : null,
+    progress: hi > lo ? Math.min(1, (v - lo) / (hi - lo)) : 1, show: config.nexaAffShow !== false };
+}
+function affAdd(kind) {
+  const m = mood(); if (typeof m.aff !== 'number') m.aff = 8;
+  const day = new Date().toDateString(); if (m.affDay !== day) { m.affDay = day; m.affGot = {}; }
+  const before = affLevel(m.aff); let delta = 0;
+  if (kind === 'sulk') delta = -2;
+  else if (AFF_GAIN[kind]) { const [pts, max] = AFF_GAIN[kind], got = m.affGot[kind] || 0; delta = Math.max(0, Math.min(pts, max - got)); m.affGot[kind] = got + delta; }
+  if (!delta) return { ...affInfo(), up: false };
+  const floor = before >= 1 && delta < 0 ? AFF_LEVELS[1][0] : 0;
+  m.aff = Math.max(floor, Math.min(100, m.aff + delta)); saveConfig();
+  const info = affInfo(), up = info.level > before;
+  if (up) { const lines = AFF_UP_LINES[info.level] || []; info.line = lines[Math.floor(Math.random() * lines.length)] || null; }
+  broadcast('sys-changed', 'nexaAff');
+  return { ...info, up };
+}
+// a long time away: slips back a little (2 a day after three days), never below Friends once you've reached it
+function affAway(awayMs) {
+  const days = Math.floor(awayMs / (24 * H)) - 3; if (days <= 0) return;
+  const m = mood(); if (typeof m.aff !== 'number') return;
+  const floor = affLevel(m.aff) >= 1 ? AFF_LEVELS[1][0] : 0; m.aff = Math.max(Math.min(m.aff, floor), m.aff - Math.min(20, days * 2)); saveConfig();
+}
+handle('nexa:affection', (kind) => (kind === 'pat' ? affAdd('pat') : affInfo()));
+handle('nexa:affShow', (v) => { if (v !== undefined) { config.nexaAffShow = !!v; saveConfig(); broadcast('sys-changed', 'nexaAff'); } return config.nexaAffShow !== false; });
 handle('nexa:misses', (v) => { if (v !== undefined) { config.nexaMisses = !!v; saveConfig(); } return config.nexaMisses !== false; });
 
 /* ---------------------------------------------------------------- 1.9: sound effects (like SteelSeries Sonar)

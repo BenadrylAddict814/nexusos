@@ -1,4 +1,8 @@
-NexusOS 1.9.2
+NexusOS 1.9.3
+
+- Nexa has an affection meter on her name card: Just met, Friends, Close friends, Besties, Crushing on you, Inseparable. It grows when you chat, pat her head, say hi each day and answer when she misses you. There's a daily limit, so it builds up over days. She gets sweeter as you get closer and celebrates each new level. You can hide the meter in her settings.
+
+From 1.9.2:
 
 - Full-screen games now cover the whole screen, taskbar included, like on Windows. Switch to another window (Alt+Tab, Discord, Firefox…) and the taskbar is back. Other apps, even full screen, never hide it.
 

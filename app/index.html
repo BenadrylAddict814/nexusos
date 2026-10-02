@@ -415,6 +415,7 @@ html.theme-neon #start,html.theme-neon #quick,html.theme-neon #trayp{box-shadow:
 .nglow{position:absolute;left:50%;bottom:30%;width:70%;aspect-ratio:1;transform:translateX(-50%) scale(calc(.9 + var(--lvl,0)*.35));border-radius:50%;background:radial-gradient(circle,rgba(255,95,162,.35),rgba(0,229,255,.12) 55%,transparent 70%);filter:blur(8px);transition:transform .08s;opacity:.7}
 .nstage.listen .nglow{opacity:1;background:radial-gradient(circle,rgba(0,229,255,.5),rgba(255,95,162,.15) 55%,transparent 70%)}
 .nplate{position:absolute;left:14px;top:14px;display:flex;flex-direction:column;gap:2px;background:rgba(10,12,20,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 12px;color:#fff}
+.naff{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px}.naff[hidden]{display:none}.naffh{color:#ff6fa8;font-size:13px;line-height:1;transition:transform .3s}.naffbar{width:96px;height:6px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden}.naffbar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#ff8fc0,#ff4f93);transition:width .8s cubic-bezier(.2,.8,.2,1)}.naff small{opacity:.9;white-space:nowrap}.naff.up .naffh{animation:affpop 1.2s ease 2}@keyframes affpop{0%,100%{transform:scale(1)}40%{transform:scale(1.7)}}
 .nplate .nname{font-size:18px;letter-spacing:.3px;border:0;background:none;padding:0;margin:0;box-shadow:none}.nstat2{font-size:12px;opacity:.8}
 .nright{display:flex;flex-direction:column;min-width:0;min-height:0}
 .nlog{flex:1;overflow:auto;padding:18px 18px 8px;display:flex;flex-direction:column;gap:10px}
@@ -1551,7 +1552,13 @@ const APPS={
   // her face frames sit on top of the picture: a blink, and two mouth shapes for talking
   const ov=k=>h('img',{class:'nov',alt:'',draggable:false,'data-k':k}),blinkI=ov('blink'),closedI=ov('closed'),midI=ov('mid'),blushI=h('img',{class:'nov nblush',alt:'',draggable:false,src:'nexa/nexa-blush.webp'});
   const fx=h('div',{class:'nfx'}),av=h('div',{class:'navwrap',title:'Poke her, or hold the mouse on her head and rub to pat her'},img,blinkI,closedI,midI,blushI),sayB=h('div',{class:'nsay'});
-  const stage=h('div',{class:'nstage idle'},glow,av,fx,sayB,h('div',{class:'nplate'},nm,stat));
+  const affFill=h('i'),affName=h('small'),aff=h('div',{class:'naff',hidden:true,title:'How close you two are. Chat with her, pat her head, say hi each day and answer when she misses you.'},h('span',{class:'naffh'},'♥'),h('div',{class:'naffbar'},affFill),affName);
+  const stage=h('div',{class:'nstage idle'},glow,av,fx,sayB,h('div',{class:'nplate'},nm,stat,aff));
+  const drawAff=a=>{if(!a)return;aff.hidden=!a.show;affFill.style.width=Math.round(a.progress*100)+'%';affName.textContent=a.name+(a.next?'':' ♥');aff.dataset.lv=a.level};
+  const affUp=a=>{drawAff(a);if(!a||!a.up)return;aff.classList.remove('up');void aff.offsetWidth;aff.classList.add('up');burst('heart',16);blushI.classList.add('hold');clearTimeout(blushT);blushT=setTimeout(()=>blushI.classList.remove('hold'),4000);
+    if(a.line)setTimeout(()=>{bubbleSay(a.line);bubble('assistant',a.line);msgs.push({role:'assistant',content:a.line});N.history(msgs).catch(()=>{});if(cfg.speak&&!busy){reqId='aff';say(a.line)}},busy?4000:600)};
+  N.affection().then(drawAff).catch(()=>{});
+  HX.onChanged&&HX.onChanged(w=>{if(w==='nexaAff'&&alive)N.affection().then(drawAff).catch(()=>{})});
   let sayT=0;const bubbleSay=t=>{sayB.textContent=t;sayB.classList.add('on');clearTimeout(sayT);sayT=setTimeout(()=>sayB.classList.remove('on'),3800)};
   const right=h('div',{class:'nright'});wrap.append(stage,right);
   const log=h('div',{class:'nlog'}),inp=h('textarea',{class:'ninp',rows:1,placeholder:'Say something…','aria-label':'Message'});
@@ -1587,7 +1594,7 @@ const APPS={
   function patStart(){clearTimeout(blushT);stage.classList.add('patting');blinkI.classList.add('hold');closedI.classList.add('hold');blushI.classList.add('hold');hush();
     clearInterval(patHearts);patHearts=setInterval(()=>burst('heart',1),420);
     setTimeout(()=>{if(!pat||!pat.on||Date.now()-patSaid<15000)return;patSaid=Date.now();const l=COZY[Math.floor(Math.random()*COZY.length)];bubbleSay(l);if(cfg.speak){reqId='pat';say(l)}},1200)}
-  function patEnd(){clearInterval(patHearts);stage.classList.remove('patting');setTimeout(()=>{blinkI.classList.remove('hold');closedI.classList.remove('hold')},500);blushT=setTimeout(()=>blushI.classList.remove('hold'),4500)}
+  function patEnd(){N.affection('pat').then(affUp).catch(()=>{});clearInterval(patHearts);stage.classList.remove('patting');setTimeout(()=>{blinkI.classList.remove('hold');closedI.classList.remove('hold')},500);blushT=setTimeout(()=>blushI.classList.remove('hold'),4500)}
   function bubble(role,text){const e=h('div',{class:'nmsg '+(role==='user'?'me':'her')},text||'');log.append(e);log.scrollTop=log.scrollHeight;return e}
   function chip(t){const e=h('div',{class:'nchip'},t);if(cur&&cur.isConnected&&!cur.textContent)log.insertBefore(e,cur);else log.append(e);log.scrollTop=log.scrollHeight;return e}
   const TOOL_LABEL={open_app:a=>'Opening '+(a.app||'an app'),list_steam_games:()=>'Checking your Steam games',launch_steam_game:a=>'Starting '+(a.name||'a game'),set_volume:a=>'Volume → '+a.percent+'%',set_brightness:a=>'Brightness → '+a.percent+'%',set_performance_mode:a=>'Performance mode → '+String(a.mode||'').replace('_',' '),save_clip:()=>'Saving a clip',set_wallpaper:()=>'Changing the background',system_status:()=>'Checking the computer',power:a=>'Asking you about: '+String(a.action||'').replace('_',' ')};
@@ -1603,7 +1610,7 @@ const APPS={
     a.onended=a.onerror=()=>{if(a.done)return;a.done=true;URL.revokeObjectURL(url);playing=null;an=null;setMouth('rest');if(!playQ.length)stage.classList.remove('talking');pump()};a.play().then(()=>{if(!lipRaf)lipRaf=requestAnimationFrame(lip)}).catch(()=>a.onended())}
   function feedSay(d){sayBuf+=d;let m;while((m=/^([\s\S]*?[.!?…](?=\s)|[\s\S]*?\n)/.exec(sayBuf))&&m[1].trim().length>=2){say(m[1]);sayBuf=sayBuf.slice(m[1].length)}}
   function hush(){reqId='';sayBuf='';playQ=[];if(playing){playing.pause();playing=null}an=null;setMouth('rest');stage.classList.remove('talking');N.stop().catch(()=>{})}
-  HX.onNexa((kind,d)=>{if(kind==='stream'&&d.id===reqId&&cur){
+  HX.onNexa((kind,d)=>{if(kind==='affup'){affUp(d);return}if(kind==='stream'&&d.id===reqId&&cur){
       if(d.delta){cur.textContent+=d.delta;feedSay(d.delta);log.scrollTop=log.scrollHeight}
       if(d.tool){const f=TOOL_LABEL[d.tool];chip((f?f(d.args||{}):d.tool)+'…');}
       if(d.toolDone&&!/^(No |That failed|Unknown|The user said no|Not allowed|Which app)/.test(d.result||''))burst('spark',8)}
@@ -1651,6 +1658,7 @@ const APPS={
         r.oninput=upd;r.onchange=async()=>{await save({pitch:+r.value});reqId='test';say('Is this better? I can go deeper, or higher, whatever you like.')};return srow('Voice depth','Lower makes her voice deeper.',r,lab)})(),
       srow('Speak her replies','',sswitch(cfg.speak,async v=>{await save({speak:v});return v},'Speak')),
       (()=>{const sw=h('span');N.misses().then(v=>sw.append(sswitch(v,async x=>{await N.misses(x);return x},'Misses you'))).catch(()=>{});return srow('She misses you','When you haven’t talked for a while, she says so from the taskbar (never during games). Ignore her and she’ll sulk a little.',sw)})(),
+      (()=>{const sw=h('span');N.affShow().then(v=>sw.append(sswitch(v,async x=>{await N.affShow(x);return x},'Affection meter'))).catch(()=>{});return srow('Affection meter','Shows how close you two are on her name card. It grows as you chat, pat her and say hi each day.',sw)})(),
       srow('Let her control NexusOS','Open apps and games, change volume, brightness, performance mode and background, save clips. Power actions always ask you first.',sswitch(cfg.control,async v=>{await save({control:v});return v},'Control')),
       h('div',{class:'row2 wrap'},h('button',{class:'pbtn',on:{click:async()=>{if(!await ask('Forget your chat?',cfg.name+' won’t remember anything you’ve said so far.','Forget',true))return;msgs=[];log.innerHTML='';N.history([]).catch(()=>{});ov.remove()}}},'Forget our chat'),
         h('button',{class:'pbtn danger',on:{click:async()=>{if(!await ask('Remove '+cfg.name+'’s downloads?','Frees about 2.9 GB. You can download her again any time.','Remove',true))return;await N.remove();ov.remove();ready=false;init()}}},'Remove downloads (2.9 GB)'),
@@ -1672,6 +1680,7 @@ const APPS={
     setStat('Waking up…','think');inp.focus();
     try{await N.start();if(!alive)return;ready=true;setStat('Here with you','idle');
       let g=null;try{g=await N.greet()}catch(e){}
+      if(g&&g.aff){drawAff(g.aff);if(g.aff.up)setTimeout(()=>affUp(g.aff),3500)}
       if(!msgs.length&&(!g||!g.text))g={kind:'hi',text:`Hi! I'm ${cfg.name}, your NexusOS buddy. Ask me anything, or tell me to open a game, turn up the volume, or switch to performance mode!`};
       if(g&&g.text){if(g.kind==='sulk'){stage.classList.add('pout');setTimeout(()=>stage.classList.remove('pout'),2600);blushI.classList.add('hold');blushT=setTimeout(()=>blushI.classList.remove('hold'),3000)}else burst('heart',g.kind==='long'?14:5);
         reqId='hi';bubble('assistant',g.text);bubbleSay(g.text);say(g.text);msgs.push({role:'assistant',content:g.text});N.history(msgs).catch(()=>{})}}
