@@ -415,6 +415,7 @@ html.theme-neon #start,html.theme-neon #quick,html.theme-neon #trayp{box-shadow:
 .nglow{position:absolute;left:50%;bottom:30%;width:70%;aspect-ratio:1;transform:translateX(-50%) scale(calc(.9 + var(--lvl,0)*.35));border-radius:50%;background:radial-gradient(circle,rgba(255,95,162,.35),rgba(0,229,255,.12) 55%,transparent 70%);filter:blur(8px);transition:transform .08s;opacity:.7}
 .nstage.listen .nglow{opacity:1;background:radial-gradient(circle,rgba(0,229,255,.5),rgba(255,95,162,.15) 55%,transparent 70%)}
 .nplate{position:absolute;left:14px;top:14px;display:flex;flex-direction:column;gap:2px;background:rgba(10,12,20,.55);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:8px 12px;color:#fff}
+.nstage.aura .nglow{background:radial-gradient(circle at 50% 42%,rgba(255,110,170,.38),rgba(255,110,170,.08) 45%,transparent 65%)!important;animation:auraP 3.2s ease-in-out infinite}@keyframes auraP{0%,100%{opacity:.75}50%{opacity:1}}
 .naff{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px}.naff[hidden]{display:none}.naffh{color:#ff6fa8;font-size:13px;line-height:1;transition:transform .3s}.naffbar{width:96px;height:6px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden}.naffbar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#ff8fc0,#ff4f93);transition:width .8s cubic-bezier(.2,.8,.2,1)}.naff small{opacity:.9;white-space:nowrap}.naff.up .naffh{animation:affpop 1.2s ease 2}@keyframes affpop{0%,100%{transform:scale(1)}40%{transform:scale(1.7)}}
 .nplate .nname{font-size:18px;letter-spacing:.3px;border:0;background:none;padding:0;margin:0;box-shadow:none}.nstat2{font-size:12px;opacity:.8}
 .nright{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -1554,7 +1555,7 @@ const APPS={
   const fx=h('div',{class:'nfx'}),av=h('div',{class:'navwrap',title:'Poke her, or hold the mouse on her head and rub to pat her'},img,blinkI,closedI,midI,blushI),sayB=h('div',{class:'nsay'});
   const affFill=h('i'),affName=h('small'),aff=h('div',{class:'naff',hidden:true,title:'How close you two are. Chat with her, pat her head, say hi each day and answer when she misses you.'},h('span',{class:'naffh'},'♥'),h('div',{class:'naffbar'},affFill),affName);
   const stage=h('div',{class:'nstage idle'},glow,av,fx,sayB,h('div',{class:'nplate'},nm,stat,aff));
-  const drawAff=a=>{if(!a)return;aff.hidden=!a.show;affFill.style.width=Math.round(a.progress*100)+'%';affName.textContent=a.name+(a.next?'':' ♥');aff.dataset.lv=a.level};
+  let affLv=0;const drawAff=a=>{if(!a)return;affLv=a.level;stage.classList.toggle('aura',a.level>=4);aff.hidden=!a.show;affFill.style.width=Math.round(a.progress*100)+'%';affName.textContent=a.name+(a.next?'':' ♥');aff.dataset.lv=a.level};
   const affUp=a=>{drawAff(a);if(!a||!a.up)return;aff.classList.remove('up');void aff.offsetWidth;aff.classList.add('up');burst('heart',16);blushI.classList.add('hold');clearTimeout(blushT);blushT=setTimeout(()=>blushI.classList.remove('hold'),4000);
     if(a.line)setTimeout(()=>{bubbleSay(a.line);bubble('assistant',a.line);msgs.push({role:'assistant',content:a.line});N.history(msgs).catch(()=>{});if(cfg.speak&&!busy){reqId='aff';say(a.line)}},busy?4000:600)};
   N.affection().then(drawAff).catch(()=>{});
@@ -1568,9 +1569,9 @@ const APPS={
   const gear=h('button',{class:'nbtn',title:'Settings','aria-label':'Settings'},svgI('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'));
   const bar=h('div',{class:'nbar'},mic,inp,sendB,spk,gear);
   function svgI(p){return h('span',{html:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`})}
-  const setStat=(t,mode)=>{stat.textContent=t;stage.className='nstage '+(mode||'idle')};
+  const setStat=(t,mode)=>{stat.textContent=t;stage.className='nstage '+(mode||'idle')+(affLv>=4?' aura':'')};
   const drawSpk=()=>{spk.innerHTML='';spk.append(svgI(cfg.speak?'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>':'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>'));spk.classList.toggle('off',!cfg.speak)};
-  const look=()=>{const b='nexa/nexa-'+(cfg.skin==='tan'?'tan':'light');img.src=b+'.webp';blinkI.src=b+'-blink.webp';closedI.src=b+'-closed.webp';midI.src=b+'-mid.webp';nm.textContent=cfg.name;api.setTitle&&api.setTitle(cfg.name)};
+  const look=()=>{const b='nexa/nexa-'+(cfg.skin==='tan'?'tan':'light')+(cfg.outfit&&cfg.outfit!=='default'?'-'+cfg.outfit:'');img.src=b+'.webp';blinkI.src=b+'-blink.webp';closedI.src=b+'-closed.webp';midI.src=b+'-mid.webp';nm.textContent=cfg.name;api.setTitle&&api.setTitle(cfg.name)};
   // ---- alive: blinking, mouth, sparkles, looking at your cursor, reacting when poked
   let mouth='rest';const setMouth=m=>{if(m===mouth)return;mouth=m;closedI.classList.toggle('on',m==='closed');midI.classList.toggle('on',m==='mid')};
   (function blinkLoop(){if(!alive)return;const one=()=>{blinkI.classList.add('on');setTimeout(()=>blinkI.classList.remove('on'),130)};one();if(Math.random()<.2)setTimeout(one,260);setTimeout(blinkLoop,2200+Math.random()*4200)})();
@@ -1581,9 +1582,11 @@ const APPS={
   setInterval(()=>{if(alive&&!document.hidden&&Math.random()<.35)burst('spark',2)},6000);
   stage.addEventListener('mousemove',e=>{const r=stage.getBoundingClientRect();av.style.setProperty('--lx',(((e.clientX-r.left)/r.width-.5)*2).toFixed(2));av.style.setProperty('--ly',(((e.clientY-r.top)/r.height-.5)*2).toFixed(2))});
   stage.addEventListener('mouseleave',()=>{av.style.setProperty('--lx',0);av.style.setProperty('--ly',0)});
+  const POKES3=['Hehe, you just can’t stay away, huh?','Bestie poke! Poke back!','You’re my favourite, you know that?'],POKES4=['Eep! W-warn me first!','My heart just did a little jump...','Ehehe... hi. You’re kinda cute when you do that.'];
   const POKES=['Hey! That tickles!','Hehe, need something?','Boop! You found me.','I’m right here, you know.','Careful, I bite! Just kidding.','Ready when you are!'];
-  av.onclick=()=>{if(patted){patted=false;return}av.classList.remove('hop');void av.offsetWidth;av.classList.add('hop');burst('heart',6);const l=POKES[Math.floor(Math.random()*POKES.length)];bubbleSay(l);if(!busy&&!playing&&cfg.speak){reqId='poke';say(l)}};
+  av.onclick=()=>{if(patted){patted=false;return}av.classList.remove('hop');void av.offsetWidth;av.classList.add('hop');burst('heart',6);const pool=POKES.concat(affLv>=3?POKES3:[],affLv>=4?POKES4:[]);const l=pool[Math.floor(Math.random()*pool.length)];bubbleSay(l);if(!busy&&!playing&&cfg.speak){reqId='poke';say(l)}};
   // ---- head pats: hold the mouse on her head and rub back and forth
+  const COZY3=['Bestie head pats are the best head pats~','Mmmh... I could stay like this all day.'],COZY5=['I feel so safe when you do that...','Nobody else gets to do this, okay? Just you~'];
   const COZY=['Mmm~ that’s nice...','Ehehe... do that again~','I-I’m not blushing! ...okay, maybe a little.','Head pats are my favourite...','You’re gonna make me melt~','Hehe, you’re so sweet to me.'];
   let pat=null,patted=false,patSaid=0,patHearts=0,blushT=0;
   const onHead=e=>{const r=av.getBoundingClientRect();return (e.clientY-r.top)/r.height<.42&&(e.clientX-r.left)/r.width>.2&&(e.clientX-r.left)/r.width<.85};
@@ -1593,7 +1596,7 @@ const APPS={
   const patStop=()=>{if(pat&&pat.on){patted=true;patEnd()}pat=null};av.addEventListener('pointerup',patStop);av.addEventListener('pointercancel',patStop);
   function patStart(){clearTimeout(blushT);stage.classList.add('patting');blinkI.classList.add('hold');closedI.classList.add('hold');blushI.classList.add('hold');hush();
     clearInterval(patHearts);patHearts=setInterval(()=>burst('heart',1),420);
-    setTimeout(()=>{if(!pat||!pat.on||Date.now()-patSaid<15000)return;patSaid=Date.now();const l=COZY[Math.floor(Math.random()*COZY.length)];bubbleSay(l);if(cfg.speak){reqId='pat';say(l)}},1200)}
+    setTimeout(()=>{if(!pat||!pat.on||Date.now()-patSaid<15000)return;patSaid=Date.now();const pool=COZY.concat(affLv>=3?COZY3:[],affLv>=5?COZY5:[]);const l=pool[Math.floor(Math.random()*pool.length)];bubbleSay(l);if(cfg.speak){reqId='pat';say(l)}},1200)}
   function patEnd(){N.affection('pat').then(affUp).catch(()=>{});clearInterval(patHearts);stage.classList.remove('patting');setTimeout(()=>{blinkI.classList.remove('hold');closedI.classList.remove('hold')},500);blushT=setTimeout(()=>blushI.classList.remove('hold'),4500)}
   function bubble(role,text){const e=h('div',{class:'nmsg '+(role==='user'?'me':'her')},text||'');log.append(e);log.scrollTop=log.scrollHeight;return e}
   function chip(t){const e=h('div',{class:'nchip'},t);if(cur&&cur.isConnected&&!cur.textContent)log.insertBefore(e,cur);else log.append(e);log.scrollTop=log.scrollHeight;return e}
@@ -1652,7 +1655,7 @@ const APPS={
     const save=async o=>{cfg=await N.setCfg(o);look();drawSpk()};
     name.onchange=()=>save({name:name.value});pers.onchange=()=>save({personality:pers.value});skin.onchange=()=>save({skin:skin.value});voice.onchange=()=>save({voice:voice.value});
     box.append(h('h3',{},'Settings'),srow('Name','',name),h('div',{class:'srow col'},h('div',{class:'sl'},h('span',{},'Personality'),h('small',{},'Describe how she talks and acts. Takes effect from your next message.')),pers),
-      srow('Look','',skin),srow('Voice','',voice,h('button',{class:'pbtn',on:{click:async()=>{reqId='test';say('Hi! This is how I sound. Pretty cute, right?')}}},'Test')),
+      srow('Look','',skin),(()=>{const sel=h('select',{class:'txt','aria-label':'Outfit'});N.affection().then(a=>{(a.outfits||[]).forEach(o=>sel.append(h('option',{value:o.id,disabled:!o.unlocked,selected:o.id===(cfg.outfit||'default')},o.name+(o.unlocked?'':' (unlocks at '+o.at+')'))))}).catch(()=>{});sel.onchange=()=>save({outfit:sel.value}).catch(e=>toast('Couldn’t change outfit',errMsg(e)));return srow('Outfit','Get closer to her to unlock more.',sel)})(),srow('Voice','',voice,h('button',{class:'pbtn',on:{click:async()=>{reqId='test';say('Hi! This is how I sound. Pretty cute, right?')}}},'Test')),
       h('p',{class:'hint'},st.device?('Her brain is running on: '+st.device+(st.device==='processor'?' (no graphics card found, so she’s slower)':'')):''),
       (()=>{const r=h('input',{type:'range',min:-4,max:3,step:.5,value:cfg.pitch,'aria-label':'Voice depth'}),lab=h('small',{},'');const upd=()=>{const v=+r.value;lab.textContent=v===0?'Normal':v<0?(v<=-3?'Much deeper':v<=-1.5?'Deeper':'A little deeper'):'Higher'};upd();
         r.oninput=upd;r.onchange=async()=>{await save({pitch:+r.value});reqId='test';say('Is this better? I can go deeper, or higher, whatever you like.')};return srow('Voice depth','Lower makes her voice deeper.',r,lab)})(),

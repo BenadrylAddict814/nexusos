@@ -1,4 +1,13 @@
-NexusOS 1.9.3
+NexusOS 1.9.4
+
+- Rewards for getting closer to Nexa:
+  - Close friends: pink hoodie
+  - Besties: midnight hoodie, plus sweeter pokes and head-pat reactions
+  - Crushing on you: a soft pink heart glow around her, flustered reactions, and a sweet hello from the taskbar the first time you sign in each day
+  - Inseparable: lavender hoodie, her most special greetings, and extra cosy head pats
+- Pick an unlocked outfit in her settings (Outfit). Each level-up tells you what you've unlocked.
+
+From 1.9.3:
 
 - Nexa has an affection meter on her name card: Just met, Friends, Close friends, Besties, Crushing on you, Inseparable. It grows when you chat, pat her head, say hi each day and answer when she misses you. There's a daily limit, so it builds up over days. She gets sweeter as you get closer and celebrates each new level. You can hide the meter in her settings.
 

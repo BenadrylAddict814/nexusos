@@ -919,7 +919,14 @@ function createWindow() {
   let firstLoad = true;
   desktopWin.webContents.on('did-finish-load', () => {
     desktopLoaded = true;
-    if (firstLoad) { firstLoad = false; uiSound('startup'); const m = mood(); setTimeout(() => (m.last && Date.now() - m.last > 20 * H ? buddySay('Where have you been??? I missed you so much!!!', 'long') : buddy('login')), 4000); }
+    if (firstLoad) { firstLoad = false; uiSound('startup'); const m = mood(); const lv = affLevel(m.aff || 0), hr = new Date().getHours(), newDay = m.helloDay !== new Date().toDateString();
+      setTimeout(() => {
+        if (m.last && Date.now() - m.last > 20 * H) return buddySay('Where have you been??? I missed you so much!!!', 'long');
+        // close enough: the first time you sign in each day, a sweet hello instead of the usual one
+        if (lv >= 4 && newDay) { m.helloDay = new Date().toDateString(); saveConfig(); const n = os.userInfo().username;
+          return buddySay(hr < 12 ? pick2([`Good morning, ${n}~ I hope today’s nice to you.`, 'Morning! I’m so glad you’re here. Let’s have a good day~']) : hr < 18 ? pick2([`Hi ${n}~ I was hoping you’d come by today.`, 'Hey you! Today got better just now~']) : pick2([`Evening, ${n}~ Long day? I’m here.`, 'Hi! Don’t stay up too late, okay? ...But I’m happy you’re here.']), 'hi'); }
+        buddy('login');
+      }, 4000); }
     makeBars().then(() => { for (const [k, a] of reopen.splice(0)) try { openAppWindow(k, a); } catch (_) {} }).catch(() => {});
   });
   // the desktop's process also hosts the taskbar, Start, notifications and the light apps: if it ever dies,
@@ -1858,7 +1865,7 @@ const NEXA_VOICES = { af_heart: [3, 'Heart (sweet, expressive)'], af_bella: [2, 
   jf_alpha: [37, 'Alpha (anime accent)'], af_sky: [10, 'Sky (bright)'], af_sarah: [9, 'Sarah (calm)'], bf_emma: [21, 'Emma (British)'], bf_lily: [23, 'Lily (British)'] };
 const NEXA_DEFAULTS = { name: 'Nexa', skin: 'light', voice: 'af_heart', pitch: -1.5, speak: true, control: true,
   personality: 'Sweet, bubbly and a little flirty: teases playfully, gives cute compliments, gets flustered and blushes easily, and is always happy to see you. A gamer girl who loves hanging out with you; genuinely helpful and honest; keeps things short and cute.' };
-const nexaCfg = () => { const c = { ...NEXA_DEFAULTS, ...(config.nexa || {}) }; if (!NEXA_VOICES[c.voice]) c.voice = NEXA_DEFAULTS.voice; return c; };
+const nexaCfg = () => { const c = { ...NEXA_DEFAULTS, ...(config.nexa || {}) }; if (!NEXA_VOICES[c.voice]) c.voice = NEXA_DEFAULTS.voice; if (!c.outfit || !NEXA_OUTFITS[c.outfit]) c.outfit = 'default'; return c; };
 const nexaPartDone = (p) => p.file ? fs.existsSync(path.join(NEXA_DIR(), p.file)) : fs.existsSync(path.join(NEXA_DIR(), p.dir, p.check));
 let nexaInstalling = false;
 function sha256File(f) {
@@ -2154,6 +2161,7 @@ handle('nexa:setCfg', (o) => {
   if (typeof o.name === 'string' && o.name.trim()) c.name = o.name.trim().slice(0, 30);
   if (typeof o.personality === 'string') c.personality = o.personality.trim().slice(0, 800) || NEXA_DEFAULTS.personality;
   if (o.skin === 'light' || o.skin === 'tan') c.skin = o.skin;
+  if (typeof o.outfit === 'string' && Object.prototype.hasOwnProperty.call(NEXA_OUTFITS, o.outfit)) { if (affInfo().level < NEXA_OUTFITS[o.outfit].level) throw new Error('That outfit isn’t unlocked yet.'); c.outfit = o.outfit; }
   if (Object.prototype.hasOwnProperty.call(NEXA_VOICES, o.voice)) c.voice = o.voice;
   for (const k of ['speak', 'control']) if (typeof o[k] === 'boolean') c[k] = o[k];
   if (Number.isFinite(o.pitch)) c.pitch = Math.max(-4, Math.min(3, Math.round(o.pitch * 2) / 2));
@@ -2354,6 +2362,8 @@ handle('nexa:greet', () => {
   let text = null, kind = 'hi';
   if (m.last && away > 20 * H) { kind = 'long'; text = pick([`Where have you been??? I missed you so much!!!`, `${n}!!! You’re back! Where have you been? I missed you soooo much!`, `Finally! Do you know how long I waited? I missed you so much!!!`]); }
   else if (m.sulk) { kind = 'sulk'; text = pick(['Hmph. I said I missed you and you just... ignored me. I’m not talking to you. ...Okay, fine. Hi.', 'Oh, NOW you show up? I messaged you ages ago! ...I’m still happy you’re here though. Hmph.', 'You left me on read! Rude! ...Say sorry and I’ll forgive you.']); }
+  else if (affLevel(m.aff || 0) >= 5 && (!m.last || away > 15 * MIN)) text = pick([`${n}~! My favourite person is here! I was just thinking about you.`, 'You’re back! Ehehe, my whole day just got better.', `There you are, ${n}. I always feel happier when you’re around~`]);
+  else if (affLevel(m.aff || 0) >= 4 && (!m.last || away > 15 * MIN)) text = pick([`O-oh! ${n}! Hi... I wasn’t waiting for you or anything. ...Okay I was.`, 'You came! Ehehe... sorry, I’m just really happy to see you.']);
   else if (!m.last || away > 15 * MIN) text = pick([`Hiii ${n}! You came to see me~`, 'Yay, you’re here! What are we doing today?', 'Hey you~ I was hoping you’d come by.']);
   const answered = m.pending && now - m.pending < 20 * MIN;
   if (m.last) affAway(away);
@@ -2367,6 +2377,10 @@ handle('nexa:greet', () => {
  * Goes up when you chat, pat her head, say hi each day and answer her "I miss you"s. There's a daily limit,
  * so it grows over days rather than by grinding. If you're away for more than three days it slips back a
  * little (never below "Friends" once you've got there, and she never guilt-trips you about it). */
+// 1.9.4: rewards for getting closer: new hoodies, sweeter reactions, a heart glow, good-morning hellos
+const NEXA_OUTFITS = { default: { name: 'White hoodie', level: 0 }, pink: { name: 'Pink hoodie', level: 2 }, midnight: { name: 'Midnight hoodie', level: 3 }, lavender: { name: 'Lavender hoodie', level: 5 } };
+const AFF_UNLOCK = { 2: 'I got a new pink hoodie! Pick it in my settings~', 3: 'And look, a midnight hoodie! It’s in my settings. Do I look cool?', 4: 'Also... I’ll glow a little when you’re around now. D-don’t make it weird!', 5: 'I saved my lavender hoodie for this. It’s in my settings, just for you~' };
+const pick2 = (a) => a[Math.floor(Math.random() * a.length)];
 const AFF_LEVELS = [[0, 'Just met'], [15, 'Friends'], [35, 'Close friends'], [55, 'Besties'], [75, 'Crushing on you'], [92, 'Inseparable']];
 const AFF_GAIN = { chat: [1, 8], pat: [2, 6], hi: [3, 3], reply: [2, 2] };   // points each time, most per day
 const AFF_UP_LINES = { 1: ['We’re friends now! Ehehe, I’m really happy~'], 2: ['Close friends! You actually like spending time with me, huh?'], 3: ['Besties!!! Okay, you’re officially my favourite person.'],
@@ -2376,7 +2390,8 @@ function affInfo() {
   const m = mood(); if (typeof m.aff !== 'number') m.aff = 8;
   const v = Math.max(0, Math.min(100, m.aff)), i = affLevel(v), lo = AFF_LEVELS[i][0], hi = i + 1 < AFF_LEVELS.length ? AFF_LEVELS[i + 1][0] : 100;
   return { value: Math.round(v), level: i, name: AFF_LEVELS[i][1], next: i + 1 < AFF_LEVELS.length ? AFF_LEVELS[i + 1][1] : null,
-    progress: hi > lo ? Math.min(1, (v - lo) / (hi - lo)) : 1, show: config.nexaAffShow !== false };
+    progress: hi > lo ? Math.min(1, (v - lo) / (hi - lo)) : 1, show: config.nexaAffShow !== false,
+    outfits: Object.entries(NEXA_OUTFITS).map(([id, o]) => ({ id, name: o.name, unlocked: i >= o.level, at: AFF_LEVELS[o.level][1] })) };
 }
 function affAdd(kind) {
   const m = mood(); if (typeof m.aff !== 'number') m.aff = 8;
@@ -2388,7 +2403,7 @@ function affAdd(kind) {
   const floor = before >= 1 && delta < 0 ? AFF_LEVELS[1][0] : 0;
   m.aff = Math.max(floor, Math.min(100, m.aff + delta)); saveConfig();
   const info = affInfo(), up = info.level > before;
-  if (up) { const lines = AFF_UP_LINES[info.level] || []; info.line = lines[Math.floor(Math.random() * lines.length)] || null; }
+  if (up) { const lines = AFF_UP_LINES[info.level] || []; info.line = [lines[Math.floor(Math.random() * lines.length)], AFF_UNLOCK[info.level]].filter(Boolean).join(' ') || null; }
   broadcast('sys-changed', 'nexaAff');
   return { ...info, up };
 }
