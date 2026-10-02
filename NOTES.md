@@ -1,4 +1,8 @@
-NexusOS 1.9.6
+NexusOS 1.9.7
+
+- Fixed: Nexa's speech bubbles (from pokes, head pats and games) could hide behind her name card and affection meter. They now appear just below it.
+
+From 1.9.6:
 
 - Two more games with Nexa: Tic-tac-toe (she plays well but gets distracted now and then) and Rock, paper, scissors (best of five, and she learns your favourite move).
 
