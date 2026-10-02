@@ -1,4 +1,13 @@
-NexusOS 1.8.4
+NexusOS 1.9.0
+
+- Sound effects, like SteelSeries Sonar (Settings > Sound):
+  - Equaliser for your headphones or speakers: 10 bands, with presets for Bass boost, Footsteps (gaming), Clear voices, Music and Treble boost. Sliders change the sound live.
+  - Remove background noise from your microphone: keeps your voice, drops fans, keyboard clicks and room noise, and stops speaker sound leaking into your mic.
+  - Microphone equaliser with Clear voice, Warm and Broadcast presets.
+  - Works with every app (Discord, games, browsers) and follows whichever headphones or mic you pick.
+- The simple Terminal app now tells you to use "System terminal" for Linux commands instead of a confusing error.
+
+From 1.8.4:
 
 - Fixed: after typing your password, the sign-in screen could start a bare "Openbox" session (just the background, nothing else) instead of NexusOS. NexusOS is now the only choice there, and anyone stuck on Openbox is switched back.
 

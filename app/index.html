@@ -234,6 +234,7 @@ select.txt{max-width:100%} select.txt option{background:var(--surface-solid);col
 .sig{display:inline-flex;color:var(--fg)} .lock{display:inline-flex;color:var(--muted)}
 .tag{font-size:12px;color:var(--accent)} .tag.dim{color:var(--muted)}
 .sbody{padding:4px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.eqbox{display:flex;gap:4px;justify-content:space-between;padding:10px 4px 4px}.eqb{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;min-width:0}.eqb input{writing-mode:vertical-lr;direction:rtl;height:130px;width:24px;margin:0;accent-color:var(--accent)}.eqb small{font-size:11px;opacity:.7;white-space:nowrap}.eqb .eqv{opacity:1;font-variant-numeric:tabular-nums}
 .wmore{display:flex;flex-direction:column;gap:8px}.wmore summary{cursor:pointer;opacity:.8;font-size:13px;margin-bottom:6px}.wmore[open]>*+*{margin-top:8px}.wmore .txt{width:100%;box-sizing:border-box}
 .busy{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;padding:6px 0}
 .spin{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite}
@@ -670,6 +671,28 @@ const SIG=n=>{const bars=n>70?4:n>50?3:n>30?2:1;return`<svg viewBox="0 0 20 16" 
 function sec(c,title,sub){const s=h('section',{class:'sset'},h('h3',{},title));if(sub)s.append(h('p',{class:'hint'},sub));c.append(s);return s}
 function srow(label,sub,...ctrl){return h('div',{class:'srow'},h('div',{class:'sl'},h('span',{},label),sub?h('small',{},sub):null),...ctrl)}
 function sswitch(on,fn,label){const b=h('button',{class:'sw-t'+(on?' on':''),role:'switch','aria-checked':!!on,'aria-label':label||'Switch'});b.onclick=async()=>{const want=!b.classList.contains('on');b.disabled=true;try{const r=await fn(want);const v=r===undefined?want:!!r;b.classList.toggle('on',v);b.setAttribute('aria-checked',v)}catch(e){toast('That didn’t work',errMsg(e))}b.disabled=false};return b}
+// 1.9: sound effects (EQ for what you hear and for your mic, mic noise removal), like SteelSeries Sonar
+const FX_NAMES={out:{flat:'Flat (off)',bass:'Bass boost',footsteps:'Footsteps (gaming)',voice:'Clear voices',music:'Music',treble:'Treble boost',custom:'Custom'},mic:{flat:'Flat (off)',clear:'Clear voice',warm:'Warm',broadcast:'Broadcast',custom:'Custom'}};
+async function soundFx(c){
+  let fx;try{fx=await HX.lx('soundFx')}catch(e){return}
+  const hz=f=>f>=1000?(f/1000)+'k':String(f);
+  function eqPanel(which){const st=fx[which];const box=h('div',{class:'eqbox'});const sl=[];let t;
+    fx.bands.forEach((f,i)=>{const val=h('small',{class:'eqv'},fmt(st.gains[i]));const r=h('input',{type:'range',min:-12,max:12,step:0.5,value:st.gains[i],'aria-label':(which==='mic'?'Microphone ':'')+hz(f)+' Hz'});
+      r.oninput=()=>{val.textContent=fmt(+r.value);sel.value='custom';clearTimeout(t);t=setTimeout(()=>save({gains:sl.map(x=>+x.value)}),140)};
+      r.ondblclick=()=>{r.value=0;r.oninput()};sl.push(r);box.append(h('div',{class:'eqb'},val,r,h('small',{},hz(f))))});
+    const sel=h('select',{class:'txt','aria-label':which==='mic'?'Microphone sound':'Sound'},fx.presets[which].concat('custom').map(k=>h('option',{value:k,selected:k===st.preset},FX_NAMES[which][k]||k)));
+    sel.onchange=()=>{if(sel.value==='custom')return;save({preset:sel.value}).then(n=>{if(n)n[which].gains.forEach((g,i)=>{sl[i].value=g;sl[i].previousSibling.textContent=fmt(g)})})};
+    async function save(patch){try{const n=await HX.lx('setSoundFx',which,patch);fx=n;showErr();return n}catch(e){toast('Couldn’t change the sound',errMsg(e))}}
+    return {sel,box}}
+  function fmt(g){return (g>0?'+':'')+g}
+  const errBox=h('div');function showErr(){errBox.innerHTML='';if(fx.error&&!fx.running&&(fx.out.on||fx.mic.eq||fx.mic.ns))errBox.append(h('div',{class:'serr'},'The sound effects couldn’t start: '+fx.error))}
+  const o=sec(c,'Sound effects','An equaliser for your headphones or speakers. Double-click a slider to reset it.');const oe=eqPanel('out');const ow=h('div',{hidden:!fx.out.on},srow('Sound','',oe.sel),oe.box);
+  o.append(errBox,srow('Equaliser','Shape the sound of everything you hear.',sswitch(fx.out.on,async v=>{fx=await HX.lx('setSoundFx','out',{on:v});ow.hidden=!v;setTimeout(()=>HX.lx('soundFx').then(n=>{fx=n;showErr()}),2500);return v},'Equaliser')),ow);
+  const m=sec(c,'Microphone effects','What others hear from you in Discord, games and calls.');
+  m.append(srow('Remove background noise',fx.nsAvailable?'Keeps your voice and removes fans, keyboard clicks and room noise. Also stops sound from your speakers leaking into your mic.':'Not available: PipeWire’s echo-cancel plugin isn’t on this computer.',fx.nsAvailable?sswitch(fx.mic.ns,async v=>{fx=await HX.lx('setSoundFx','mic',{ns:v});setTimeout(()=>HX.lx('soundFx').then(n=>{fx=n;showErr()}),2500);return v},'Remove background noise'):h('span')));
+  const me=eqPanel('mic');const mw=h('div',{hidden:!fx.mic.eq},srow('Voice','',me.sel),me.box);
+  m.append(srow('Microphone equaliser','Make your voice clearer, warmer or more like a streamer’s.',sswitch(fx.mic.eq,async v=>{fx=await HX.lx('setSoundFx','mic',{eq:v});mw.hidden=!v;setTimeout(()=>HX.lx('soundFx').then(n=>{fx=n;showErr()}),2500);return v},'Microphone equaliser')),mw);
+  showErr()}
 const busyEl=t=>h('div',{class:'busy'},h('span',{class:'spin'}),t||'Working…');
 const errEl=e=>h('div',{class:'serr'},errMsg(e));
 function settingsPages(){const P=[];
@@ -737,7 +760,8 @@ const PAGES={
      if(a.outputs.length>1){const sel=h('select',{class:'txt','aria-label':'Output device'},a.outputs.map(o=>h('option',{value:o.name,selected:o.isDefault},o.label)));sel.onchange=()=>HX.lx('setDefaultOutput',sel.value).then(()=>toast('Output changed',sel.selectedOptions[0].textContent)).catch(e=>toast('Couldn’t switch',errMsg(e)));s.append(srow('Play sound through','',sel))}}
    const mic=a.inputs.find(x=>x.isDefault)||a.inputs[0];const m=sec(c,'Microphone');
    if(!mic)m.append(h('p',{class:'hint'},'No microphone was found.'));else{const mv=h('input',{type:'range',min:0,max:100,value:Math.min(100,mic.volume),'aria-label':'Microphone level'});let t2;mv.oninput=()=>{clearTimeout(t2);t2=setTimeout(()=>HX.lx('setMicVolume',+mv.value).catch(()=>{}),60)};m.append(srow('Input level',mic.label,mv));
-     if(a.inputs.length>1){const sel=h('select',{class:'txt','aria-label':'Input device'},a.inputs.map(o=>h('option',{value:o.name,selected:o.isDefault},o.label)));sel.onchange=()=>HX.lx('setDefaultInput',sel.value).catch(e=>toast('Couldn’t switch',errMsg(e)));m.append(srow('Use microphone','',sel))}}},
+     if(a.inputs.length>1){const sel=h('select',{class:'txt','aria-label':'Input device'},a.inputs.map(o=>h('option',{value:o.name,selected:o.isDefault},o.label)));sel.onchange=()=>HX.lx('setDefaultInput',sel.value).catch(e=>toast('Couldn’t switch',errMsg(e)));m.append(srow('Use microphone','',sel))}}
+   if(OSM())soundFx(c)},
  async display(c){const s=sec(c,'Brightness');let b;try{b=await HX.lx('brightness')}catch(e){b={present:false}}
    if(b.present){const r=h('input',{type:'range',min:5,max:100,value:b.percent,'aria-label':'Brightness'});let t;r.oninput=()=>{clearTimeout(t);t=setTimeout(()=>HX.lx('setBrightness',+r.value).catch(e=>toast('Brightness',errMsg(e))),60);const q=$('#bright');if(q)q.value=r.value};s.append(srow('Screen brightness','',r))}else s.append(h('p',{class:'hint'},'This screen’s brightness is set on the monitor itself.'));
    const d=sec(c,'Screens');d.append(busyEl());let info;try{info=await HX.lx('displays')}catch(e){d.lastChild.replaceWith(errEl(e));return}d.lastChild.remove();
@@ -1403,7 +1427,9 @@ const APPS={
    if(e.key==='ArrowDown'){inp.value=hist[++hi]||'';if(hi>hist.length)hi=hist.length;return}
    if(e.key!=='Enter')return;const v=inp.value.trim();inp.value='';line([prompt(),v]);if(v){hist.push(v);hi=hist.length}
    const sp=v.indexOf(' ');const c=sp<0?v:v.slice(0,sp),a=sp<0?'':v.slice(sp+1);if(!c){b.scrollTop=1e9;return}
-   inp.disabled=true;Promise.resolve().then(()=>cmds[c]?cmds[c](a):c+': command not found').then(o=>{if(o)line(o)}).catch(err=>line(c+': '+errMsg(err))).finally(()=>{inp.disabled=false;row.replaceChild(prompt(),row.firstChild);b.scrollTop=1e9;inp.focus()})});
+   const SYSHINT=' This simple terminal only works inside your home folder. For Linux commands, open “System terminal” from Start.';
+   if(OSM()&&/(^|\s)\/(?!\/)/.test(a)&&cmds[c]&&/^(ls|cd|cat|rm|open)$/.test(c)){line(c+': can’t reach '+a.trim().split(/\s+/).find(x=>x.startsWith('/'))+'.'+SYSHINT);b.scrollTop=1e9;return}
+   inp.disabled=true;Promise.resolve().then(()=>cmds[c]?cmds[c](a):c+': command not found.'+(OSM()?SYSHINT:'')).then(o=>{if(o)line(o)}).catch(err=>line(c+': '+errMsg(err))).finally(()=>{inp.disabled=false;row.replaceChild(prompt(),row.firstChild);b.scrollTop=1e9;inp.focus()})});
   t.addEventListener('click',()=>inp.focus());b.append(t);setTimeout(()=>inp.focus(),60)}},
  paint:{name:'Paint',w:700,h:500,mount(b,api,file){
   if(!HX||!SYS)return LEGACY.paint.mount(b,api,file);

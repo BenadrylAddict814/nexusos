@@ -275,7 +275,7 @@ const LX = {
       run('pactl', ['-f', 'json', 'list', 'sinks']), run('pactl', ['-f', 'json', 'list', 'sources']),
       run('pactl', ['get-default-sink']).catch(() => ''), run('pactl', ['get-default-source']).catch(() => '')]);
     const vol = (d) => { const v = d.volume && Object.values(d.volume)[0]; return v ? parseInt(String(v.value_percent), 10) || 0 : 0; };
-    const map = (arr, def) => JSON.parse(arr || '[]').filter((d) => !/\.monitor$/.test(d.name)).map((d) => ({ name: d.name, label: d.description || d.name, volume: vol(d), muted: !!d.mute, isDefault: d.name === def.trim() }));
+    const map = (arr, def) => JSON.parse(arr || '[]').filter((d) => !/\.monitor$/.test(d.name) && !/^nexus_/.test(d.name)).map((d) => ({ name: d.name, label: d.description || d.name, volume: vol(d), muted: !!d.mute, isDefault: d.name === def.trim() }));
     return { outputs: map(sinks, defSink), inputs: map(sources, defSource) };
   },
   setDefaultOutput: async (name) => { await run('pactl', ['set-default-sink', String(name)]); return true; },
@@ -942,6 +942,7 @@ function createWindow() {
   startTray();
   startUsbWatch();
   startKeys();
+  fxStart();
   applyTouchpadAtStart();
   try { globalShortcut.register('Control+Super+T', () => toggleTouchpad()); } catch (_) {}
   sweepLeftovers();
@@ -2307,3 +2308,147 @@ handle('nexa:greet', () => {
   return { text, kind, sulkedAt: sulk, away };
 });
 handle('nexa:misses', (v) => { if (v !== undefined) { config.nexaMisses = !!v; saveConfig(); } return config.nexaMisses !== false; });
+
+/* ---------------------------------------------------------------- 1.9: sound effects (like SteelSeries Sonar)
+ * An equaliser for whatever you listen on, and for your microphone, plus microphone noise removal.
+ * They run as PipeWire "smart filters" in one small pipewire process that NexusOS starts:
+ * apps keep using your normal speakers/headphones/mic and WirePlumber slips the filters in between,
+ * so picking another device in Settings still just works. Nothing changes system-wide. */
+const FX_BANDS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const FX_PRESETS = {
+  out: { flat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], bass: [6, 5, 4, 2, 0, 0, 0, 0, 0, 0], footsteps: [-4, -3, -2, 0, 0, 1, 3, 4, 3, 1],
+    voice: [-3, -2, -1, 0, 1, 2, 3, 3, 1, 0], music: [4, 3, 2, 0, -1, -1, 0, 2, 3, 3], treble: [0, 0, 0, 0, 0, 0, 1, 3, 4, 5] },
+  mic: { flat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], clear: [-12, -8, -3, 0, 0, 1, 3, 3, 2, 0], warm: [-6, -2, 2, 2, 1, 0, 0, 0, -1, -2],
+    broadcast: [-12, -6, 0, 2, 2, 1, 3, 4, 2, 0] },
+};
+const FX_FILE = path.join(os.homedir(), '.config', 'nexusos', 'sound-effects.conf');
+const FX_AEC = ['/usr/lib/x86_64-linux-gnu/spa-0.2/aec/libspa-aec-webrtc.so', '/usr/lib/spa-0.2/aec/libspa-aec-webrtc.so', '/usr/lib64/spa-0.2/aec/libspa-aec-webrtc.so'];
+const fxGains = (g) => FX_BANDS.map((_, i) => Math.max(-12, Math.min(12, Math.round((Number((g || [])[i]) || 0) * 2) / 2)));
+function fxCfg() {
+  const c = config.soundfx || {}, o = c.out || {}, m = c.mic || {};
+  return { out: { on: !!o.on, preset: String(o.preset || 'flat'), gains: fxGains(o.gains) },
+    mic: { eq: !!m.eq, preset: String(m.preset || 'flat'), gains: fxGains(m.gains), ns: !!m.ns } };
+}
+const fxHasNs = () => FX_AEC.some((f) => fs.existsSync(f));
+const fxNum = (n) => (Math.round(n * 100) / 100).toFixed(2);
+// a 10-band graphic EQ; "pre" is a 0 Hz high-shelf, which is a plain volume change, so boosts can't clip
+function fxGraph(gains) {
+  const pre = -Math.max(0, ...gains);
+  const nodes = [`{ type = builtin name = pre label = bq_highshelf control = { "Freq" = 0.0 "Q" = 1.0 "Gain" = ${fxNum(pre)} } }`]
+    .concat(FX_BANDS.map((f, i) => `{ type = builtin name = b${i + 1} label = bq_peaking control = { "Freq" = ${f}.0 "Q" = 1.41 "Gain" = ${fxNum(gains[i])} } }`));
+  const chain = ['pre'].concat(FX_BANDS.map((_, i) => 'b' + (i + 1)));
+  const links = chain.slice(1).map((n, i) => `{ output = "${chain[i]}:Out" input = "${n}:In" }`);
+  return `filter.graph = {\n        nodes = [\n          ${nodes.join('\n          ')}\n        ]\n        links = [\n          ${links.join('\n          ')}\n        ]\n      }`;
+}
+function fxConf(fx) {
+  const mods = [];
+  if (fx.out.on) mods.push(`  { name = libpipewire-module-filter-chain
+    args = {
+      node.description = "NexusOS sound equaliser"
+      media.name = "NexusOS sound equaliser"
+      ${fxGraph(fx.out.gains)}
+      audio.channels = 2
+      audio.position = [ FL FR ]
+      capture.props = { node.name = "nexus_eq" media.class = Audio/Sink filter.smart = true filter.smart.name = "nexus-eq" }
+      playback.props = { node.name = "nexus_eq.out" node.passive = true stream.dont-remix = true }
+    }
+  }`);
+  if (fx.mic.ns && fxHasNs()) mods.push(`  { name = libpipewire-module-echo-cancel
+    args = {
+      library.name = aec/libspa-aec-webrtc
+      monitor.mode = true
+      audio.channels = 1
+      audio.position = [ MONO ]
+      aec.args = { webrtc.noise_suppression = true webrtc.high_pass_filter = true webrtc.voice_detection = true webrtc.gain_control = false }
+      capture.props = { node.name = "nexus_ns.in" node.passive = true }
+      source.props = { node.name = "nexus_ns" node.description = "NexusOS noise removal" media.class = Audio/Source filter.smart = true filter.smart.name = "nexus-ns" }
+    }
+  }`);
+  if (fx.mic.eq) mods.push(`  { name = libpipewire-module-filter-chain
+    args = {
+      node.description = "NexusOS microphone equaliser"
+      media.name = "NexusOS microphone equaliser"
+      ${fxGraph(fx.mic.gains)}
+      audio.channels = 1
+      audio.position = [ MONO ]
+      capture.props = { node.name = "nexus_miceq.in" node.passive = true }
+      playback.props = { node.name = "nexus_miceq" media.class = Audio/Source filter.smart = true filter.smart.name = "nexus-mic-eq" }
+    }
+  }`);
+  if (!mods.length) return null;
+  return `# Made by NexusOS (Settings > Sound). Changes here are overwritten.
+context.properties = { log.level = 0 }
+context.spa-libs = {
+  audio.convert.* = audioconvert/libspa-audioconvert
+  support.* = support/libspa-support
+}
+context.modules = [
+  { name = libpipewire-module-rt args = { } flags = [ ifexists nofail ] }
+  { name = libpipewire-module-protocol-native }
+  { name = libpipewire-module-client-node }
+  { name = libpipewire-module-adapter }
+${mods.join('\n')}
+]
+`;
+}
+let fxProc = null, fxErr = '', fxStarted = 0, fxIds = null;
+function fxStop() { const p = fxProc; fxProc = null; fxIds = null; if (p) try { p.kill('SIGTERM'); } catch (_) {} }
+function fxStart() {
+  fxStop(); fxErr = '';
+  if (!OS_MODE) return;
+  const conf = fxConf(fxCfg());
+  if (!conf) { try { fs.unlinkSync(FX_FILE); } catch (_) {} return; }
+  try { fs.mkdirSync(path.dirname(FX_FILE), { recursive: true }); fs.writeFileSync(FX_FILE, conf); } catch (e) { fxErr = e.message; return; }
+  let p;
+  try { p = cp.spawn('pipewire', ['-c', FX_FILE], { stdio: ['ignore', 'ignore', 'pipe'], env: { ...process.env, PIPEWIRE_LOG_SYSTEMD: 'false' } }); } catch (e) { fxErr = e.message; return; }
+  fxProc = p; fxStarted = Date.now(); let tail = '';
+  p.stderr.on('data', (d) => { tail = (tail + d).slice(-2000); });
+  p.on('error', (e) => { if (fxProc === p) { fxProc = null; fxErr = e.code === 'ENOENT' ? 'PipeWire isn’t installed.' : e.message; broadcast('sys-changed', 'soundfx'); } });
+  p.on('exit', () => {
+    if (fxProc !== p) return;                                    // we stopped it ourselves
+    fxProc = null; fxIds = null;
+    const quick = Date.now() - fxStarted < 8000;
+    fxErr = (tail.trim().split('\n').filter(Boolean).slice(-2).join(' ') || 'The sound effects stopped.').slice(0, 300);
+    if (!quick) setTimeout(() => { if (!fxProc) fxStart(); }, 3000);   // it ran fine for a while: try again (e.g. after PipeWire restarted)
+    broadcast('sys-changed', 'soundfx');
+  });
+}
+// slider moves: change the running filters straight away (no gap in the sound); falls back to a quick restart
+async function fxLive(which) {
+  const fx = fxCfg(); const g = which === 'mic' ? fx.mic.gains : fx.out.gains;
+  if (!fxProc) return false;
+  if (!fxIds) {
+    const dump = JSON.parse(await run('pw-dump', [], { timeout: 5000 }));
+    fxIds = {};
+    for (const o of dump) { const n = o.info && o.info.props && o.info.props['node.name']; if (n === 'nexus_eq' || n === 'nexus_miceq') fxIds[n] = o.id; }
+  }
+  const id = fxIds[which === 'mic' ? 'nexus_miceq' : 'nexus_eq']; if (id == null) return false;
+  const params = [`"pre:Gain" ${fxNum(-Math.max(0, ...g))}`].concat(g.map((v, i) => `"b${i + 1}:Gain" ${fxNum(v)}`)).join(' ');
+  await run('pw-cli', ['set-param', String(id), 'Props', `{ params = [ ${params} ] }`], { timeout: 5000 });
+  return true;
+}
+Object.assign(LX, {
+  async soundFx() {
+    const fx = fxCfg();
+    return { ...fx, bands: FX_BANDS, presets: { out: Object.keys(FX_PRESETS.out), mic: Object.keys(FX_PRESETS.mic) }, nsAvailable: fxHasNs(), running: !!fxProc, error: fxErr };
+  },
+  async setSoundFx(which, patch) {
+    if (which !== 'out' && which !== 'mic') throw new Error('Unknown sound effect.');
+    const fx = fxCfg(), cur = fx[which]; patch = patch || {};
+    let restart = false, live = false;
+    if (typeof patch.on === 'boolean' && which === 'out' && patch.on !== cur.on) { cur.on = patch.on; restart = true; }
+    if (typeof patch.eq === 'boolean' && which === 'mic' && patch.eq !== cur.eq) { cur.eq = patch.eq; restart = true; }
+    if (typeof patch.ns === 'boolean' && which === 'mic' && patch.ns !== cur.ns) { if (patch.ns && !fxHasNs()) throw new Error('Noise removal needs PipeWire’s echo-cancel plugin, which isn’t on this computer.'); cur.ns = patch.ns; restart = true; }
+    if (patch.preset && FX_PRESETS[which][patch.preset]) { cur.preset = patch.preset; cur.gains = FX_PRESETS[which][patch.preset].slice(); live = true; }
+    if (Array.isArray(patch.gains)) { cur.gains = fxGains(patch.gains); cur.preset = 'custom'; live = true; }
+    config.soundfx = fx; saveConfig();
+    if (restart) fxStart();
+    else if (live) {
+      const on = which === 'out' ? cur.on : cur.eq;
+      if (on) { const ok = await fxLive(which).catch(() => false); if (!ok) fxStart(); else { try { fs.writeFileSync(FX_FILE, fxConf(fx)); } catch (_) {} } }
+    }
+    broadcast('sys-changed', 'soundfx');
+    return LX.soundFx();
+  },
+});
+app.on('will-quit', () => fxStop());
