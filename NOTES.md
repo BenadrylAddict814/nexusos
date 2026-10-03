@@ -1,4 +1,27 @@
-NexusOS 1.9.7
+NexusOS 2.0.0
+
+The big one.
+
+Look and speed
+- Fresh look: Settings has icons in its sidebar and big page titles, Start shows your recent files, and the taskbar, menus and windows are smoother and more rounded.
+- Lighter: the desktop goes quiet when a window or game covers it, and NexusOS checks for changes less often.
+- Game Mode (Settings > Gaming): when a game starts, Performance mode turns on, notifications and Nexa's pings pause, and Nexa's brain sleeps to free about 3 GB of graphics memory. Everything goes back when you quit.
+- Windows-style shortcuts: Windows key + Left/Right snaps a window to half the screen. Windows key + Shift + S (or Print Screen) takes a screenshot of an area you drag; it's saved to Pictures > Screenshots and copied, ready to paste.
+
+Apps
+- App Store: search all of Flathub, not just the featured apps. Install, open and remove anything.
+- Files: unzip zip, 7z and rar files (double-click or right-click > Extract here), make zips (right-click > Compress), picture thumbnails, and a Recent view.
+- Discord game status (Settings > Gaming): NexusOS can set up Discord's own Linux version, so it shows the game you're playing like on Windows. NexusOS keeps it updated.
+- Steam: if Steam restarts itself without NexusOS's menu fix, you get a notification with a Restart Steam button.
+- Notifications can now have a button.
+
+Nexa
+- Memory: she remembers what you tell her about yourself between chats. See or remove memories in her settings, or tell her "forget that".
+- Reminders and timers: "remind me in 20 minutes to…", "set a timer for 5 minutes", "remind me at 18:30". She pings you from the taskbar, and they also show as a notification during games.
+- Gaming buddy: she knows what you played and for how long, asks how it went, and can chat about it.
+- More games: Trivia (she hosts and plays too), Memory match, and a daily challenge with bonus affection.
+
+From 1.9.7:
 
 - Fixed: Nexa's speech bubbles (from pokes, head pats and games) could hide behind her name card and affection meter. They now appear just below it.
 

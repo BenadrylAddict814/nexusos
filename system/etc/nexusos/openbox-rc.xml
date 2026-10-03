@@ -22,6 +22,11 @@
     <keybind key="W-d"><action name="ToggleShowDesktop"/></keybind>
     <keybind key="W-Up"><action name="Maximize"/></keybind>
     <keybind key="W-Down"><action name="Unmaximize"/></keybind>
+    <!-- 2.0: snap windows to the left or right half, and screenshots like Windows -->
+    <keybind key="W-Left"><action name="UnmaximizeFull"/><action name="MaximizeVert"/><action name="MoveResizeTo"><x>0</x><width>50%</width></action></keybind>
+    <keybind key="W-Right"><action name="UnmaximizeFull"/><action name="MaximizeVert"/><action name="MoveResizeTo"><x>-0</x><width>50%</width></action></keybind>
+    <keybind key="W-S-s"><action name="Execute"><command>/opt/nexusos/nexusos --snip</command></action></keybind>
+    <keybind key="Print"><action name="Execute"><command>/opt/nexusos/nexusos --snip</command></action></keybind>
     <keybind key="C-A-t"><action name="Execute"><command>lxterminal</command></action></keybind>
     <keybind key="XF86TouchpadToggle"><action name="Execute"><command>/opt/nexusos/nexusos --toggle-touchpad</command></action></keybind>
   </keyboard>

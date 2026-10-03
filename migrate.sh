@@ -43,6 +43,10 @@ dpkg -s libvulkan1 >/dev/null 2>&1 || need="$need libvulkan1"
 command -v bzip2 >/dev/null 2>&1 || need="$need bzip2"
 # 1.8: switching the touchpad on and off
 command -v xinput >/dev/null 2>&1 || need="$need xinput"
+# 2.0: unpacking zip, 7z and rar files in Files
+command -v bsdtar >/dev/null 2>&1 || need="$need libarchive-tools"
+# 2.0: Discord's own Linux version needs these
+for pk in libatomic1 libxss1 libnotify4; do dpkg -s $pk >/dev/null 2>&1 || need="$need $pk"; done
 if dpkg -s nvidia-driver >/dev/null 2>&1 && ! dpkg -s nvidia-vulkan-icd >/dev/null 2>&1; then need="$need nvidia-vulkan-icd"; fi
 if dpkg -l tlp 2>/dev/null | grep -q '^ii'; then need=$(echo "$need" | sed 's/ power-profiles-daemon//'); fi   # TLP and power-profiles-daemon don't mix
 if [ -n "$need" ]; then

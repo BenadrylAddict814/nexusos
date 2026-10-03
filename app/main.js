@@ -677,6 +677,8 @@ const expandEnv = (s) => s.replace(/%([^%]+)%/g, (_, v) => process.env[v] || '')
 const nvidiaPresent = () => { try { return IS_LINUX && fs.readdirSync('/proc/driver/nvidia/gpus').length > 0; } catch (_) { return false; } };
 const nvidiaInstalled = () => IS_LINUX && (fs.existsSync('/usr/bin/nvidia-smi') ||
   ['nvidia-current.ko', 'nvidia-current.ko.xz', 'nvidia.ko', 'nvidia.ko.xz'].some((f) => fs.existsSync(path.join('/lib/modules', os.release(), 'updates/dkms', f))));
+const FLATPAK_ID = /^[A-Za-z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+){2,}$/;
+const iconCache = new Map();
 const STORE = {
   async available() {
     if (IS_LINUX) return has('flatpak');
@@ -686,7 +688,9 @@ const STORE = {
   async installed() {
     if (IS_LINUX) {
       const out = await run('flatpak', ['list', '--app', '--columns=application,name,installation']).catch(() => '');
-      return out.trim().split('\n').filter(Boolean).map((l) => { const [id, name, inst] = l.split('\t'); const c = CATALOG.find((x) => x.flatpak === id); return { id, name, key: c ? c.key : null, system: inst === 'system' }; });
+      const list = out.trim().split('\n').filter(Boolean).map((l) => { const [id, name, inst] = l.split('\t'); const c = CATALOG.find((x) => x.flatpak === id); return { id, name, key: c ? c.key : null, system: inst === 'system' }; });
+      if (discordNativeInstalled()) { for (const a of list) if (a.id === 'com.discordapp.Discord') a.name = 'Discord (App Store)'; list.push({ id: 'discord-native', name: 'Discord', key: null, native: true }); }
+      return list;
     }
     if (IS_WIN) {
       const out = await run('winget', ['list', '--accept-source-agreements', '--disable-interactivity'], { timeout: 60000 }).catch(() => '');
@@ -711,6 +715,7 @@ const STORE = {
     return true;
   },
   async launch(idOrKey) {
+    if (IS_LINUX && idOrKey === 'discord-native') return discordLaunch();
     if (IS_LINUX) {
       const c = CATALOG.find((x) => x.key === idOrKey);
       const id = c ? c.flatpak : String(idOrKey);
@@ -734,7 +739,46 @@ const STORE = {
     }
     throw new Error('Not available here');
   },
+  // 2.0: search all of Flathub (falls back to `flatpak search` if the website can't be reached)
+  async search(q) {
+    q = String(q || '').trim().slice(0, 60); if (!IS_LINUX || q.length < 2) return [];
+    const inst = new Set((await STORE.installed().catch(() => [])).map((a) => a.id));
+    let hits = [];
+    try {
+      const { net } = require('electron');
+      const r = await net.fetch('https://flathub.org/api/v2/search', { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'NexusOS/' + VERSION }, body: JSON.stringify({ query: q, filters: [], hits_per_page: 30, page: 1 }) });
+      if (!r.ok) throw new Error('Flathub answered ' + r.status);
+      const j = await r.json();
+      hits = (j.hits || []).map((h) => ({ id: h.app_id || h.id, name: h.name, summary: h.summary || '', icon: h.icon || null, verified: !!(h.verification_verified || h.verified) })).filter((h) => h.id && FLATPAK_ID.test(h.id) && h.name);
+      if (!hits.length) throw new Error('no results');   // also ask flatpak itself, in case the website's format changed
+    } catch (e) {
+      const out = await run('flatpak', ['search', '--columns=application,name,description', q], { timeout: 30000 }).catch(() => '');
+      hits = out.trim().split('\n').filter(Boolean).map((l) => { const [id, name, summary] = l.split('\t'); return { id, name, summary: summary || '', icon: null }; });
+      if (!hits.length && e && e.message !== 'no results') throw new Error('Couldn’t search Flathub. Check your internet connection.');
+    }
+    return hits.filter((h) => h.id && FLATPAK_ID.test(h.id) && h.name).slice(0, 30).map((h) => ({ ...h, installed: inst.has(h.id) }));
+  },
+  async remoteIcon(url) {
+    url = String(url || ''); if (!/^https:\/\/dl\.flathub\.org\/[\w./%-]+\.(png|svg)$/i.test(url)) return null;
+    if (iconCache.has(url)) return iconCache.get(url);
+    try {
+      const buf = await download(url, 300 * 1024);
+      const u = (/\.svg$/i.test(url) ? 'data:image/svg+xml;base64,' : 'data:image/png;base64,') + buf.toString('base64');
+      if (iconCache.size > 300) iconCache.clear(); iconCache.set(url, u); return u;
+    } catch (_) { return null; }
+  },
+  async installId(id) {
+    id = String(id || ''); if (!IS_LINUX || !FLATPAK_ID.test(id)) throw new Error('Unknown app');
+    await run('flatpak', ['remote-add', '--user', '--if-not-exists', 'flathub', 'https://dl.flathub.org/repo/flathub.flatpakrepo'], { timeout: 60000 });
+    await streamJob('store:' + id, 'flatpak', ['install', '--user', '-y', '--noninteractive', 'flathub', id]);
+    return true;
+  },
+  async uninstallId(id) {
+    id = String(id || ''); if (!IS_LINUX || !FLATPAK_ID.test(id)) throw new Error('Unknown app');
+    await streamJob('store:' + id, 'flatpak', ['uninstall', '--user', '-y', '--noninteractive', id]); return true;
+  },
   async icon(id) {
+    if (id === 'discord-native') { const p = path.join(DISCORD_DIR(), 'Discord', 'discord.png'); return fs.existsSync(p) ? 'data:image/png;base64,' + fs.readFileSync(p).toString('base64') : null; }
     if (!IS_LINUX || !/^[A-Za-z0-9_.-]+$/.test(String(id))) return null;
     const roots = [path.join(os.homedir(), '.local/share/flatpak/exports/share/icons/hicolor'), '/var/lib/flatpak/exports/share/icons/hicolor'];
     for (const r of roots) for (const s of ['128x128', '256x256', '64x64', '512x512']) {
@@ -1019,6 +1063,7 @@ let toastH = 0;
 let toastReady = false, toastIdle = null, toastMaking = false; const toastQueue = [];
 function toastSend(ch, data) {
   if (!OS_MODE) return sendTo(win, ch, data);
+  if (gameModeOn && ch === 'toast' && !(data && /^⏰/.test(String(data.t || '')))) return;   // Game Mode: Do Not Disturb (reminders still show)
   clearTimeout(toastIdle);
   if ((!toastWin || toastWin.isDestroyed()) && !toastMaking) {
     const b = screen.getPrimaryDisplay().bounds; toastReady = false; toastH = 0; toastMaking = true;
@@ -1216,6 +1261,7 @@ function handleArgs(argv) {
     if (url) openUrl(url);
     for (const p of pathsFromArgs(argv).slice(0, 5)) { try { openFromArgs(p); } catch (_) {} }
     if (open && Object.prototype.hasOwnProperty.call(APP_TITLES, open)) openAppWindow(open);
+    if ((argv || []).includes('--snip')) snipStart().catch((e) => toastSend('toast', { t: 'Couldn’t take a screenshot', s: errMsgOf(e) }));
     if ((argv || []).includes('--toggle-touchpad')) toggleTouchpad();
     if ((argv || []).includes('--toggle-start')) { if (popupWin && popupWin.isVisible()) hidePopup(); else showPopup('start'); }
   } else if (url) openUrl(url);
@@ -1310,6 +1356,154 @@ handle('fs:readDataUrl', async (file) => {
 handle('fs:writeText', async (file, text) => { await fs.promises.writeFile(mustBeInDrive(file), String(text), 'utf8'); return true; });
 handle('fs:writeBinary', async (file, b64) => { await fs.promises.writeFile(mustBeInDrive(file), Buffer.from(String(b64), 'base64')); return true; });
 handle('fs:unique', (dir, name) => uniquePath(mustBeInDrive(dir), cleanName(name)));
+// 2.0: unzip and zip
+const ARCHIVE_RE = /\.(zip|7z|rar|tar|tar\.gz|tgz|tar\.xz|txz|tar\.bz2|tbz2|tar\.zst)$/i;
+const PY_ZIP = 'import sys,zipfile,os\nout=sys.argv[1]\nwith zipfile.ZipFile(out,"w",zipfile.ZIP_DEFLATED) as z:\n  for p in sys.argv[2:]:\n    base=os.path.dirname(p)\n    if os.path.isdir(p):\n      for r,ds,fs in os.walk(p):\n        for f in fs:\n          fp=os.path.join(r,f)\n          if os.path.abspath(fp)!=os.path.abspath(out): z.write(fp,os.path.relpath(fp,base))\n    else: z.write(p,os.path.relpath(p,base))\n';
+const PY_UNZIP = 'import sys,zipfile,tarfile,os\na,d=sys.argv[1],sys.argv[2]\nif zipfile.is_zipfile(a):\n  with zipfile.ZipFile(a) as z: z.extractall(d)\nelse:\n  with tarfile.open(a) as t: t.extractall(d,filter="data")\n';
+handle('fs:extract', async (p) => {
+  const a = mustBeInDrive(p); if (!ARCHIVE_RE.test(a)) throw new Error('That isn’t a zip or archive file NexusOS can open.');
+  const name = path.basename(a).replace(ARCHIVE_RE, '') || 'Extracted';
+  const dest = uniquePath(path.dirname(a), name); await fs.promises.mkdir(dest);
+  try {
+    if (await has('bsdtar')) await run('bsdtar', ['-xf', a, '-C', dest], { timeout: 600000 });   // zip, 7z, rar, tar… (refuses unsafe paths)
+    else await run('python3', ['-c', PY_UNZIP, a, dest], { timeout: 600000 });
+  } catch (e) { await fs.promises.rm(dest, { recursive: true, force: true }).catch(() => {}); throw new Error(/password|encrypt/i.test(e.message) ? 'This archive has a password, which NexusOS can’t open yet.' : 'Couldn’t unpack it: ' + e.message); }
+  // one folder inside? use it directly instead of a folder in a folder
+  try { const inside = await fs.promises.readdir(dest); if (inside.length === 1 && fs.statSync(path.join(dest, inside[0])).isDirectory()) { const tmp = dest + '.nx-tmp'; await fs.promises.rename(path.join(dest, inside[0]), tmp); await fs.promises.rmdir(dest); const fin = uniquePath(path.dirname(a), inside[0]); await fs.promises.rename(tmp, fin); return fin; } } catch (_) {}
+  return dest;
+});
+handle('fs:compress', async (paths) => {
+  const list = (Array.isArray(paths) ? paths : [paths]).slice(0, 500).map((x) => mustBeInDrive(x)); if (!list.length) throw new Error('Nothing to zip.');
+  const dir = path.dirname(list[0]); const name = list.length === 1 ? path.basename(list[0]).replace(/\.[^.\/]+$/, '') : 'Archive';
+  const out = uniquePath(dir, name + '.zip');
+  await run('python3', ['-c', PY_ZIP, out, ...list], { timeout: 600000 });
+  return out;
+});
+// 2.0: recently opened files, for the Recent view in Files
+handle('fs:recent', (add) => {
+  let l = Array.isArray(config.recentFiles) ? config.recentFiles : [];
+  if (typeof add === 'string' && path.isAbsolute(add)) { l = [add, ...l.filter((x) => x !== add)].slice(0, 40); config.recentFiles = l; saveConfig(); }
+  return l.filter((x) => { try { return fs.statSync(x).isFile(); } catch (_) { return false; } }).slice(0, 30).map((x) => { const st = fs.statSync(x); return { path: x, name: path.basename(x), size: st.size, mtime: st.mtimeMs, dir: false }; });
+});
+/* ---------------------------------------------------------------- 2.0: screenshots (Win+Shift+S or Print Screen)
+ * Freezes the screen, you drag a box (or click for the whole screen), and it's saved to Pictures/Screenshots
+ * and copied so you can paste it straight into Discord. */
+let snipWin = null, snipImg = null;
+async function snipStart() {
+  if (!OS_MODE || snipWin) return;
+  const { desktopCapturer, clipboard } = require('electron');
+  const d = screen.getPrimaryDisplay(), sf = d.scaleFactor || 1;
+  const src = (await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: Math.round(d.bounds.width * sf), height: Math.round(d.bounds.height * sf) } }))[0];
+  if (!src || src.thumbnail.isEmpty()) throw new Error('The screen couldn’t be captured.');
+  snipImg = src.thumbnail;
+  snipWin = makeWin({ frame: false, x: d.bounds.x, y: d.bounds.y, width: d.bounds.width, height: d.bounds.height, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, fullscreenable: false, show: false }, { view: 'snip' });
+  snipWin.setAlwaysOnTop(true, 'screen-saver');
+  snipWin.webContents.once('did-finish-load', () => { if (!snipWin) return; sendTo(snipWin, 'snip', { img: snipImg.toDataURL() }); snipWin.show(); snipWin.focus(); });
+  snipWin.on('closed', () => { snipWin = null; snipImg = null; });
+  void clipboard;
+}
+handle('snip:done', async (r) => {
+  const w = snipWin, img = snipImg; if (!w || !img) return false;
+  w.destroy();
+  if (!r) return false;
+  const { clipboard } = require('electron');
+  const sz = img.getSize(), d = screen.getPrimaryDisplay(), k = sz.width / d.bounds.width;
+  const rect = { x: Math.max(0, Math.round(r.x * k)), y: Math.max(0, Math.round(r.y * k)), width: Math.round(r.w * k), height: Math.round(r.h * k) };
+  const shot = rect.width >= 4 && rect.height >= 4 ? img.crop({ ...rect, width: Math.min(rect.width, sz.width - rect.x), height: Math.min(rect.height, sz.height - rect.y) }) : img;
+  const dir = path.join(DRIVE, 'Pictures', 'Screenshots'); await fs.promises.mkdir(dir, { recursive: true });
+  const t = new Date(), pad = (n) => String(n).padStart(2, '0');
+  const file = uniquePath(dir, `Screenshot ${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())} ${pad(t.getHours())}-${pad(t.getMinutes())}-${pad(t.getSeconds())}.png`);
+  await fs.promises.writeFile(file, shot.toPNG()); clipboard.writeImage(shot); playSound('clip');
+  toastSend('toast', { t: 'Screenshot saved and copied', s: 'Paste it anywhere with Ctrl+V. It’s in Pictures › Screenshots.' });
+  return file;
+});
+/* ---------------------------------------------------------------- 2.0: Discord that can see your games
+ * The App Store's Discord is sandboxed, so it can't see which game you're playing. This installs Discord's own
+ * Linux download in your home folder instead (same account and servers), and NexusOS keeps it updated. */
+const DISCORD_DIR = () => path.join(os.homedir(), '.local', 'share', 'nexusos', 'discord');
+const DISCORD_TEST = /^http:\/\/127\.0\.0\.1:\d+$/.test(process.env.NEXUS_DISCORD_BASE || '') ? process.env.NEXUS_DISCORD_BASE : null;   // only for testing on this computer
+const discordBin = () => path.join(DISCORD_DIR(), 'Discord', 'Discord');
+const discordNativeInstalled = () => IS_LINUX && fs.existsSync(discordBin());
+const discordVersion = () => { try { return JSON.parse(fs.readFileSync(path.join(DISCORD_DIR(), 'Discord', 'resources', 'build_info.json'), 'utf8')).version || null; } catch (_) { return null; } };
+async function discordLatest() {
+  const { net } = require('electron');
+  try {
+    const r = await net.fetch((DISCORD_TEST || 'https://discord.com') + '/api/updates/stable?platform=linux', { headers: { 'User-Agent': 'NexusOS/' + VERSION } });
+    const v = r.ok ? String((await r.json()).name || '') : ''; if (/^\d+\.\d+\.\d+$/.test(v)) return v;
+  } catch (_) {}
+  // otherwise: where Discord's download link points to tells the version
+  const r2 = await net.fetch('https://discord.com/api/download?platform=linux&format=tar.gz', { method: 'HEAD', redirect: 'manual', headers: { 'User-Agent': 'NexusOS/' + VERSION } });
+  const m = /\/apps\/linux\/(\d+\.\d+\.\d+)\//.exec(r2.headers.get('location') || r2.url || '');
+  if (!m) throw new Error('Couldn’t reach Discord to check for its newest version.'); return m[1];
+}
+let discordBusy = null;
+function discordInstall() {
+  if (discordBusy) return discordBusy;
+  discordBusy = (async () => {
+    const v = await discordLatest(); const dir = DISCORD_DIR(); await fs.promises.mkdir(dir, { recursive: true });
+    const tgz = path.join(dir, 'discord.tar.gz'), tmp = path.join(dir, 'new');
+    const { net } = require('electron');
+    const r = await net.fetch(`${DISCORD_TEST || 'https://dl.discordapp.net'}/apps/linux/${v}/discord-${v}.tar.gz`, { headers: { 'User-Agent': 'NexusOS/' + VERSION } });
+    if (!r.ok) throw new Error('Couldn’t download Discord (' + r.status + ').');
+    const total = +r.headers.get('content-length') || 0; let got = 0, lastPct = -1;
+    const out = fs.createWriteStream(tgz); const reader = r.body.getReader();
+    for (;;) { const { done, value } = await reader.read(); if (done) break; got += value.length; if (got > 400 * 1048576) throw new Error('The download is much bigger than expected.'); if (!out.write(Buffer.from(value))) await new Promise((res) => out.once('drain', res));
+      const pct = total ? Math.floor(got / total * 90) : 0; if (pct !== lastPct) { lastPct = pct; broadcast('job', { id: 'discord', pct, line: `Downloading Discord ${v}… ${fmtMB(got)}` }); } }
+    await new Promise((res, rej) => out.end((e) => (e ? rej(e) : res())));
+    broadcast('job', { id: 'discord', pct: 95, line: 'Unpacking…' });
+    await fs.promises.rm(tmp, { recursive: true, force: true }); await fs.promises.mkdir(tmp);
+    await run('tar', ['-xzf', tgz, '-C', tmp], { timeout: 300000 });
+    if (!fs.existsSync(path.join(tmp, 'Discord', 'Discord'))) throw new Error('The Discord download looks different than expected.');
+    const cur = path.join(dir, 'Discord'), old = path.join(dir, 'old');
+    await fs.promises.rm(old, { recursive: true, force: true });
+    if (fs.existsSync(cur)) await fs.promises.rename(cur, old);
+    await fs.promises.rename(path.join(tmp, 'Discord'), cur);
+    await Promise.all([fs.promises.rm(old, { recursive: true, force: true }), fs.promises.rm(tmp, { recursive: true, force: true }), fs.promises.rm(tgz, { force: true })]);
+    // NexusOS does the updating, so Discord shouldn't nag about downloading a new version itself
+    const sf = path.join(os.homedir(), '.config', 'discord', 'settings.json'); let st = {}; try { st = JSON.parse(fs.readFileSync(sf, 'utf8')); } catch (_) {}
+    st.SKIP_HOST_UPDATE = true; await fs.promises.mkdir(path.dirname(sf), { recursive: true }); fs.writeFileSync(sf, JSON.stringify(st, null, 2));
+    broadcast('job', { id: 'discord', pct: 100, line: 'Done' }); broadcast('sys-changed', 'apps');
+    return v;
+  })().finally(() => { discordBusy = null; });
+  return discordBusy;
+}
+async function discordLaunch() {
+  if (!discordNativeInstalled()) throw new Error('Discord isn’t set up yet.');
+  // a newer Discord? update first (Discord refuses to start when it's too old)
+  try { const v = await Promise.race([discordLatest(), new Promise((_, rej) => setTimeout(() => rej(new Error('slow')), 4000))]); if (v !== discordVersion()) { toastSend('toast', { t: 'Updating Discord', s: 'It opens by itself when it’s ready.' }); await discordInstall(); } } catch (_) {}
+  cp.spawn(discordBin(), [], { detached: true, stdio: 'ignore', cwd: path.join(DISCORD_DIR(), 'Discord') }).unref();
+  return true;
+}
+Object.assign(LX, {
+  discordNative: async () => ({ installed: discordNativeInstalled(), version: discordVersion(), flatpak: (await STORE.installed().catch(() => [])).some((a) => a.id === 'com.discordapp.Discord'), busy: !!discordBusy }),
+  discordNativeInstall: () => discordInstall(),
+  discordNativeRemove: async () => { await fs.promises.rm(DISCORD_DIR(), { recursive: true, force: true }); broadcast('sys-changed', 'apps'); return true; },
+  discordFlatpakRemove: () => STORE.uninstallId('com.discordapp.Discord'),
+});
+// notification buttons
+const toastActs = { 'steam-restart': () => steamRestart() };
+handle('toast:act', (id) => { const f = toastActs[String(id)]; if (f) return f(); return false; });
+/* ---------------------------------------------------------------- 2.0: Steam's menus
+ * NexusOS starts Steam in the mode where its menus take clicks. If Steam comes back some other way (it restarts
+ * itself after updates), offer to restart it properly. */
+let steamWarned = false;
+function steamMainArgs() {
+  try { for (const d of fs.readdirSync('/proc')) { if (!/^\d+$/.test(d)) continue; let c; try { c = fs.readFileSync('/proc/' + d + '/cmdline', 'utf8'); } catch (_) { continue; }
+    const a = c.split('\0'); if (/ubuntu12_32\/steam$/.test(a[0] || '')) return a; } } catch (_) {}
+  return null;
+}
+setInterval(() => {
+  if (!OS_MODE) return; const a = steamMainArgs();
+  if (!a) { steamWarned = false; return; }
+  if (steamWarned || a.includes('-cef-disable-gpu') || gameWins.size) return;
+  steamWarned = true;
+  toastSend('toast', { t: 'Steam’s menus might not respond', s: 'Steam restarted itself without NexusOS’s menu fix.', act: { id: 'steam-restart', label: 'Restart Steam' } });
+}, 30000);
+async function steamRestart() {
+  if (gameWins.size) { toastSend('toast', { t: 'Not while you’re playing', s: 'Close your game first.' }); return false; }
+  await run('flatpak', ['kill', STEAM_ID]).catch(() => {});
+  setTimeout(() => STORE.launch('steam').catch(() => {}), 2500); return true;
+}
 handle('fs:mkdir', async (dir, name) => { const p = uniquePath(mustBeInDrive(dir), cleanName(name || 'New folder')); await fs.promises.mkdir(p); return p; });
 handle('fs:rename', async (p, name) => {
   const src = mustBeInDrive(p); if (src === path.resolve(DRIVE)) throw new Error('The drive itself can’t be renamed.');
@@ -1979,6 +2173,58 @@ const NEXA_TOOLS = [
   { name: 'system_status', description: 'Battery, memory, CPU/GPU load and temperature, performance mode.', parameters: { type: 'object', properties: {} } },
   { name: 'power', description: 'Sleep, restart, shut down, or restart into Windows. The user is always asked to confirm.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['sleep', 'restart', 'shutdown', 'restart_windows'] } }, required: ['action'] } },
 ];
+// 2.0: things she can always do, even with "control NexusOS" off: remember things and set reminders
+const NEXA_TOOLS_ALWAYS = [
+  { name: 'remember', description: 'Save a short fact about the user to your long-term memory, so you still know it in future chats (their preferred name, favourite games, uni course, birthday, plans, likes). Write it as a short third-person note, e.g. "Studies design at uni". Never save passwords or similar secrets.', parameters: { type: 'object', properties: { fact: { type: 'string' } }, required: ['fact'] } },
+  { name: 'forget', description: 'Remove facts from your memory that match some words, when the user asks you to forget something.', parameters: { type: 'object', properties: { about: { type: 'string' } }, required: ['about'] } },
+  { name: 'set_reminder', description: 'Set a reminder or timer. Give either "minutes" from now, or "time" as 24-hour HH:MM (today, or tomorrow if that time has passed). "text" is what to remind them about.', parameters: { type: 'object', properties: { minutes: { type: 'number' }, time: { type: 'string' }, text: { type: 'string' } }, required: ['text'] } },
+  { name: 'list_reminders', description: 'List the reminders and timers that are set.', parameters: { type: 'object', properties: {} } },
+  { name: 'cancel_reminder', description: 'Cancel reminders whose text matches some words (or "all").', parameters: { type: 'object', properties: { about: { type: 'string' } }, required: ['about'] } },
+];
+const NEXA_ALWAYS = new Set(NEXA_TOOLS_ALWAYS.map((t) => t.name));
+const memList = () => (Array.isArray(config.nexaMemory) ? config.nexaMemory : (config.nexaMemory = []));
+const remList = () => (Array.isArray(config.nexaReminders) ? config.nexaReminders : (config.nexaReminders = []));
+const fmtWhen = (t) => { const d = new Date(t), now = new Date(), tom = new Date(now.getTime() + 864e5); const hm = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }); return d.toDateString() === now.toDateString() ? hm : d.toDateString() === tom.toDateString() ? 'tomorrow ' + hm : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ' ' + hm; };
+const matches = (text, q) => { const w = String(q || '').toLowerCase().split(/\W+/).filter((x) => x.length > 2); return w.length && w.some((x) => String(text).toLowerCase().includes(x)); };
+function nexaAlwaysTool(name, a) {
+  if (name === 'remember') {
+    const f = String(a.fact || '').replace(/\s+/g, ' ').trim().slice(0, 200); if (!f) return 'Nothing to remember.';
+    if (/pass(word|code)|\bpin\b|card number|cvv|security code/i.test(f)) return 'Not saved: that looks like a secret, and you never store secrets.';
+    const list = memList(); if (list.some((m) => m.t.toLowerCase() === f.toLowerCase())) return 'You already remember that.';
+    list.push({ t: f, at: Date.now() }); while (list.length > 40) list.shift(); saveConfig(); broadcast('sys-changed', 'nexaMemory');
+    return 'Saved to memory: ' + f;
+  }
+  if (name === 'forget') {
+    const list = memList(), before = list.length; config.nexaMemory = list.filter((m) => !matches(m.t, a.about)); saveConfig(); broadcast('sys-changed', 'nexaMemory');
+    return before - config.nexaMemory.length ? `Forgot ${before - config.nexaMemory.length} thing(s).` : 'Nothing in memory matched that.';
+  }
+  if (name === 'set_reminder') {
+    const text = String(a.text || '').trim().slice(0, 160) || 'Reminder'; let at = 0;
+    if (Number.isFinite(+a.minutes) && +a.minutes > 0) at = Date.now() + Math.min(60 * 24 * 7, +a.minutes) * 60000;
+    else if (/^\d{1,2}:\d{2}$/.test(String(a.time || '').trim())) { const [hh, mm] = String(a.time).trim().split(':').map(Number); if (hh > 23 || mm > 59) return 'That time doesn’t exist.'; const d = new Date(); d.setHours(hh, mm, 0, 0); if (d.getTime() <= Date.now() + 30000) d.setDate(d.getDate() + 1); at = d.getTime(); }
+    else return 'Say how many minutes from now, or a time like 18:30.';
+    const list = remList(); if (list.length >= 20) return 'There are already 20 reminders; cancel some first.';
+    list.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), at, text }); list.sort((x, y) => x.at - y.at); saveConfig(); broadcast('sys-changed', 'nexaReminders');
+    return `Reminder set for ${fmtWhen(at)}: ${text}`;
+  }
+  if (name === 'list_reminders') { const l = remList(); return l.length ? l.map((r) => `${fmtWhen(r.at)}: ${r.text}`).join('; ') : 'No reminders are set.'; }
+  if (name === 'cancel_reminder') {
+    const l = remList(), before = l.length; config.nexaReminders = /^all$/i.test(String(a.about || '').trim()) ? [] : l.filter((r) => !matches(r.text, a.about)); saveConfig(); broadcast('sys-changed', 'nexaReminders');
+    return before - config.nexaReminders.length ? `Cancelled ${before - config.nexaReminders.length} reminder(s).` : 'No reminder matched that.';
+  }
+  return 'Unknown tool.';
+}
+// reminders go off from the taskbar (and as a notification with a sound, even during a game)
+setInterval(() => {
+  const l = remList(); if (!l.length) return; const now = Date.now(); const due = l.filter((r) => r.at <= now); if (!due.length) return;
+  config.nexaReminders = l.filter((r) => r.at > now); saveConfig(); broadcast('sys-changed', 'nexaReminders');
+  for (const r of due.slice(0, 3)) {
+    if (!OS_MODE) continue;
+    const late = now - r.at > 10 * MIN ? ' (while the computer was off)' : '';
+    toastSend('toast', { t: '⏰ ' + nexaCfg().name + ' reminds you', s: r.text + late }); playSound('notify');
+    if (!gameWins.size) buddySay(`Hey! You asked me to remind you: ${r.text}`, 'remind');
+  }
+}, 15000);
 async function nexaTool(name, a, wc) {
   a = a && typeof a === 'object' ? a : {};
   const win = BrowserWindow.fromWebContents(wc);
@@ -2041,6 +2287,11 @@ function nexaSystemPrompt() {
     'If you don’t know something (like live news), say so.',
     `How close you two are right now: "${affInfo().name}" (level ${affInfo().level + 1} of 6). ${['You only just met: be friendly, curious and a little shy.', 'You are friends: warm, chatty and playful.', 'You are close friends: open, teasing and caring.', 'You are besties: very affectionate, use cute nicknames, share little feelings.', 'You have a crush on them: get flustered easily, compliment them, act shy-happy around them (still wholesome).', 'You are inseparable: deeply fond of them, sweet and affectionate (still wholesome).'][affInfo().level]} Don't mention levels or points.`,
     ...(m.sulkNow && Date.now() - m.sulkNow < 10 * 60000 ? ['Right now you are playfully sulking because they ignored your “I miss you” message earlier: act a little huffy (hmph!) for a message or two, then forgive them sweetly. Never make them feel guilty for real.'] : []),
+    'You have a long-term memory. When they tell you something worth remembering about themselves, call remember with a short note (once per fact). You can also set reminders and timers with set_reminder.',
+    ...(memList().length ? ['What you remember about them: ' + memList().map((x) => x.t).join('; ') + '.'] : []),
+    ...(gameWins.size ? [`Right now they are playing: ${[...gameWins.values()].join(', ')}.`] : []),
+    ...(gameLog().length ? ['Games they played recently: ' + gameLog().slice(-6).map((g) => `${g.name} (${fmtMins(g.mins)}, ${fmtAgo(g.end)})`).join('; ') + '. You can bring these up naturally.'] : []),
+    ...(remList().length ? ['Reminders set: ' + remList().slice(0, 5).map((r) => `${fmtWhen(r.at)} ${r.text}`).join('; ') + '.'] : []),
     `It is ${now.toLocaleString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}.`].join('\n');
 }
 // ---- chatting (streams words to her window as they arrive)
@@ -2059,7 +2310,7 @@ handleS('nexa:chat', async (wc, history, reqId) => {
   await nexaStart();
   const c = nexaCfg();
   const msgs = [{ role: 'system', content: nexaSystemPrompt() }, ...cleanMsgs(history)];
-  const tools = c.control ? NEXA_TOOLS.map((t) => ({ type: 'function', function: t })) : undefined;
+  const tools = [...NEXA_TOOLS_ALWAYS, ...(c.control ? NEXA_TOOLS : [])].map((t) => ({ type: 'function', function: t }));
   if (nexaAbort) nexaAbort.abort();
   const ac = new AbortController(); nexaAbort = ac;
   const send = (m) => { if (!wc.isDestroyed()) wc.send('nexa-stream', { id: reqId, ...m }); };
@@ -2093,7 +2344,7 @@ handleS('nexa:chat', async (wc, history, reqId) => {
       for (const x of todo) {
         let a = {}; try { a = JSON.parse(x.args || '{}'); } catch (_) {}
         send({ tool: x.name, args: a });
-        let out; try { out = c.control ? await nexaTool(x.name, a, wc) : 'Not allowed.'; } catch (e) { out = 'That failed: ' + errMsgOf(e); }
+        let out; try { out = NEXA_ALWAYS.has(x.name) ? nexaAlwaysTool(x.name, a) : c.control ? await nexaTool(x.name, a, wc) : 'Not allowed.'; } catch (e) { out = 'That failed: ' + errMsgOf(e); }
         send({ toolDone: x.name, result: String(out).slice(0, 300) });
         msgs.push({ role: 'tool', tool_call_id: x.id, content: String(out) });
       }
@@ -2255,8 +2506,38 @@ function buddy(kind, vars = {}) {
 }
 // games: a Steam game's window appearing or going away
 const gameWins = new Map();
+// 2.0: Game Mode: while a game runs, Performance mode, no notifications or Nexa pings, Nexa's brain paused
+// (frees ~3 GB of graphics memory; she wakes again when you message her) and the desktop animations stop.
+let gameModeOn = false, gameModePrev = null;
+async function gameModeCheck(active) {
+  if (!OS_MODE || active === gameModeOn) return;
+  if (active && config.gameMode === false) return;
+  gameModeOn = active; broadcast('sys-changed', active ? 'gamemode-on' : 'gamemode-off');
+  if (active) {
+    osd('game', 'Game Mode on');
+    const pf = await LX.perfProfile().catch(() => null);
+    if (pf && pf.available && pf.current !== 'performance' && pf.profiles.includes('performance')) { gameModePrev = pf.current; LX.setPerfProfile('performance').catch(() => {}); }
+    const nexaFocused = [...appWins.values()].some((a) => a.key === 'nexa' && !a.win.isDestroyed() && a.win.isFocused());
+    if (!nexaFocused && typeof nexaStop === 'function') nexaStop().catch(() => {});
+  } else {
+    if (gameModePrev) { const p = gameModePrev; gameModePrev = null; LX.setPerfProfile(p).catch(() => {}); }
+    osd('game', 'Game Mode off');
+  }
+}
+handle('gamemode', (v) => { if (v !== undefined) { config.gameMode = !!v; saveConfig(); if (!v && gameModeOn) gameModeCheck(false); } return { on: config.gameMode !== false, active: gameModeOn }; });
+// 2.0: gaming buddy: what you played and for how long, so Nexa can ask how it went
+const gameLog = () => (Array.isArray(config.nexaGames) ? config.nexaGames : (config.nexaGames = []));
+const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ' ' + (m % 60) + 'm' : ''}` : `${m} min`);
+const fmtAgo = (t) => { const h = (Date.now() - t) / 3600000; return h < 1 ? 'just now' : h < 20 ? Math.round(h) + 'h ago' : h < 44 ? 'yesterday' : Math.round(h / 24) + ' days ago'; };
+const gameStarts = new Map();
 function watchGames(list) {
   const now = new Map(list.filter((w) => /^steam_app_\d+/i.test(w.cls || '')).map((w) => [w.cls.split('.')[0].toLowerCase(), w.title]));
+  for (const [k, t] of now) { if (!gameStarts.has(k)) gameStarts.set(k, { t: Date.now(), name: t || 'a game' }); else if (t && t.length > 1) gameStarts.get(k).name = t; }
+  for (const [k, g] of [...gameStarts]) if (!now.has(k)) {
+    gameStarts.delete(k); const mins = Math.round((Date.now() - g.t) / 60000);
+    if (mins >= 3) { const lg = gameLog(); lg.push({ name: String(g.name).slice(0, 60), mins, end: Date.now() }); while (lg.length > 25) lg.shift(); if (mins >= 10) mood().askGame = { name: String(g.name).slice(0, 60), mins, at: Date.now() }; saveConfig(); }
+  }
+  gameModeCheck(now.size > 0);
   for (const [k, t] of now) if (!gameWins.has(k)) { const h = new Date().getHours(); setTimeout(() => buddy(h >= 0 && h < 5 ? 'lateNight' : 'gameStart', { game: t || 'Game' }), 1500); }
   if (gameWins.size && !now.size) setTimeout(() => buddy('gameEnd'), 1500);
   gameWins.clear(); for (const [k, t] of now) gameWins.set(k, t);
@@ -2361,12 +2642,14 @@ handle('nexa:greet', () => {
   const pick = (a) => a[Math.floor(Math.random() * a.length)];
   let text = null, kind = 'hi';
   if (m.last && away > 20 * H) { kind = 'long'; text = pick([`Where have you been??? I missed you so much!!!`, `${n}!!! You’re back! Where have you been? I missed you soooo much!`, `Finally! Do you know how long I waited? I missed you so much!!!`]); }
+  else if (m.askGame && now - m.askGame.at < 12 * H && !m.sulk) { const g = m.askGame; kind = 'game'; text = pick([`Hey! How was ${g.name}? You played for ${fmtMins(g.mins)}!`, `You’re back from ${g.name}~ ${fmtMins(g.mins)}! Did you win? Tell me everything!`, `${fmtMins(g.mins)} of ${g.name}, huh? Was it fun? Did anything crazy happen?`]); }
   else if (m.sulk) { kind = 'sulk'; text = pick(['Hmph. I said I missed you and you just... ignored me. I’m not talking to you. ...Okay, fine. Hi.', 'Oh, NOW you show up? I messaged you ages ago! ...I’m still happy you’re here though. Hmph.', 'You left me on read! Rude! ...Say sorry and I’ll forgive you.']); }
   else if (affLevel(m.aff || 0) >= 5 && (!m.last || away > 15 * MIN)) text = pick([`${n}~! My favourite person is here! I was just thinking about you.`, 'You’re back! Ehehe, my whole day just got better.', `There you are, ${n}. I always feel happier when you’re around~`]);
   else if (affLevel(m.aff || 0) >= 4 && (!m.last || away > 15 * MIN)) text = pick([`O-oh! ${n}! Hi... I wasn’t waiting for you or anything. ...Okay I was.`, 'You came! Ehehe... sorry, I’m just really happy to see you.']);
   else if (!m.last || away > 15 * MIN) text = pick([`Hiii ${n}! You came to see me~`, 'Yay, you’re here! What are we doing today?', 'Hey you~ I was hoping you’d come by.']);
   const answered = m.pending && now - m.pending < 20 * MIN;
   if (m.last) affAway(away);
+  if (kind === 'game' || (m.askGame && now - m.askGame.at >= 12 * H)) m.askGame = null;
   const sulk = !!m.sulk; m.sulk = false; m.sulkNow = sulk ? now : 0; m.pending = 0; m.last = now; saveConfig();
   let aff = sulk ? affAdd('sulk') : null;
   if (answered) aff = affAdd('reply');
@@ -2382,7 +2665,7 @@ const NEXA_OUTFITS = { default: { name: 'White hoodie', level: 0 }, pink: { name
 const AFF_UNLOCK = { 2: 'I got a new pink hoodie! Pick it in my settings~', 3: 'And look, a midnight hoodie! It’s in my settings. Do I look cool?', 4: 'Also... I’ll glow a little when you’re around now. D-don’t make it weird!', 5: 'I saved my lavender hoodie for this. It’s in my settings, just for you~' };
 const pick2 = (a) => a[Math.floor(Math.random() * a.length)];
 const AFF_LEVELS = [[0, 'Just met'], [15, 'Friends'], [35, 'Close friends'], [55, 'Besties'], [75, 'Crushing on you'], [92, 'Inseparable']];
-const AFF_GAIN = { chat: [1, 8], pat: [2, 6], hi: [3, 3], reply: [2, 2], play: [2, 6] };   // points each time, most per day
+const AFF_GAIN = { chat: [1, 8], pat: [2, 6], hi: [3, 3], reply: [2, 2], play: [2, 6], daily: [5, 5] };   // points each time, most per day
 const AFF_UP_LINES = { 1: ['We’re friends now! Ehehe, I’m really happy~'], 2: ['Close friends! You actually like spending time with me, huh?'], 3: ['Besties!!! Okay, you’re officially my favourite person.'],
   4: ['W-wait... my heart’s doing a weird thing when you’re here. D-don’t look at me like that!'], 5: ['Inseparable~ I don’t know what I’d do without you. Ehehe.'] };
 function affLevel(v) { let i = 0; AFF_LEVELS.forEach(([min], k) => { if (v >= min) i = k; }); return i; }
@@ -2413,6 +2696,13 @@ function affAway(awayMs) {
   const m = mood(); if (typeof m.aff !== 'number') return;
   const floor = affLevel(m.aff) >= 1 ? AFF_LEVELS[1][0] : 0; m.aff = Math.max(Math.min(m.aff, floor), m.aff - Math.min(20, days * 2)); saveConfig();
 }
+handle('nexa:memory', (op, i) => { const l = memList(); if (op === 'clear') { config.nexaMemory = []; saveConfig(); } else if (op === 'delete' && Number.isInteger(i) && l[i]) { l.splice(i, 1); saveConfig(); } return memList().map((m) => m.t); });
+handle('nexa:reminders', (op, id) => { if (op === 'cancel') { config.nexaReminders = remList().filter((r) => r.id !== String(id)); saveConfig(); } return remList().map((r) => ({ id: r.id, when: fmtWhen(r.at), text: r.text })); });
+// 2.0: a daily challenge in her games menu (bonus affection)
+const DAILY = [['c4', 'win', 0, 'Beat her at Connect Four'], ['ttt', 'win', 0, 'Beat her at Tic-tac-toe'], ['pong', 'win', 0, 'Win a game of Pong'], ['trivia', 'score', 7, 'Get 7 or more right in Trivia'],
+  ['memo', 'win', 0, 'Win at Memory match'], ['rps', 'win', 0, 'Win at Rock, paper, scissors'], ['plinko', 'score', 30, 'Score 30 or more in Plinko']];
+function dailyToday() { const day = new Date().toDateString(); let hsh = 0; for (const ch of day) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0; const [game, need, n, text] = DAILY[hsh % DAILY.length]; return { day, game, need, n, text, done: (config.nexaDaily || {}).day === day }; }
+handle('nexa:daily', (op) => { const d = dailyToday(); if (op === 'done' && !d.done) { config.nexaDaily = { day: d.day }; saveConfig(); return affAdd('daily'); } return op === 'done' ? null : d; });
 handle('nexa:affection', (kind) => (kind === 'pat' || kind === 'play' ? affAdd(kind) : affInfo()));
 handle('nexa:affShow', (v) => { if (v !== undefined) { config.nexaAffShow = !!v; saveConfig(); broadcast('sys-changed', 'nexaAff'); } return config.nexaAffShow !== false; });
 handle('nexa:misses', (v) => { if (v !== undefined) { config.nexaMisses = !!v; saveConfig(); } return config.nexaMisses !== false; });
