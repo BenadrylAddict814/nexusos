@@ -1,4 +1,8 @@
-NexusOS 2.0.0
+NexusOS 2.0.1
+
+- Nexa: once she's at "Crushing on you", a 💋 button appears in the corner of her picture. Blow her a kiss and she gets flustered and blushes. At "Inseparable" she blows one back. It raises her affection a little each day.
+
+From 2.0.0:
 
 The big one.
 

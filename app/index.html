@@ -423,6 +423,7 @@ html.theme-neon #start,html.theme-neon #quick,html.theme-neon #trayp{box-shadow:
 .asfh{display:flex;flex-direction:column;gap:10px;margin-top:14px}.asfh h3{margin:6px 2px 0;font-size:15px}
 .fthumb{width:22px;height:22px;object-fit:cover;border-radius:4px;background:var(--raised);flex:none}
 body.snipview{background:#000;cursor:crosshair;overflow:hidden}body.snipview>:not(.snipui){display:none!important}.snipcv{position:fixed;inset:0;z-index:10;display:block}.sniptip{z-index:11;position:fixed;top:24px;left:50%;transform:translateX(-50%);background:rgba(10,12,20,.85);color:#fff;padding:8px 14px;border-radius:10px;font:500 13px var(--body);pointer-events:none}
+.nkiss{position:absolute;z-index:4;right:14px;bottom:14px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,95,162,.5);background:rgba(10,12,20,.55);backdrop-filter:blur(8px);font-size:22px;cursor:pointer;transition:transform .15s}.nkiss:hover{transform:scale(1.1)}.nkiss[hidden]{display:none}.nkfly{position:absolute;z-index:6;right:30px;bottom:40px;font-size:30px;pointer-events:none;animation:nkf 1.2s ease-in forwards}.nkfly.back{right:auto;left:45%;top:30%;bottom:auto;animation:nkb 1.2s ease-out forwards}@keyframes nkf{0%{transform:translate(0,0) scale(.6);opacity:0}20%{opacity:1}100%{transform:translate(-150px,-260px) scale(1.4);opacity:0}}@keyframes nkb{0%{transform:scale(.6);opacity:0}25%{opacity:1}100%{transform:translate(160px,220px) scale(1.6);opacity:0}}
 .naff{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px}.naff[hidden]{display:none}.naffh{color:#ff6fa8;font-size:13px;line-height:1;transition:transform .3s}.naffbar{width:96px;height:6px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden}.naffbar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#ff8fc0,#ff4f93);transition:width .8s cubic-bezier(.2,.8,.2,1)}.naff small{opacity:.9;white-space:nowrap}.naff.up .naffh{animation:affpop 1.2s ease 2}@keyframes affpop{0%,100%{transform:scale(1)}40%{transform:scale(1.7)}}
 .nplate .nname{font-size:18px;letter-spacing:.3px;border:0;background:none;padding:0;margin:0;box-shadow:none}.nstat2{font-size:12px;opacity:.8}
 .nright{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -1642,8 +1643,9 @@ const APPS={
   const ov=k=>h('img',{class:'nov',alt:'',draggable:false,'data-k':k}),blinkI=ov('blink'),closedI=ov('closed'),midI=ov('mid'),blushI=h('img',{class:'nov nblush',alt:'',draggable:false,src:'nexa/nexa-blush.webp'});
   const fx=h('div',{class:'nfx'}),av=h('div',{class:'navwrap',title:'Poke her, or hold the mouse on her head and rub to pat her'},img,blinkI,closedI,midI,blushI),sayB=h('div',{class:'nsay'});
   const affFill=h('i'),affName=h('small'),aff=h('div',{class:'naff',hidden:true,title:'How close you two are. Chat with her, pat her head, say hi each day and answer when she misses you.'},h('span',{class:'naffh'},'♥'),h('div',{class:'naffbar'},affFill),affName);
-  const stage=h('div',{class:'nstage idle'},glow,av,fx,sayB,h('div',{class:'nplate'},nm,stat,aff));
-  let affLv=0;const drawAff=a=>{if(!a)return;affLv=a.level;stage.classList.toggle('aura',a.level>=4);aff.hidden=!a.show;affFill.style.width=Math.round(a.progress*100)+'%';affName.textContent=a.name+(a.next?'':' ♥');aff.dataset.lv=a.level};
+  const kissB=h('button',{class:'nkiss',hidden:true,title:'Blow her a kiss','aria-label':'Blow her a kiss'},'💋');
+  const stage=h('div',{class:'nstage idle'},glow,av,fx,sayB,h('div',{class:'nplate'},nm,stat,aff),kissB);
+  let affLv=0;const drawAff=a=>{if(!a)return;affLv=a.level;kissB.hidden=a.level<4;stage.classList.toggle('aura',a.level>=4);aff.hidden=!a.show;affFill.style.width=Math.round(a.progress*100)+'%';affName.textContent=a.name+(a.next?'':' ♥');aff.dataset.lv=a.level};
   const affUp=a=>{drawAff(a);if(!a||!a.up)return;aff.classList.remove('up');void aff.offsetWidth;aff.classList.add('up');burst('heart',16);blushI.classList.add('hold');clearTimeout(blushT);blushT=setTimeout(()=>blushI.classList.remove('hold'),4000);
     if(a.line)setTimeout(()=>{bubbleSay(a.line);bubble('assistant',a.line);msgs.push({role:'assistant',content:a.line});N.history(msgs).catch(()=>{});if(cfg.speak&&!busy){reqId='aff';say(a.line)}},busy?4000:600)};
   N.affection().then(drawAff).catch(()=>{});
@@ -1671,6 +1673,13 @@ const APPS={
   setInterval(()=>{if(alive&&!document.hidden&&Math.random()<.35)burst('spark',2)},6000);
   stage.addEventListener('mousemove',e=>{const r=stage.getBoundingClientRect();av.style.setProperty('--lx',(((e.clientX-r.left)/r.width-.5)*2).toFixed(2));av.style.setProperty('--ly',(((e.clientY-r.top)/r.height-.5)*2).toFixed(2))});
   stage.addEventListener('mouseleave',()=>{av.style.setProperty('--lx',0);av.style.setProperty('--ly',0)});
+  // 2.0.1: blow her a kiss (from "Crushing on you"): she gets flustered; at Inseparable she blows one back
+  const KISS4=['E-eh?! D-did you just... ehehe, my face is so red right now.','Wh-what was that for?! ...I didn’t say stop.','Eep! You can’t just do that out of nowhere! ...Okay, you can.'],KISS5=['Mwah~ right back at you!','Ehehe... catch! *blows a kiss back*','You’re so sweet to me... mwah~'];
+  let kissT=0;kissB.onclick=()=>{if(Date.now()-kissT<8000)return;kissT=Date.now();const fly=h('span',{class:'nkfly'},'💋');stage.append(fly);setTimeout(()=>fly.remove(),1300);
+    setTimeout(()=>{blushI.classList.add('hold');clearTimeout(blushT);blushT=setTimeout(()=>blushI.classList.remove('hold'),5000);av.classList.remove('hop');void av.offsetWidth;av.classList.add('hop');burst('heart',affLv>=5?20:12);
+      const pool=affLv>=5?KISS5:KISS4,l=pool[Math.floor(Math.random()*pool.length)];bubbleSay(l);if(cfg.speak&&!busy&&!playing){reqId='kiss';say(l)}
+      if(affLv>=5)setTimeout(()=>{const back=h('span',{class:'nkfly back'},'💋');stage.append(back);setTimeout(()=>back.remove(),1300)},900);
+      N.affection('kiss').then(affUp).catch(()=>{})},700)};
   const POKES3=['Hehe, you just can’t stay away, huh?','Bestie poke! Poke back!','You’re my favourite, you know that?'],POKES4=['Eep! W-warn me first!','My heart just did a little jump...','Ehehe... hi. You’re kinda cute when you do that.'];
   const POKES=['Hey! That tickles!','Hehe, need something?','Boop! You found me.','I’m right here, you know.','Careful, I bite! Just kidding.','Ready when you are!'];
   av.onclick=()=>{if(patted){patted=false;return}av.classList.remove('hop');void av.offsetWidth;av.classList.add('hop');burst('heart',6);const pool=POKES.concat(affLv>=3?POKES3:[],affLv>=4?POKES4:[]);const l=pool[Math.floor(Math.random()*pool.length)];bubbleSay(l);if(!busy&&!playing&&cfg.speak){reqId='poke';say(l)}};
