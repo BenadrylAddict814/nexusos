@@ -55,6 +55,12 @@ if [ -n "$need" ]; then
     || { DEBIAN_FRONTEND=noninteractive timeout 300 apt-get update >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive timeout 600 apt-get install -y --no-install-recommends $need >/dev/null 2>&1; } \
     || say "  (couldn't install$need; you can try again later from Settings > Updates)"
 fi
+# 2.1: controllers: Steam's udev rules let Steam (and games) see game pads and their USB sticks (on its own, so a missing package can't hold up the rest)
+if ! dpkg -s steam-devices >/dev/null 2>&1; then
+  say "Installing controller support..."
+  DEBIAN_FRONTEND=noninteractive timeout 300 apt-get install -y --no-install-recommends steam-devices >/dev/null 2>&1 || say "  (couldn't install controller rules now; NexusOS will try again with the next update)"
+  udevadm control --reload-rules >/dev/null 2>&1 || true; udevadm trigger --subsystem-match=hidraw --subsystem-match=input >/dev/null 2>&1 || true
+fi
 command -v powerprofilesctl >/dev/null 2>&1 && systemctl enable --now power-profiles-daemon.service >/dev/null 2>&1 || true
 [ -f "$HERE/system/usr/lib/nexusos/nexus-setup-zram" ] && bash "$HERE/system/usr/lib/nexusos/nexus-setup-zram" || true
 # 1.6.2: switch off background services NexusOS never uses (each keeps some memory busy)

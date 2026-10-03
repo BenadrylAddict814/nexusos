@@ -1009,6 +1009,7 @@ function createWindow() {
   startWindowWatch();
   startTray();
   startUsbWatch();
+  startPadWatch();
   startKeys();
   fxStart();
   applyTouchpadAtStart();
@@ -1504,6 +1505,50 @@ Object.assign(LX, {
 // notification buttons
 const toastActs = { 'steam-restart': () => steamRestart() };
 handle('toast:act', (id) => { const f = toastActs[String(id)]; if (f) return f(); return false; });
+/* ---------------------------------------------------------------- 2.1: controllers
+ * Lists game controllers (anything the kernel sees as a joystick), says when one connects, and reports
+ * whether Steam's controller rules are installed (Steam needs them to see most pads). */
+function listPads() {
+  let txt = ''; try { txt = fs.readFileSync('/proc/bus/input/devices', 'utf8'); } catch (_) { return []; }
+  return txt.split(/\n\s*\n/).map((b) => {
+    const name = (/^N: Name="(.*)"$/m.exec(b) || [])[1], h = (/^H: Handlers=(.*)$/m.exec(b) || [])[1] || '', id = /^I: Bus=(\w+) Vendor=(\w+) Product=(\w+)/m.exec(b);
+    const js = (/\b(js\d+)\b/.exec(h) || [])[1]; if (!name || !js) return null;
+    return { name: name.replace(/\s+/g, ' ').trim(), js, event: (/\b(event\d+)\b/.exec(h) || [])[1] || null, usb: id ? id[1] === '0003' : false, vendor: id ? id[2] : '', product: id ? id[3] : '', virtual: /steam|virtual|uinput/i.test(name) || (id && id[2] === '28de') };
+  }).filter(Boolean);
+}
+const steamRulesOk = () => ['/lib/udev/rules.d/60-steam-input.rules', '/usr/lib/udev/rules.d/60-steam-input.rules', '/etc/udev/rules.d/60-steam-input.rules'].some((f) => fs.existsSync(f));
+let padsKnown = null, padT = null;
+function padCheck() {
+  const now = listPads().filter((p) => !p.virtual); const names = new Set(now.map((p) => p.js + p.name));
+  if (padsKnown) {
+    for (const p of now) if (!padsKnown.has(p.js + p.name)) { toastSend('toast', { t: '🎮 Controller connected', s: p.name }); osd('game', p.name.slice(0, 40)); }
+    if (now.length < padsKnown.size && !gameWins.size) toastSend('toast', { t: 'Controller disconnected', s: 'Plug the USB stick back in or turn the controller on again.' });
+  }
+  padsKnown = names; broadcast('sys-changed', 'pads');
+}
+function startPadWatch() {
+  if (!OS_MODE) return; padCheck();
+  try { fs.watch('/dev/input', (ev, f) => { if (!/^js\d+/.test(String(f || ''))) return; clearTimeout(padT); padT = setTimeout(padCheck, 900); }); } catch (_) { setInterval(padCheck, 5000); }
+}
+/* ---------------------------------------------------------------- 2.1: shut down later */
+let shutdownAt = 0, shutdownT = null, shutdownWarnT = null;
+function shutdownClear() { clearTimeout(shutdownT); clearTimeout(shutdownWarnT); shutdownAt = 0; broadcast('sys-changed', 'shutdown-timer'); }
+function shutdownSet(minutes) {
+  shutdownClear(); const m = Math.max(1, Math.min(24 * 60, Math.round(+minutes || 0))); shutdownAt = Date.now() + m * 60000;
+  const warnIn = m * 60000 - 60000;
+  shutdownWarnT = setTimeout(() => { toastSend('toast', { t: '⏰ Shutting down in 1 minute', s: 'Save your work. Changed your mind?', act: { id: 'shutdown-cancel', label: 'Cancel shutdown' } }); playSound('notify'); osd('game', 'Shutting down in 1 minute'); }, Math.max(0, warnIn));
+  shutdownT = setTimeout(() => { shutdownAt = 0; LX.power('shutdown').catch(() => {}); }, m * 60000);
+  broadcast('sys-changed', 'shutdown-timer');
+  return shutdownAt;
+}
+toastActs['shutdown-cancel'] = () => { shutdownClear(); toastSend('toast', { t: 'Shutdown cancelled', s: '' }); return true; };
+Object.assign(LX, {
+  controllers: async () => ({ pads: listPads(), steamRules: steamRulesOk() }),
+  shutdownTimer: async (minutes) => {
+    if (minutes === null || minutes === 0 || minutes === false) shutdownClear(); else if (minutes !== undefined) shutdownSet(minutes);
+    return { at: shutdownAt || 0, when: shutdownAt ? new Date(shutdownAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null };
+  },
+});
 /* ---------------------------------------------------------------- 2.0: Steam's menus
  * NexusOS starts Steam in the mode where its menus take clicks. If Steam comes back some other way (it restarts
  * itself after updates), offer to restart it properly. */
@@ -2192,6 +2237,7 @@ const NEXA_TOOLS = [
   { name: 'save_clip', description: 'Save a clip of the last moments of gameplay (Clips must be running).', parameters: { type: 'object', properties: {} } },
   { name: 'set_wallpaper', description: 'Change the desktop background. "live" shows you (Nexa) moving on the desktop.', parameters: { type: 'object', properties: { which: { type: 'string', enum: ['hoodie', 'hoodie_tan', 'live', 'live_tan', 'animated'] } }, required: ['which'] } },
   { name: 'system_status', description: 'Battery, memory, CPU/GPU load and temperature, performance mode.', parameters: { type: 'object', properties: {} } },
+  { name: 'shutdown_timer', description: 'Shut the computer down after some minutes (e.g. 30), or cancel a planned shutdown with minutes = 0.', parameters: { type: 'object', properties: { minutes: { type: 'integer' } }, required: ['minutes'] } },
   { name: 'power', description: 'Sleep, restart, shut down, or restart into Windows. The user is always asked to confirm.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['sleep', 'restart', 'shutdown', 'restart_windows'] } }, required: ['action'] } },
 ];
 // 2.0: things she can always do, even with "control NexusOS" off: remember things and set reminders
@@ -2310,6 +2356,7 @@ async function nexaTool(name, a, wc) {
       if (pf && pf.available) parts.push(`performance mode ${pf.current}`);
       return parts.join('; ') + '.';
     }
+    case 'shutdown_timer': { const m = Math.round(+a.minutes || 0); if (m <= 0) { shutdownClear(); return 'Cancelled the planned shutdown.'; } shutdownSet(m); toastSend('toast', { t: 'Shutting down at ' + new Date(shutdownAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), s: 'Cancel it from the power button in Start.' }); return `The computer will shut down in ${m} minutes (at ${new Date(shutdownAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}).`; }
     case 'power': {
       const act = { sleep: 'sleep', restart: 'restart', shutdown: 'shutdown', restart_windows: 'windows' }[a.action]; if (!act) return 'Unknown action.';
       const label = { sleep: 'put the computer to sleep', restart: 'restart the computer', shutdown: 'shut down the computer', windows: 'restart into Windows' }[act];
@@ -2356,6 +2403,9 @@ handleS('nexa:chat', async (wc, history, reqId) => {
   const c = nexaCfg();
   const msgs = [{ role: 'system', content: nexaSystemPrompt() }, ...cleanMsgs(history)];
   let toolList = [...NEXA_TOOLS_ALWAYS, ...(c.control ? NEXA_TOOLS : [])];
+  { const lastUser = [...cleanMsgs(history)].reverse().find((x) => x.role === 'user'); const sm = lastUser && !/\bremind/i.test(lastUser.content) && (/\bshut ?down\b/i.test(lastUser.content) || /\b(turn|power|switch) off (the |my )?(pc|computer|laptop)\b/i.test(lastUser.content)) && /\b(shut ?down|off)\b.*?\b(?:in|after)\s+(\d+|an?|one|two|half an?)\s*(minutes?|mins?|hours?|hrs?|h)\b/i.exec(lastUser.content);
+    if (sm && OS_MODE) { const n = /^\d/.test(sm[2]) ? +sm[2] : /half/i.test(sm[2]) ? 0.5 : /two/i.test(sm[2]) ? 2 : 1; const mins = /^h/i.test(sm[3]) ? n * 60 : n; shutdownSet(mins); const when = new Date(shutdownAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      msgs.push({ role: 'system', content: `NexusOS has scheduled a shutdown at ${when} as they asked (they'll get a warning with a Cancel button a minute before). Confirm it briefly. Do not call shutdown_timer or power.` }); toolList = toolList.filter((t) => t.name !== 'shutdown_timer' && t.name !== 'power'); } }
   { const lastUser = [...cleanMsgs(history)].reverse().find((x) => x.role === 'user'); const r = lastUser && parseReminder(lastUser.content);
     if (r) { const out = nexaAlwaysTool('set_reminder', r); if (wc && !wc.isDestroyed()) wc.send('nexa-stream', { id: reqId, toolDone: 'set_reminder', result: out });
       msgs.push({ role: 'system', content: `NexusOS has already handled their request: ${out}. Confirm it to them briefly in your own words. Do not call set_reminder for this.` });

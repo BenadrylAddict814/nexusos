@@ -1,4 +1,13 @@
-NexusOS 2.0.3
+NexusOS 2.1.0
+
+- Controllers: Settings › Gaming › Controllers lists your connected controllers and has a live tester
+  (press buttons and move the sticks to see them light up). A notification tells you when one connects.
+  NexusOS now installs Steam's controller rules, so Steam and your games can see wireless pads that use a USB stick.
+  Tips for generic pads are on the same page.
+- Shut down later: choose "Shut down later…" in the Start power menu, use Settings › Power, or tell Nexa
+  "shut down in 30 minutes". You get a warning a minute before, with a Cancel button.
+
+From 2.0.3:
 
 - Fixed: Nexa sometimes said she'd remind you but never set the reminder. NexusOS now spots reminder and timer requests in your message itself ("remind me in 2 minutes to…", "set a timer for 5 minutes", "remind me at 7pm about…") and sets them every time.
 

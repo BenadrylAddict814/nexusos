@@ -94,6 +94,7 @@ libarchive-tools
 libatomic1
 libxss1
 libnotify4
+steam-devices
 libvulkan1
 python3
 python3-gi

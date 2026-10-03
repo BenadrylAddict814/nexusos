@@ -72,6 +72,21 @@ power…) only work when "Let her control NexusOS" is on. Affection (`AFF_*`) ha
 never drops below Friends once reached. All her state is in the config file (`nexaMood`, `nexaMemory`,
 `nexaReminders`, `nexaGames`, `nexaDaily`).
 
+The small model sometimes says "sure!" without calling a tool. So for requests that must happen, NexusOS
+reads the user's message itself before the model answers: `parseReminder()` (reminders and timers) and the
+shutdown-timer pattern in the `nexa:chat` handler. It then tells the model, in a system message, that the
+request is already done. Use the same trick for any new "must not be forgotten" action.
+
+### Controllers and the shutdown timer (2.1)
+
+- `listPads()` reads `/proc/bus/input/devices` (anything with a `js*` handler). Steam's virtual pads (vendor
+  `28de`) are ignored. `startPadWatch()` watches `/dev/input` and shows a notification when a pad connects.
+- The owner's pad is a **generic wireless one with a USB stick**. These usually work as HID or XInput.
+  `steam-devices` (udev rules, installed by `migrate.sh` and listed in the ISO) lets Flatpak Steam see them.
+  The tips in Settings › Gaming suggest X-input mode and Steam's "generic controllers" option.
+- The shutdown timer is `shutdownSet()` / `shutdownClear()`. There's a one-minute warning notification with a
+  Cancel button (`toastActs`), and it's offered in the Start power menu, Settings › Power, and Nexa.
+
 ## Lessons learned (don't relearn these)
 
 - **No compositor.** Openbox draws nothing on top, so Steam's menus only take clicks when Steam starts with
