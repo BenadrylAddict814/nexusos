@@ -22,3 +22,5 @@ A gaming desktop on Debian 13 with NVIDIA graphics, Steam and Discord from a bui
 ## Security notes
 - The private signing key is only in the repository secret (and your offline backup). Never commit it.
 - Keep two-factor authentication on for this GitHub account: it controls what your computers install.
+
+Picking NexusOS up later? Read [DEVELOPING.md](DEVELOPING.md) first.
