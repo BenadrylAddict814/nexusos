@@ -160,6 +160,17 @@ async function fetchManifest() {
 }
 
 /* ---------------------------------------------------------------- NexusOS: system integration */
+const KB_RE = /^[a-z]{2,4}(\([a-z0-9_]+\))?$/;
+let kbGroup = 0;
+const kbList = () => { const l = Array.isArray(config.kbLayouts) && config.kbLayouts.length ? config.kbLayouts : [config.kbd || 'us']; return l.filter((x) => KB_RE.test(x)).slice(0, 4); };
+async function kbApply() {
+  const l = kbList(); const parts = l.map((x) => x.replace(')', '').split('('));
+  const args = ['-layout', parts.map((p) => p[0]).join(','), '-variant', parts.map((p) => p[1] || '').join(','), '-option', ''];
+  if (l.length > 1) args.push('-option', 'grp:lalt_lshift_toggle');
+  await run('setxkbmap', args); kbGroup = 0; broadcast('sys-changed', 'kb');
+}
+const PY_LOCKGROUP = 'import ctypes,ctypes.util,sys\nx=ctypes.cdll.LoadLibrary(ctypes.util.find_library("X11") or "libX11.so.6")\nx.XOpenDisplay.restype=ctypes.c_void_p\nd=x.XOpenDisplay(None)\nif not d: sys.exit(1)\nx.XkbLockGroup.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_uint]\nx.XkbLockGroup(d,0x100,int(sys.argv[1]))\nx.XFlush.argtypes=[ctypes.c_void_p]\nx.XFlush(d)\n';
+async function kbLock(n) { await run('python3', ['-c', PY_LOCKGROUP, String(n)]); kbGroup = n; broadcast('sys-changed', 'kb'); }
 const LX = {
   /* Wi-Fi and network (NetworkManager) */
   async netStatus() {
@@ -392,13 +403,19 @@ const LX = {
   },
   setClock24: async (v) => { config.clock24 = !!v; saveConfig(); return config.clock24; },
 
+  /* 2.0.2: several keyboard layouts, switched with Left Alt + Left Shift like on Windows */
+  async layouts() { return { layouts: kbList(), current: kbGroup }; },
+  async setLayouts(list) {
+    list = (Array.isArray(list) ? list : []).map(String).filter((l) => KB_RE.test(l)); list = [...new Set(list)].slice(0, 4);
+    if (!list.length) throw new Error('Keep at least one layout.');
+    config.kbLayouts = list; config.kbd = list[0]; saveConfig(); await kbApply(); return LX.layouts();
+  },
+  async nextLayout() { const l = kbList(); if (l.length < 2) return LX.layouts(); await kbLock(((kbGroup || 0) + 1) % l.length); return LX.layouts(); },
   /* Keyboard layout */
   async keyboard() { const q = await run('setxkbmap', ['-query']).catch(() => ''); const m = /layout:\s*(\S+)/.exec(q); return { layout: m ? m[1] : (config.kbd || 'us') }; },
   async setKeyboard(layout) {
-    if (!/^[a-z]{2,3}(\([a-z0-9_]+\))?$/.test(String(layout))) throw new Error('Unknown layout');
-    const [l, v] = layout.replace(')', '').split('(');
-    await run('setxkbmap', v ? ['-layout', l, '-variant', v] : ['-layout', l]);
-    config.kbd = layout; saveConfig(); return true;
+    if (!KB_RE.test(String(layout))) throw new Error('Unknown layout');
+    const l = kbList(); l[0] = layout; return LX.setLayouts(l);
   },
 
   /* Security status */
@@ -1277,7 +1294,11 @@ app.whenReady().then(() => {
   lockDownSession(session.defaultSession, false);
   lockDownSession(session.fromPartition('persist:halcyon'), true);
   setupDownloads();
-  if (OS_MODE && config.kbd) LX.setKeyboard(config.kbd).catch(() => {});
+  if (OS_MODE && (config.kbd || config.kbLayouts)) kbApply().catch(() => {});
+  // 2.0.2: first time: start from the layout(s) the computer already uses (e.g. Portuguese from the installer)
+  else if (OS_MODE) run('setxkbmap', ['-query']).then((q) => { const L = (/layout:\s*(\S+)/.exec(q) || [])[1], V = (/variant:\s*(\S+)/.exec(q) || [])[1] || '';
+    if (!L) return; const vs = V.split(','); const list = L.split(',').map((l, i) => (vs[i] ? `${l}(${vs[i]})` : l)).filter((x) => KB_RE.test(x)).slice(0, 4);
+    if (list.length) { config.kbLayouts = list; config.kbd = list[0]; saveConfig(); broadcast('sys-changed', 'kb'); } }).catch(() => {});
   createWindow();
   const first = OS_MODE ? desktopWin : win; first.webContents.once('did-finish-load', () => setTimeout(() => handleArgs(process.argv), 400));
 });
@@ -2581,6 +2602,8 @@ handle('osd:size', (w) => {
 });
 // Caps Lock / Num Lock: a tiny helper watches the keyboard lights
 let keysProc = null, keysRestarts = 0;
+const KB_NAMES = { gb: 'English (UK)', us: 'English (US)', 'us(intl)': 'English (international)', pt: 'Português', br: 'Português (Brasil)', ru: 'Русский', ua: 'Українська', fr: 'Français', de: 'Deutsch', es: 'Español', it: 'Italiano', pl: 'Polski', jp: '日本語', kr: '한국어', gr: 'Ελληνικά', tr: 'Türkçe', ara: 'العربية', il: 'עברית' };
+const kbName = (l) => KB_NAMES[l] || l.toUpperCase();
 function startKeys() {
   if (!OS_MODE || keysProc) return;
   const bin = '/usr/lib/nexusos/nexus-keys'; if (!fs.existsSync(bin)) return;
@@ -2591,7 +2614,8 @@ function startKeys() {
     while ((i = buf.indexOf('\n')) >= 0) {
       const line = buf.slice(0, i); buf = buf.slice(i + 1); let m; try { m = JSON.parse(line); } catch (_) { continue; }
       if (m.type === 'change' && config.lockKeysOsd !== false) osd(m.key === 'caps' ? 'caps' : 'num', `${m.key === 'caps' ? 'Caps Lock' : 'Num Lock'} ${m.on ? 'on' : 'off'}`);
-      if (m.type === 'ready') keysRestarts = 0;
+      if (m.type === 'ready') { keysRestarts = 0; if (Number.isInteger(m.group)) { kbGroup = m.group; broadcast('sys-changed', 'kb'); } }
+      if (m.type === 'group' && Number.isInteger(m.group) && m.group !== kbGroup) { kbGroup = m.group; broadcast('sys-changed', 'kb'); const l = kbList()[m.group]; if (l && kbList().length > 1) osd('kb', kbName(l)); }
     }
   });
   keysProc.on('exit', () => { keysProc = null; if (keysRestarts++ < 5) setTimeout(startKeys, 3000); });

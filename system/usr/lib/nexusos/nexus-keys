@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# NexusOS: watches the Caps Lock and Num Lock lights and prints a line when one changes,
+# NexusOS: watches the Caps Lock and Num Lock lights (and, since 2.0.2, the keyboard layout) and prints a line when one changes,
 # so the desktop can show "Caps Lock on/off". Uses only libX11 (no extra packages).
 import ctypes, ctypes.util, json, sys, time
 x = ctypes.cdll.LoadLibrary(ctypes.util.find_library('X11') or 'libX11.so.6')
@@ -10,6 +10,15 @@ x.XkbGetNamedIndicator.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.POINT
 d = x.XOpenDisplay(None)
 if not d:
     print(json.dumps({'type': 'fatal', 'error': 'no display'}), flush=True); sys.exit(2)
+class XkbState(ctypes.Structure):
+    _fields_ = [('group', ctypes.c_ubyte), ('locked_group', ctypes.c_ubyte), ('base_group', ctypes.c_ushort), ('latched_group', ctypes.c_ushort),
+                ('mods', ctypes.c_ubyte), ('base_mods', ctypes.c_ubyte), ('latched_mods', ctypes.c_ubyte), ('locked_mods', ctypes.c_ubyte),
+                ('compat_state', ctypes.c_ubyte), ('grab_mods', ctypes.c_ubyte), ('compat_grab_mods', ctypes.c_ubyte), ('lookup_mods', ctypes.c_ubyte),
+                ('compat_lookup_mods', ctypes.c_ubyte), ('ptr_buttons', ctypes.c_ushort)]
+x.XkbGetState.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.POINTER(XkbState)]
+def group():
+    st = XkbState()
+    return st.group if x.XkbGetState(d, 0x100, ctypes.byref(st)) == 0 else None
 names = {'caps': x.XInternAtom(d, b'Caps Lock', 0), 'num': x.XInternAtom(d, b'Num Lock', 0)}
 def state():
     out = {}
@@ -17,8 +26,8 @@ def state():
         on = ctypes.c_int(0)
         out[k] = bool(on.value) if x.XkbGetNamedIndicator(d, atom, None, ctypes.byref(on), None, None) else None
     return out
-last = state()
-print(json.dumps({'type': 'ready', **last}), flush=True)
+last = state(); lastg = group()
+print(json.dumps({'type': 'ready', 'group': lastg, **last}), flush=True)
 while True:
     time.sleep(0.15)
     now = state()
@@ -26,4 +35,7 @@ while True:
         if now[k] is not None and now[k] != last[k]:
             print(json.dumps({'type': 'change', 'key': k, 'on': now[k]}), flush=True)
     last = now
+    g = group()
+    if g is not None and g != lastg:
+        print(json.dumps({'type': 'group', 'group': g}), flush=True); lastg = g
     if sys.stdout.closed: break

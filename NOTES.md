@@ -1,4 +1,8 @@
-NexusOS 2.0.1
+NexusOS 2.0.2
+
+- Several keyboard layouts, like on Windows: in Settings > Keyboard, add layouts (for example Russian). Switch with Left Alt + Left Shift. The current layout shows on the taskbar next to the arrow (PT, RU…): click it to switch, or right-click it for keyboard settings. A small note appears when you switch.
+
+From 2.0.1:
 
 - Nexa: once she's at "Crushing on you", a 💋 button appears in the corner of her picture. Blow her a kiss and she gets flustered and blushes. At "Inseparable" she blows one back. It raises her affection a little each day.
 
