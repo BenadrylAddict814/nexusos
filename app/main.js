@@ -2235,6 +2235,30 @@ function nexaAlwaysTool(name, a) {
   }
   return 'Unknown tool.';
 }
+// 2.0.3: small AI models sometimes say "sure!" without actually setting the reminder, so NexusOS spots
+// reminder and timer requests in your message itself and sets them for sure
+const NUMW = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, fifteen: 15, twenty: 20, thirty: 30, forty: 40, 'forty-five': 45, sixty: 60, 'half an': 0.5, half: 0.5, 'a couple of': 2, 'a couple': 2, couple: 2, 'a few': 3, few: 3 };
+function parseReminder(msg) {
+  const t = String(msg || '').trim(); if (!/\b(remind|reminder|timer|alarm)\b/i.test(t) || t.length > 300) return null;
+  if (/\b(cancel|delete|remove|stop|list|what|which|show)\b/i.test(t) && !/\bremind me\b/i.test(t)) return null;
+  const num = '(\\d+(?:[.,]\\d+)?|half an?|a couple(?: of)?|couple|a few|few|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty(?:-five)?|sixty)';
+  const dur = new RegExp('\\b(?:in|after|for)\\s+' + num + '\\s*(seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h)\\b', 'i');
+  const dur2 = new RegExp('\\b' + num + '[\\s-]*(seconds?|secs?|minutes?|mins?|hours?|hrs?)[\\s-]*(?:timer|alarm)\\b', 'i');
+  const at = /\bat\s+(\d{1,2})(?:[:.h](\d{2}))?\s*(am|pm)?\b/i;
+  let minutes = null, time = null, rest = t, m;
+  if ((m = dur.exec(t)) || (m = dur2.exec(t))) {
+    const raw = m[1].toLowerCase().replace(',', '.'); const n = /^\d/.test(raw) ? parseFloat(raw) : (NUMW[raw] ?? NUMW[raw.replace(/ of$/, '')] ?? 1);
+    const u = m[2].toLowerCase(); minutes = /^s/.test(u) ? n / 60 : /^h/.test(u) ? n * 60 : n; rest = t.replace(m[0], ' ');
+  } else if ((m = at.exec(t)) && /\bremind|alarm\b/i.test(t)) {
+    let hh = +m[1]; const mm = +(m[2] || 0); const ap = (m[3] || '').toLowerCase(); if (ap === 'pm' && hh < 12) hh += 12; if (ap === 'am' && hh === 12) hh = 0;
+    if (hh > 23 || mm > 59) return null; time = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`; rest = t.replace(m[0], ' ');
+  } else return null;
+  if (!(minutes > 0) && !time) return null;
+  let what = (/\b(?:to|about|that|for)\s+(.+)$/i.exec(rest.replace(/^.*?\b(remind me|set (?:a |an )?(?:reminder|timer|alarm))\b/i, ' ')) || [])[1] || '';
+  what = what.replace(/\b(please|pls|thanks|thank you)\b/gi, '').replace(/[?!.\s]+$/, '').trim();
+  if (!what || /^(a|an|the)?\s*(reminder|timer|alarm)$/i.test(what)) what = /timer/i.test(t) ? 'Your timer is done!' : 'Reminder';
+  return { minutes, time, text: what.slice(0, 160) };
+}
 // reminders go off from the taskbar (and as a notification with a sound, even during a game)
 setInterval(() => {
   const l = remList(); if (!l.length) return; const now = Date.now(); const due = l.filter((r) => r.at <= now); if (!due.length) return;
@@ -2331,7 +2355,12 @@ handleS('nexa:chat', async (wc, history, reqId) => {
   await nexaStart();
   const c = nexaCfg();
   const msgs = [{ role: 'system', content: nexaSystemPrompt() }, ...cleanMsgs(history)];
-  const tools = [...NEXA_TOOLS_ALWAYS, ...(c.control ? NEXA_TOOLS : [])].map((t) => ({ type: 'function', function: t }));
+  let toolList = [...NEXA_TOOLS_ALWAYS, ...(c.control ? NEXA_TOOLS : [])];
+  { const lastUser = [...cleanMsgs(history)].reverse().find((x) => x.role === 'user'); const r = lastUser && parseReminder(lastUser.content);
+    if (r) { const out = nexaAlwaysTool('set_reminder', r); if (wc && !wc.isDestroyed()) wc.send('nexa-stream', { id: reqId, toolDone: 'set_reminder', result: out });
+      msgs.push({ role: 'system', content: `NexusOS has already handled their request: ${out}. Confirm it to them briefly in your own words. Do not call set_reminder for this.` });
+      toolList = toolList.filter((t) => t.name !== 'set_reminder'); var reminderDone = true; } }
+  const tools = toolList.map((t) => ({ type: 'function', function: t }));
   if (nexaAbort) nexaAbort.abort();
   const ac = new AbortController(); nexaAbort = ac;
   const send = (m) => { if (!wc.isDestroyed()) wc.send('nexa-stream', { id: reqId, ...m }); };
@@ -2365,7 +2394,7 @@ handleS('nexa:chat', async (wc, history, reqId) => {
       for (const x of todo) {
         let a = {}; try { a = JSON.parse(x.args || '{}'); } catch (_) {}
         send({ tool: x.name, args: a });
-        let out; try { out = NEXA_ALWAYS.has(x.name) ? nexaAlwaysTool(x.name, a) : c.control ? await nexaTool(x.name, a, wc) : 'Not allowed.'; } catch (e) { out = 'That failed: ' + errMsgOf(e); }
+        let out; try { out = x.name === 'set_reminder' && typeof reminderDone !== 'undefined' && reminderDone ? 'Already set, no need to set it again.' : NEXA_ALWAYS.has(x.name) ? nexaAlwaysTool(x.name, a) : c.control ? await nexaTool(x.name, a, wc) : 'Not allowed.'; } catch (e) { out = 'That failed: ' + errMsgOf(e); }
         send({ toolDone: x.name, result: String(out).slice(0, 300) });
         msgs.push({ role: 'tool', tool_call_id: x.id, content: String(out) });
       }

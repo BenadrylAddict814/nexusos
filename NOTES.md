@@ -1,4 +1,8 @@
-NexusOS 2.0.2
+NexusOS 2.0.3
+
+- Fixed: Nexa sometimes said she'd remind you but never set the reminder. NexusOS now spots reminder and timer requests in your message itself ("remind me in 2 minutes to…", "set a timer for 5 minutes", "remind me at 7pm about…") and sets them every time.
+
+From 2.0.2:
 
 - Several keyboard layouts, like on Windows: in Settings > Keyboard, add layouts (for example Russian). Switch with Left Alt + Left Shift. The current layout shows on the taskbar next to the arrow (PT, RU…): click it to switch, or right-click it for keyboard settings. A small note appears when you switch.
 
