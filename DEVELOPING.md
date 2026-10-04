@@ -120,6 +120,20 @@ The preview hides 350 ms after the pointer leaves both the button and the previe
 - Nexa's llama-server stops after 10 minutes without use (`nexaUsed`); the page wakes it with `wake()`.
 - To measure, compare `ps -o times=` of the Electron processes over 30 s with the desktop focused and with an app focused.
 
+### Screen lock and the session loop (2.2.3)
+
+- The screen locks through LightDM: `xss-lock -- /usr/lib/nexusos/nexus-lock`. `dm-tool lock` returns at once,
+  so `nexus-lock` waits (watching `loginctl show-session … -p Active`) until the person is back, then resets the
+  screen-saver timer. Without that wait xss-lock could lock again. `ensureLocker()` swaps in the new locker for
+  sessions started before 2.2.3. The screen-saver "cycle" is 0 for the same reason.
+- Screen-off time and lock are `config.screenOff` / `config.screenLock`, applied with `xset` by `screenApply()`.
+  Turning lock off writes `~/.local/share/nexusos/lock-off`, which `nexus-lock` checks.
+- `nexus-padwake` (started while a controller is connected) runs `xset s reset` when the pad is used.
+- `nexusos-session` restarts the desktop when it exits. Exit 0 only logs out if a real Log out left the
+  `$XDG_RUNTIME_DIR/nexusos-logout-UID` mark (or the desktop ran 15 s or more, for older versions). Exit 3 restarts,
+  and exit 4 means "another copy was still closing". Everything is logged to **`~/.local/share/nexusos/session.log`**:
+  read it first if the desktop ever disappears.
+
 ## Lessons learned (don't relearn these)
 
 - **No compositor.** Openbox draws nothing on top, so Steam's menus only take clicks when Steam starts with

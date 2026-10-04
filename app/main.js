@@ -39,7 +39,8 @@ if (IS_LINUX) {
 app.setName('NexusOS');
 // A second copy (for example a link opened from Discord) hands its address to the running NexusOS and exits.
 const PRIMARY = app.requestSingleInstanceLock();
-if (!PRIMARY) app.exit(0);
+// (2.2.3: if the session's own copy finds another one still closing, it says so with code 4, so the session waits and tries again instead of logging out)
+if (!PRIMARY) app.exit(process.argv.includes('--session') ? 4 : 0);
 
 let win = null;
 
@@ -332,7 +333,7 @@ const LX = {
   },
   power: async (action) => {
     const a = { shutdown: 'poweroff', restart: 'reboot', sleep: 'suspend' }[action];
-    if (action === 'logout') { setTimeout(() => app.exit(0), 50); return true; }
+    if (action === 'logout') { try { fs.writeFileSync(path.join(process.env.XDG_RUNTIME_DIR || '/tmp', 'nexusos-logout-' + process.getuid()), ''); } catch (_) {} setTimeout(() => app.exit(0), 50); return true; }
     if (action === 'windows') { await run('pkexec', ['/usr/lib/nexusos/nexus-system', 'reboot-windows'], { timeout: 60000 }); return true; }
     if (!a) throw new Error('Unknown power action');
     await run('systemctl', [a]); return true;
@@ -1012,6 +1013,7 @@ function createWindow() {
   startUsbWatch();
   startPadWatch();
   upkeepAtStart();
+  screenApply().catch(() => {}); setTimeout(ensureLocker, 3000);
   startKeys();
   fxStart();
   applyTouchpadAtStart();
@@ -1385,7 +1387,7 @@ app.whenReady().then(() => {
   createWindow();
   const first = OS_MODE ? desktopWin : win; first.webContents.once('did-finish-load', () => setTimeout(() => handleArgs(process.argv), 400));
 });
-app.on('window-all-closed', () => app.quit());
+app.on('window-all-closed', () => { if (OS_MODE) app.exit(1); else app.quit(); });   // the desktop never closes on purpose: let the session start it again
 
 /* ---------------------------------------------------------------- the only doors into the system */
 function handle(channel, fn) {
@@ -1606,12 +1608,48 @@ function padCheck() {
     for (const p of now) if (!padsKnown.has(p.js + p.name)) { toastSend('toast', { t: '🎮 Controller connected', s: p.name }); osd('game', p.name.slice(0, 40)); }
     if (now.length < padsKnown.size && !gameWins.size) toastSend('toast', { t: 'Controller disconnected', s: 'Plug the USB stick back in or turn the controller on again.' });
   }
-  padsKnown = names; broadcast('sys-changed', 'pads');
+  padsKnown = names; broadcast('sys-changed', 'pads'); padAwake();
 }
 function startPadWatch() {
   if (!OS_MODE) return; padCheck();
   try { fs.watch('/dev/input', (ev, f) => { if (!/^js\d+/.test(String(f || ''))) return; clearTimeout(padT); padT = setTimeout(padCheck, 900); }); } catch (_) { setInterval(padCheck, 5000); }
 }
+/* ---------------------------------------------------------------- 2.2.3: screen off and lock */
+const LOCK_OFF_FILE = () => path.join(os.homedir(), '.local/share/nexusos/lock-off');
+const screenCfg = () => ({ minutes: [1, 2, 5, 10, 15, 30, 60, 0].includes(config.screenOff) ? config.screenOff : 10, lock: config.screenLock !== false });
+async function screenApply() {
+  if (!OS_MODE) return; const c = screenCfg(), sec = String(c.minutes * 60);
+  if (c.minutes) { await run('xset', ['s', sec, '0']).catch(() => {}); await run('xset', ['+dpms']).catch(() => {}); await run('xset', ['dpms', sec, sec, sec]).catch(() => {}); }
+  else { await run('xset', ['s', 'off']).catch(() => {}); await run('xset', ['-dpms']).catch(() => {}); }
+  try { if (c.lock) fs.rmSync(LOCK_OFF_FILE(), { force: true }); else { fs.mkdirSync(path.dirname(LOCK_OFF_FILE()), { recursive: true }); fs.writeFileSync(LOCK_OFF_FILE(), ''); } } catch (_) {}
+}
+// sessions started before 2.2.3 run the old locker (it could lock twice); swap in the new one without signing out
+function ensureLocker() {
+  if (!OS_MODE || !fs.existsSync('/usr/lib/nexusos/nexus-lock') || fs.existsSync('/run/live/medium')) return;
+  const me = process.getuid(); let old = 0, ok = false;
+  for (const d of fs.readdirSync('/proc')) {
+    if (!/^\d+$/.test(d)) continue;
+    try { if (fs.statSync('/proc/' + d).uid !== me) continue; const cmd = fs.readFileSync(`/proc/${d}/cmdline`, 'utf8').split('\0');
+      if (!/(^|\/)xss-lock$/.test(cmd[0] || '')) continue; if (cmd.includes('/usr/lib/nexusos/nexus-lock')) ok = true; else if (cmd.includes('dm-tool')) old = +d; } catch (_) {}
+  }
+  if (ok || !old) return;
+  try { process.kill(old, 'SIGTERM'); } catch (_) { return; }
+  setTimeout(() => { try { const p = cp.spawn('xss-lock', ['--', '/usr/lib/nexusos/nexus-lock'], { detached: true, stdio: 'ignore' }); p.on('error', () => {}); p.unref(); } catch (_) {} }, 500);
+}
+// a controller counts as activity, so the screen doesn't turn off (and lock) while you play with one
+let padWake = null;
+function padAwake() {
+  if (!OS_MODE) return; const any = listPads().some((p) => !p.virtual), bin = '/usr/lib/nexusos/nexus-padwake';
+  if (any && !padWake && fs.existsSync(bin)) { try { padWake = cp.spawn(bin, [], { stdio: 'ignore' }); padWake.on('error', () => { padWake = null; }); padWake.on('exit', () => { padWake = null; }); } catch (_) { padWake = null; } }
+  else if (!any && padWake) { try { padWake.kill(); } catch (_) {} padWake = null; }
+}
+app.on('will-quit', () => { if (padWake) try { padWake.kill(); } catch (_) {} });
+Object.assign(LX, {
+  screenOff: async (o) => {
+    if (o && typeof o === 'object') { if (o.minutes != null && [1, 2, 5, 10, 15, 30, 60, 0].includes(+o.minutes)) config.screenOff = +o.minutes; if (typeof o.lock === 'boolean') config.screenLock = o.lock; saveConfig(); await screenApply(); }
+    return screenCfg();
+  },
+});
 /* ---------------------------------------------------------------- 2.1: shut down later */
 let shutdownAt = 0, shutdownT = null, shutdownWarnT = null;
 function shutdownClear() { clearTimeout(shutdownT); clearTimeout(shutdownWarnT); shutdownAt = 0; broadcast('sys-changed', 'shutdown-timer'); }

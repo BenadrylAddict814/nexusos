@@ -1,4 +1,14 @@
-NexusOS 2.2.2
+NexusOS 2.2.3
+
+- Fixed: after the screen locked while you were away, signing back in could drop you straight back to the sign-in
+  screen. The lock now waits properly until you're back, the screen can no longer lock a second time while
+  you're away, and a desktop that closes by accident restarts instead of logging you out.
+- Choose when the screen turns off: Settings › Power › Screen. Pick 1 minute to 1 hour, or Never, and whether it
+  locks when it turns off.
+- Playing with a controller now counts as activity, so the screen no longer turns off (and locks) in the middle
+  of a game.
+
+From 2.2.2:
 
 Tune-up: NexusOS does less in the background, so there's more left for your games.
 - The desktop used to keep redrawing itself all the time (a hidden loading spinner, Nexa bobbing on the taskbar,

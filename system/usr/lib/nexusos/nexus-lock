@@ -1,0 +1,18 @@
+#!/bin/sh
+# NexusOS: lock the screen with the sign-in screen, then wait until you're back.
+# xss-lock expects the locker to keep running until the screen is unlocked, but `dm-tool lock` returns at once.
+# Without this wait, the screen saver could lock again (a second sign-in screen) while you're away or right after
+# you sign back in.
+log() { mkdir -p "$HOME/.local/share/nexusos" 2>/dev/null; echo "$(date '+%F %T') lock: $*" >> "$HOME/.local/share/nexusos/session.log" 2>/dev/null; }
+[ -f "$HOME/.local/share/nexusos/lock-off" ] && exit 0      # "Lock when the screen turns off" is off
+sid=${XDG_SESSION_ID:-auto}
+active() { loginctl show-session "$sid" -p Active --value 2>/dev/null; }
+log "locking"
+dm-tool lock || { log "dm-tool lock failed"; exit 0; }
+if [ "$(active)" = "" ]; then sleep 5; exit 0; fi           # can't tell where we are: don't hang
+i=0; while [ "$(active)" = yes ] && [ $i -lt 30 ]; do sleep 0.5; i=$((i + 1)); done   # the switch to the sign-in screen
+while [ "$(active)" = no ]; do sleep 1; done                # wait until you've signed back in
+log "back"
+sleep 1
+xset s reset 2>/dev/null; xset dpms force on 2>/dev/null     # start the "screen off" countdown from zero again
+exit 0

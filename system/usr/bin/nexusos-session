@@ -7,8 +7,15 @@ export GTK_THEME=Adwaita:dark
 xsetroot -solid '#05060a' 2>/dev/null
 # remember NexusOS as this account's session (the sign-in screen reads it next time)
 printf '[Desktop]\nSession=nexusos\n' > "$HOME/.dmrc" 2>/dev/null || true
-# screen off after 10 minutes of no activity
-xset s 600 600 2>/dev/null; xset +dpms 2>/dev/null; xset dpms 600 900 1200 2>/dev/null
+# screen off after 10 minutes of no activity (NexusOS applies your own choice from Settings > Power when it starts).
+# 2.2.3: no screen-saver "cycle", which made the screen lock a second time while you were away
+xset s 600 0 2>/dev/null; xset +dpms 2>/dev/null; xset dpms 600 600 600 2>/dev/null
+LOG="$HOME/.local/share/nexusos/session.log"
+mkdir -p "$HOME/.local/share/nexusos" 2>/dev/null
+[ -f "$LOG" ] && tail -n 300 "$LOG" > "$LOG.tmp" 2>/dev/null && mv -f "$LOG.tmp" "$LOG"
+log() { echo "$(date '+%F %T') $*" >> "$LOG" 2>/dev/null; }
+log "session started"
+trap 'log "session ended by signal (the display server stopped)"; kill $(jobs -p) 2>/dev/null; exit 0' HUP TERM
 
 if command -v dbus-update-activation-environment >/dev/null 2>&1; then
   dbus-update-activation-environment --systemd DISPLAY XAUTHORITY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP GTK_THEME
@@ -28,18 +35,29 @@ done
 
 # lock the screen when you're away and before sleep (installed systems only, not the live USB)
 if [ ! -d /run/live/medium ] && command -v xss-lock >/dev/null 2>&1; then
-  xss-lock -- dm-tool lock &
+  if [ -x /usr/lib/nexusos/nexus-lock ]; then xss-lock -- /usr/lib/nexusos/nexus-lock & else xss-lock -- dm-tool lock & fi
 fi
 
 # run the desktop; if it ever crashes, start it again.
 # If a new version keeps failing to start, fall back to the previous version by itself.
 BIN=/opt/nexusos/nexusos
+MARK="${XDG_RUNTIME_DIR:-/tmp}/nexusos-logout-$(id -u)"
+rm -f "$MARK"
 fails=0; since=$(date +%s)
 while :; do
+  t0=$(date +%s)
   "$BIN" --session
   code=$?
-  [ "$code" -eq 0 ] && break          # 0 means "Log out"
+  ran=$(( $(date +%s) - t0 ))
+  log "desktop exited with code $code after ${ran}s"
+  # 0 means "Log out". Since 2.2.3 a real Log out also leaves a mark, so a desktop that closed by accident
+  # (for example a second copy that started while the old one was still closing) no longer logs you out.
+  if [ "$code" -eq 0 ]; then
+    if [ -f "$MARK" ] || [ "$ran" -ge 15 ]; then rm -f "$MARK"; log "logged out"; break; fi
+    code=4
+  fi
   [ "$code" -eq 3 ] && continue       # 3 means "restart the desktop" (after an update)
+  if [ "$code" -eq 4 ]; then sleep 2; fi   # 4: the previous copy was still closing; give it a moment
   now=$(date +%s)
   if [ $((now - since)) -lt 30 ]; then fails=$((fails + 1)); else fails=1; since=$now; fi
   if [ "$fails" -ge 3 ] && [ -z "${NEXUS_ROLLED_BACK:-}" ] && [ -r /var/lib/nexusos/previous ]; then
@@ -50,6 +68,7 @@ while :; do
     fi
   fi
   if [ "$fails" -ge 4 ]; then
+    log "desktop keeps closing; giving up"
     lxterminal --title="NexusOS" -e sh -c 'echo "The NexusOS desktop keeps closing unexpectedly."; echo "Type exit to log out."; exec bash'
     break
   fi

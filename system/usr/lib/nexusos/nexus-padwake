@@ -1,0 +1,35 @@
+#!/usr/bin/python3
+# NexusOS: counts game-controller buttons and sticks as activity, so the screen doesn't turn off (and lock)
+# while you play with a controller. Started by the desktop while a controller is connected.
+import glob, os, select, subprocess, time
+fds, last, parent = {}, 0.0, os.getppid()
+while True:
+    if os.getppid() != parent:   # the desktop closed: stop too
+        break
+    for path in glob.glob('/dev/input/js*'):
+        if path not in fds:
+            try: fds[path] = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+            except OSError: pass
+    for path in [p for p in fds if not os.path.exists(p)]:
+        try: os.close(fds.pop(path))
+        except OSError: pass
+    if not fds:
+        time.sleep(5); continue
+    try: ready, _, _ = select.select(list(fds.values()), [], [], 5)
+    except (OSError, ValueError): ready = []
+    busy = False
+    for fd in ready:
+        try:
+            if os.read(fd, 4096): busy = True
+        except BlockingIOError: pass
+        except OSError:
+            for p, f in list(fds.items()):
+                if f == fd:
+                    fds.pop(p)
+                    try: os.close(f)
+                    except OSError: pass
+    if busy and time.time() - last > 30:
+        last = time.time()
+        subprocess.run(['xset', 's', 'reset'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if busy:
+        time.sleep(1)   # stick wobble sends lots of tiny events: no need to look at every one
