@@ -1,4 +1,18 @@
-NexusOS 2.1.0
+NexusOS 2.2.0
+
+- Study with Nexa: press the book button in Nexa's window to start a study session (25 minutes of focus,
+  5 minute breaks, 4 rounds; you can change the times). Notifications wait until the break, she cheers you on,
+  tells you to stretch and drink water on breaks, and nudges you if you open a game mid-round. Each finished
+  round raises her affection a little.
+- Night light: Settings › Display › Night light makes the screen warmer in the evening to go easier on your
+  eyes. Choose off, on, or a schedule (9pm to 7am by default), and how warm. There's a tile for it in quick settings.
+- Focus is real now: the Focus tile in quick settings silences notifications and Nexa's "miss you" pings until
+  you turn it off. Reminders and alarms still come through.
+- Looks after itself: apps from the App Store update once a week by themselves (never during a game or study
+  time), and leftover unused parts are cleaned up. Settings › Apps shows when it last ran and has
+  "Update apps now". If the NVIDIA graphics driver stops running after a system update, a notification offers to fix it.
+
+From 2.1.0:
 
 - Controllers: Settings › Gaming › Controllers lists your connected controllers and has a live tester
   (press buttons and move the sticks to see them light up). A notification tells you when one connects.

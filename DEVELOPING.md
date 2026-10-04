@@ -87,6 +87,21 @@ request is already done. Use the same trick for any new "must not be forgotten" 
 - The shutdown timer is `shutdownSet()` / `shutdownClear()`. There's a one-minute warning notification with a
   Cancel button (`toastActs`), and it's offered in the Start power menu, Settings › Power, and Nexa.
 
+### Upkeep, night light, Focus and study (2.2)
+
+All in one block of `main.js` (search for `nightCfg`), just above the "Steam's menus" section.
+
+- **Night light** is `xrandr --output … --gamma 1:G:B` (no compositor, so no shader tricks). `nightApply()` runs
+  every minute for the schedule and again when a screen is plugged in. Settings live in `config.night*`.
+- **Focus** is `config.dnd`. `toastSend()` drops ordinary notifications while Game Mode, Focus or a study round is
+  on. Anything whose title starts with **⏰** (reminders, timers, study bells) always gets through.
+- **Study mode** (`study`, `studyStep()`) is a Pomodoro timer in the main process, so it keeps running when Nexa's
+  window closes. Finished rounds give affection (`AFF_GAIN.study`).
+- **Upkeep**: `appsAutoUpdate()` runs `flatpak update --user` then `uninstall --unused` at most once a week, never
+  during a game or study round. `upkeepAtStart()` also offers a "Fix it" button if the NVIDIA driver isn't loaded.
+- Watch out: top-level code in `main.js` runs before constants defined further down (`H`, `MIN`). Using one of
+  those at load time crashes the whole app (every IPC call then fails with "No handler registered").
+
 ## Lessons learned (don't relearn these)
 
 - **No compositor.** Openbox draws nothing on top, so Steam's menus only take clicks when Steam starts with

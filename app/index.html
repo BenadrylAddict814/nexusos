@@ -62,7 +62,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:14px
 .ibtn:hover{background:var(--raised)} .ibtn svg{width:18px;height:18px}
 #quick{left:auto;right:10px;transform:translateY(12px);width:min(340px,calc(100vw - 20px));padding:18px;display:flex;flex-direction:column;gap:14px}
 #quick.open{transform:none}
-.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .tile{border:1px solid var(--line);background:var(--raised);color:var(--fg);border-radius:12px;padding:12px 8px;font:500 12px var(--body);display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
 .tile svg{width:18px;height:18px} .tile{overflow-wrap:anywhere;text-align:center} .tile.on{background:var(--accent);color:var(--accent-fg);border-color:transparent}
 .slider{display:flex;align-items:center;gap:10px} .slider svg{width:18px;height:18px;color:var(--muted);flex:none}
@@ -426,6 +426,7 @@ body.snipview{background:#000;cursor:crosshair;overflow:hidden}body.snipview>:no
 .nkiss{position:absolute;z-index:4;right:14px;bottom:14px;width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,95,162,.5);background:rgba(10,12,20,.55);backdrop-filter:blur(8px);font-size:22px;cursor:pointer;transition:transform .15s}.nkiss:hover{transform:scale(1.1)}.nkiss[hidden]{display:none}.nkfly{position:absolute;z-index:6;right:30px;bottom:40px;font-size:30px;pointer-events:none;animation:nkf 1.2s ease-in forwards}.nkfly.back{right:auto;left:45%;top:30%;bottom:auto;animation:nkb 1.2s ease-out forwards}@keyframes nkf{0%{transform:translate(0,0) scale(.6);opacity:0}20%{opacity:1}100%{transform:translate(-150px,-260px) scale(1.4);opacity:0}}@keyframes nkb{0%{transform:scale(.6);opacity:0}25%{opacity:1}100%{transform:translate(160px,220px) scale(1.6);opacity:0}}
 #kbInd{width:auto;min-width:36px;padding:0 8px;font:700 12px var(--body);letter-spacing:.05em;color:var(--fg)}.kbcode{font:700 12px var(--body);opacity:.7;letter-spacing:.05em}
 .padtest{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--raised) 55%,transparent)}.padtest[hidden]{display:none}.padbtns{display:flex;flex-wrap:wrap;gap:6px}.pb{min-width:34px;padding:5px 8px;border-radius:8px;border:1px solid var(--line);text-align:center;font:600 12px var(--body);transition:background .08s}.pb.on{background:var(--accent);color:var(--accent-fg);border-color:transparent}.padsticks{display:flex;gap:24px}.stk{width:64px;height:64px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center}.stk i{width:18px;height:18px;border-radius:50%;background:var(--accent);transition:transform .05s}
+.study{display:flex;flex-direction:column;gap:12px;align-items:stretch;max-width:520px;width:100%;align-self:center}.sring{--p:0deg;width:190px;height:190px;border-radius:50%;align-self:center;display:grid;place-content:center;text-align:center;background:radial-gradient(closest-side,var(--surface-solid) 82%,transparent 83%),conic-gradient(#ff5fa2 var(--p),rgba(255,255,255,.1) 0)}.sring.brk{background:radial-gradient(closest-side,var(--surface-solid) 82%,transparent 83%),conic-gradient(#3fd0b4 var(--p),rgba(255,255,255,.1) 0)}.stime{font:700 38px var(--display);font-variant-numeric:tabular-nums}.sring small{opacity:.75}
 .naff{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px}.naff[hidden]{display:none}.naffh{color:#ff6fa8;font-size:13px;line-height:1;transition:transform .3s}.naffbar{width:96px;height:6px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden}.naffbar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#ff8fc0,#ff4f93);transition:width .8s cubic-bezier(.2,.8,.2,1)}.naff small{opacity:.9;white-space:nowrap}.naff.up .naffh{animation:affpop 1.2s ease 2}@keyframes affpop{0%,100%{transform:scale(1)}40%{transform:scale(1.7)}}
 .nplate .nname{font-size:18px;letter-spacing:.3px;border:0;background:none;padding:0;margin:0;box-shadow:none}.nstat2{font-size:12px;opacity:.8}
 .nright{display:flex;flex-direction:column;min-width:0;min-height:0}
@@ -526,7 +527,8 @@ body.snipview{background:#000;cursor:crosshair;overflow:hidden}body.snipview>:no
   <div class="tiles">
     <button class="tile on" data-t="wifi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5 12a10 10 0 0 1 14 0"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1"/></svg>Wi-Fi</button>
     <button class="tile on" data-t="bt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></svg>Bluetooth</button>
-    <button class="tile" data-t="focus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Focus</button>
+    <button class="tile" data-t="focus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/><path d="M3 3l18 18"/></svg>Focus</button>
+    <button class="tile" data-t="night"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Night light</button>
   </div>
   <div class="slider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><input type="range" id="bright" min="40" max="100" value="100" aria-label="Brightness"></div>
   <div class="slider"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg><input type="range" id="vol" min="0" max="100" value="60" aria-label="Volume"></div>
@@ -812,7 +814,13 @@ const PAGES={
    if(!mic)m.append(h('p',{class:'hint'},'No microphone was found.'));else{const mv=h('input',{type:'range',min:0,max:100,value:Math.min(100,mic.volume),'aria-label':'Microphone level'});let t2;mv.oninput=()=>{clearTimeout(t2);t2=setTimeout(()=>HX.lx('setMicVolume',+mv.value).catch(()=>{}),60)};m.append(srow('Input level',mic.label,mv));
      if(a.inputs.length>1){const sel=h('select',{class:'txt','aria-label':'Input device'},a.inputs.map(o=>h('option',{value:o.name,selected:o.isDefault},o.label)));sel.onchange=()=>HX.lx('setDefaultInput',sel.value).catch(e=>toast('Couldn’t switch',errMsg(e)));m.append(srow('Use microphone','',sel))}}
    if(OSM())soundFx(c)},
- async display(c){const s=sec(c,'Brightness');let b;try{b=await HX.lx('brightness')}catch(e){b={present:false}}
+ async display(c){if(OSM())HX.lx('night').then(n=>{const ns=sec(c,'Night light','Warmer colours with less blue light, easier on your eyes at night.');c.insertBefore(ns,c.children[2]||null);
+     const mode=h('select',{class:'txt','aria-label':'Night light'},...[['off','Off'],['auto','On a schedule'],['on','On now']].map(([v,l])=>h('option',{value:v,selected:n.mode===v},l)));
+     const str=h('input',{type:'range',min:10,max:100,value:n.strength,'aria-label':'Warmth'});const from=h('input',{class:'txt',type:'time',value:n.from,'aria-label':'From'}),to=h('input',{class:'txt',type:'time',value:n.to,'aria-label':'Until'});
+     const sched=h('div',{hidden:n.mode!=='auto'},srow('From','',from),srow('Until','',to));let t;
+     mode.onchange=()=>{sched.hidden=mode.value!=='auto';HX.lx('night',{mode:mode.value})};str.oninput=()=>{clearTimeout(t);t=setTimeout(()=>HX.lx('night',{strength:+str.value}),120)};from.onchange=()=>HX.lx('night',{from:from.value});to.onchange=()=>HX.lx('night',{to:to.value});
+     ns.append(srow('Night light','',mode),srow('Warmth','',str),sched)}).catch(()=>{});
+   const s=sec(c,'Brightness');let b;try{b=await HX.lx('brightness')}catch(e){b={present:false}}
    if(b.present){const r=h('input',{type:'range',min:5,max:100,value:b.percent,'aria-label':'Brightness'});let t;r.oninput=()=>{clearTimeout(t);t=setTimeout(()=>HX.lx('setBrightness',+r.value).catch(e=>toast('Brightness',errMsg(e))),60);const q=$('#bright');if(q)q.value=r.value};s.append(srow('Screen brightness','',r))}else s.append(h('p',{class:'hint'},'This screen’s brightness is set on the monitor itself.'));
    const d=sec(c,'Screens');d.append(busyEl());let info;try{info=await HX.lx('displays')}catch(e){d.lastChild.replaceWith(errEl(e));return}d.lastChild.remove();
    for(const o of info.outputs){if(!o.modes.length)continue;const sel=h('select',{class:'txt','aria-label':'Resolution for '+o.name},o.modes.map(m=>h('option',{value:m.mode,selected:m.current},m.mode.replace('x',' × ')+(m.preferred?' (recommended)':''))));
@@ -915,6 +923,10 @@ const PAGES={
        for(const f of imgs){const t=h('button',{class:'pic',title:f.name,'aria-label':f.name,on:{click:async()=>{await setAsBackground(f.path);openSettings('appearance')}}});row.append(t);HX.readDataUrl(f.path).then(u=>{t.style.backgroundImage=`url("${u}")`}).catch(()=>{})}}).catch(()=>{})}
    if(HX&&!OSM())sec(c,'Clock').append(srow('24-hour clock','',sswitch(clock24,async v=>{clock24=await HX.clock24(v);tick();return clock24},'24-hour clock')))},
  async apps(c){const s=sec(c,'Apps',OSM()?'Apps come from Flathub and run in their own sandbox.':'Apps install through winget, Windows’ own installer.');s.append(h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:()=>openApp('store')}},'Open the App Store')));
+   if(OSM()){const up=sec(c,'Automatic updates','Apps from the App Store update themselves once a week (never during a game or study time). Security updates for the system install by themselves too.');const lab=h('small',{},'');const btn=h('button',{class:'pbtn'},'Update apps now');
+     const drawU=async()=>{const u=await HX.lx('upkeep').catch(()=>({}));lab.textContent=u.busy?'Updating now…':u.appsUpdatedAt?'Last checked '+new Date(u.appsUpdatedAt).toLocaleDateString('en-GB',{day:'numeric',month:'short'})+(u.appsUpdated?' · '+u.appsUpdated+' updated':' · everything was up to date'):'Not checked yet.';btn.disabled=!!u.busy};
+     btn.onclick=async()=>{btn.disabled=true;lab.textContent='Updating now… (this can take a while)';try{const r=await HX.lx('appsUpdate');toast('Apps are up to date',r&&r.changed?r.changed+' updated.':'Nothing needed updating.')}catch(e){toast('Couldn’t update apps',errMsg(e))}drawU()};
+     up.append(srow('App updates',lab,btn));drawU()}
    const l=sec(c,'Installed');l.append(busyEl());const list=await installedApps(true);l.lastChild.remove();if(!list.length)l.append(h('p',{class:'hint'},'Nothing installed from the App Store yet.'));
    for(const a of list){const r=srow(a.name,a.id);if(a.key||OSM())r.append(h('button',{class:'pbtn',on:{click:()=>HX.store('launch',a.key||a.id).catch(e=>toast('Couldn’t open',errMsg(e)))}},'Open'));l.append(r)}},
  system(c){const s=sec(c,'NexusOS');
@@ -1042,8 +1054,11 @@ $('#power').onclick=async e=>{e.stopPropagation();if(MW&&OSM()){const w=await ca
  if(OSM()){const pmx=pm;canWin().then(w=>{if(w&&pmx&&pmx.isConnected)pmx.children[1].after(B('Restart into Windows',()=>powerAction('windows')))})}
  $('#start').append(pm)};
 function shutDown(){closePanels();const bt=$('#boot');$('#boot h2').textContent='Shutting down';bt.classList.remove('done');setTimeout(()=>{if(HX)HX.quit();else{$('#boot h2').textContent='NexusOS';Object.keys(wins).forEach(close);boot()}},1200)}
+function syncTiles(){if(!HX||!OSM())return;HX.lx('dnd').then(v=>{const t=document.querySelector('.tile[data-t=focus]');if(t)t.classList.toggle('on',!!v)}).catch(()=>{});HX.lx('night').then(n=>{const t=document.querySelector('.tile[data-t=night]');if(t)t.classList.toggle('on',!!n.active)}).catch(()=>{})}
+if(HX&&HX.onChanged)HX.onChanged(w=>{if(w==='dnd'||w==='night')syncTiles()});setTimeout(syncTiles,1500);
 document.querySelectorAll('.tile').forEach(t=>t.onclick=()=>{const k=t.dataset.t;
-  if(k==='focus'){t.classList.toggle('on');toast(t.classList.contains('on')?'Focus on':'Focus off',t.classList.contains('on')?'Notifications are paused.':'Notifications are back on.');return}
+  if(k==='focus'){const on=!t.classList.contains('on');t.classList.toggle('on',on);if(OSM())HX.lx('dnd',on).catch(()=>{});toast(on?'Focus on':'Focus off',on?'Notifications wait until you turn Focus off (reminders still come through).':'Notifications are back on.');return}
+  if(k==='night'){if(!OSM())return;HX.lx('night').then(n=>HX.lx('night',{mode:n.active?'off':'on'})).then(n=>{t.classList.toggle('on',n.active);toast(n.active?'Night light on':'Night light off',n.active?'Warmer colours are easier on your eyes. Schedule it in Settings › Display.':'')}).catch(()=>{});return}
   if(OSM()){closePanels();openSettings(k==='wifi'?'wifi':'bluetooth');return}
   if(HX&&SYS&&SYS.isWin){closePanels();HX.winSettings(k==='wifi'?'wifi':'bluetooth').catch(()=>{});return}
   if(k==='wifi'){closePanels();openApp('web');return}
@@ -1689,8 +1704,8 @@ const APPS={
   const sendB=h('button',{class:'nbtn pri',title:'Send','aria-label':'Send'},svgI('<path d="M4 12h14M12 5l7 7-7 7"/>'));
   const spk=h('button',{class:'nbtn',title:'Her voice on or off','aria-label':'Voice'},'');
   const gear=h('button',{class:'nbtn',title:'Settings','aria-label':'Settings'},svgI('<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/>'));
-  const playB=h('button',{class:'nbtn',title:'Play a game with her','aria-label':'Games'},'');
-  const bar=h('div',{class:'nbar'},mic,inp,sendB,playB,spk,gear);
+  const playB=h('button',{class:'nbtn',title:'Play a game with her','aria-label':'Games'},''),studyB=h('button',{class:'nbtn',title:'Study with her','aria-label':'Study'},'');
+  const bar=h('div',{class:'nbar'},mic,inp,sendB,playB,studyB,spk,gear);
   function svgI(p){return h('span',{html:`<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`})}
   const setStat=(t,mode)=>{stat.textContent=t;stage.className='nstage '+(mode||'idle')+(affLv>=4?' aura':'')};
   const drawSpk=()=>{spk.innerHTML='';spk.append(svgI(cfg.speak?'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>':'<path d="M11 5 6 9H2v6h4l5 4z"/><path d="m22 9-6 6M16 9l6 6"/>'));spk.classList.toggle('off',!cfg.speak)};
@@ -1787,6 +1802,25 @@ const APPS={
     N.affection('play').then(affUp).catch(()=>{})};
   let gStop=null;
   playB.onclick=()=>openGames();
+  // 2.2: study mode (Pomodoro). The timer runs in NexusOS itself, so it keeps going if you close her window.
+  studyB.append(svgI('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/>'));
+  let studyT=0;studyB.onclick=()=>openStudy();
+  async function openStudy(){if(gStop){gStop();gStop=null}clearInterval(studyT);right.innerHTML='';const panel=h('div',{class:'ngames'});right.append(panel);
+    const back=h('button',{class:'pbtn',on:{click:()=>{clearInterval(studyT);right.innerHTML='';right.append(log,bar);inp.focus()}}},'← Back to chat');
+    panel.append(h('div',{class:'nghead'},back,h('b',{},'Study with '+cfg.name)));const body=h('div',{class:'study'});panel.append(body);
+    const draw=async()=>{const st=await HX.lx('study').catch(()=>null);body.innerHTML='';
+      if(!st){const sel=(lbl,opts,def)=>h('select',{class:'txt','aria-label':lbl},...opts.map(v=>h('option',{value:v,selected:v===def},v)));
+        const f=sel('Focus minutes',[15,20,25,30,45,50,60],25),b=sel('Break minutes',[5,10,15],5),r=sel('Rounds',[1,2,3,4,6,8],4);
+        body.append(h('p',{class:'hint'},'Focus for a while, then take a short break, and repeat. While you focus, notifications wait and '+cfg.name+' keeps quiet (she’ll nudge you if you open a game!). Each round you finish makes her a little happier.'),
+          srow('Focus','minutes',f),srow('Break','minutes',b),srow('Rounds','',r),
+          h('div',{class:'row2'},h('button',{class:'pbtn pri',on:{click:async()=>{await HX.lx('study','start',{focus:+f.value,brk:+b.value,rounds:+r.value});const l=['Okay, study time! I’ll keep you company~','Let’s do this! No slacking, okay? Ehehe.','Focus mode on! I believe in you~'][Math.floor(Math.random()*3)];bubbleSay(l);if(cfg.speak&&!busy){reqId='study';say(l)}draw()}}},'Start studying')));return}
+      const ring=h('div',{class:'sring'},h('b',{class:'stime'},''),h('small',{},st.phase==='focus'?'Focus':'Break'));
+      body.append(ring,h('p',{class:'hint',style:'text-align:center'},`Round ${st.round} of ${st.rounds}`+(st.phase==='break'?' · stretch and rest your eyes':' · notifications are waiting')),
+        h('div',{class:'row2',style:'justify-content:center'},h('button',{class:'pbtn danger',on:{click:async()=>{await HX.lx('study','stop');bubbleSay('Okay, we can stop here. Good job today~');draw()}}},'Stop'),h('button',{class:'pbtn',on:{click:()=>{clearInterval(studyT);right.innerHTML='';right.append(log,bar)}}},'Hide (keeps running)')));
+      ring.classList.toggle('brk',st.phase==='break');const total=(st.phase==='focus'?st.focusMin:st.breakMin)*60000;let end=Date.now()+st.left;
+      const tick=()=>{const left=Math.max(0,end-Date.now()),m=Math.floor(left/60000),sec=Math.floor(left/1000)%60;ring.querySelector('.stime').textContent=m+':'+String(sec).padStart(2,'0');ring.style.setProperty('--p',(1-left/total)*360+'deg');if(left<=0){clearInterval(studyT);setTimeout(draw,6000)}};
+      clearInterval(studyT);tick();studyT=setInterval(tick,1000)};
+    draw();HX.onChanged&&HX.onChanged(w=>{if(w==='study'&&body.isConnected)draw()})}
   function openGames(){if(gStop){gStop();gStop=null}right.innerHTML='';const panel=h('div',{class:'ngames'});right.append(panel);
     const back=h('button',{class:'pbtn',on:{click:()=>{if(gStop){gStop();gStop=null}right.innerHTML='';right.append(log,bar);log.scrollTop=log.scrollHeight;inp.focus()}}},'← Back to chat');
     const pick=(t,d,fn)=>h('button',{class:'ngpick',on:{click:()=>fn()}},h('b',{},t),h('small',{},d));
@@ -1986,7 +2020,7 @@ const APPS={
         reqId='hi';bubble('assistant',g.text);bubbleSay(g.text);say(g.text);msgs.push({role:'assistant',content:g.text});N.history(msgs).catch(()=>{})}}
     catch(e){setStat('Couldn’t wake up','idle');chip('I couldn’t start: '+errMsg(e))}}
   init();
-  api.onClose=()=>{alive=false;hush();if(rec)stopRec();if(gStop){gStop();gStop=null}}}},
+  api.onClose=()=>{alive=false;hush();if(rec)stopRec();if(gStop){gStop();gStop=null}clearInterval(studyT)}}},
  clips:{name:'Clips',w:960,h:640,mount(b,api){
   const wrap=h('div',{class:'clips'});b.append(wrap);
   if(!HX||!OSM()||!HX.clips){wrap.append(h('p',{class:'hint',style:'padding:20px'},'Clips works on NexusOS.'));return}

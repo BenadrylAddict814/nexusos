@@ -1006,10 +1006,12 @@ function createWindow() {
     placeToasts();
   };
   screen.on('display-metrics-changed', fit); screen.on('display-added', fit); screen.on('display-removed', fit);
+  screen.on('display-added', () => setTimeout(() => nightApply(true).catch(() => {}), 1500));
   startWindowWatch();
   startTray();
   startUsbWatch();
   startPadWatch();
+  upkeepAtStart();
   startKeys();
   fxStart();
   applyTouchpadAtStart();
@@ -1081,7 +1083,7 @@ let toastH = 0;
 let toastReady = false, toastIdle = null, toastMaking = false; const toastQueue = [];
 function toastSend(ch, data) {
   if (!OS_MODE) return sendTo(win, ch, data);
-  if (gameModeOn && ch === 'toast' && !(data && /^⏰/.test(String(data.t || '')))) return;   // Game Mode: Do Not Disturb (reminders still show)
+  if ((gameModeOn || config.dnd || studyFocusing()) && ch === 'toast' && !(data && /^⏰/.test(String(data.t || '')))) return;   // Game Mode, Focus and study time: Do Not Disturb (reminders still show)
   clearTimeout(toastIdle);
   if ((!toastWin || toastWin.isDestroyed()) && !toastMaking) {
     const b = screen.getPrimaryDisplay().bounds; toastReady = false; toastH = 0; toastMaking = true;
@@ -1549,6 +1551,84 @@ Object.assign(LX, {
     return { at: shutdownAt || 0, when: shutdownAt ? new Date(shutdownAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null };
   },
 });
+/* ---------------------------------------------------------------- 2.2: Focus, night light, study mode, upkeep on autopilot */
+// Focus (Do Not Disturb): notifications wait, except reminders and timers
+// Night light: warmer colours (less blue) on a schedule or on demand, through the screen's gamma
+const nightCfg = () => ({ mode: ['off', 'on', 'auto'].includes(config.nightMode) ? config.nightMode : 'off', strength: clampInt(config.nightStrength ?? 50, 10, 100), from: /^\d\d:\d\d$/.test(config.nightFrom || '') ? config.nightFrom : '21:00', to: /^\d\d:\d\d$/.test(config.nightTo || '') ? config.nightTo : '07:00' });
+function nightActive() { const c = nightCfg(); if (c.mode === 'on') return true; if (c.mode !== 'auto') return false;
+  const m = new Date().getHours() * 60 + new Date().getMinutes(), [fh, fm] = c.from.split(':').map(Number), [th, tm] = c.to.split(':').map(Number), f = fh * 60 + fm, t = th * 60 + tm;
+  return f <= t ? m >= f && m < t : m >= f || m < t; }
+let nightLast = null;
+async function nightApply(force) {
+  if (!OS_MODE) return; const on = nightActive(), k = nightCfg().strength / 100, key = on ? 'on' + k : 'off'; if (!force && key === nightLast) return; nightLast = key;
+  const g = on ? `1:${(1 - 0.22 * k).toFixed(2)}:${(1 - 0.55 * k).toFixed(2)}` : '1:1:1';
+  const q = await run('xrandr', ['--query'], { timeout: 5000 }).catch(() => ''); const outs = [...q.matchAll(/^(\S+) connected/gm)].map((x) => x[1]);
+  for (const o of outs) await run('xrandr', ['--output', o, '--gamma', g], { timeout: 5000 }).catch(() => {});
+  broadcast('sys-changed', 'night');
+}
+setInterval(() => nightApply(false), 60000);
+// Study mode with Nexa: focus / break rounds (Pomodoro). While focusing: no notifications, no "miss you" pings.
+let study = null, studyTick = null, studyNudged = false;
+const studyFocusing = () => !!(study && study.phase === 'focus');
+const studyInfo = () => (study ? { ...study, left: Math.max(0, study.end - Date.now()) } : null);
+function studyStep() {
+  if (!study) return; if (Date.now() < study.end) {
+    if (study.phase === 'focus' && gameWins.size && !studyNudged) { studyNudged = true; buddySay('Hey! We’re supposed to be studying~ Games after this round, okay?', 'study'); }
+    return; }
+  const n = nexaCfg().name;
+  if (study.phase === 'focus') {
+    const a = affAdd('study'); if (a.up && a.line) setTimeout(() => buddySay(a.line, 'hi'), 6000);
+    if (study.round >= study.rounds) { toastSend('toast', { t: '⏰ Study session done!', s: `${study.rounds} rounds. ${n} is proud of you.` }); playSound('notify'); buddySay(`We did it! ${study.rounds} whole rounds! I’m so proud of you~ Go have some fun now!`, 'study'); study = null; clearInterval(studyTick); broadcast('sys-changed', 'study'); return; }
+    study.phase = 'break'; study.end = Date.now() + study.breakMin * 60000;
+    toastSend('toast', { t: '⏰ Break time!', s: `${study.breakMin} minutes. Stretch, drink some water.` }); playSound('notify'); buddySay(['Break time! You did great. Go stretch~', 'Round done! Drink some water, okay?', 'Phew! Rest your eyes for a bit~'][Math.floor(Math.random() * 3)], 'study');
+  } else {
+    study.phase = 'focus'; study.round++; study.end = Date.now() + study.focusMin * 60000; studyNudged = false;
+    toastSend('toast', { t: '⏰ Back to it!', s: `Round ${study.round} of ${study.rounds}.` }); playSound('notify'); buddySay(`Round ${study.round}! You’ve got this~`, 'study');
+  }
+  broadcast('sys-changed', 'study');
+}
+Object.assign(LX, {
+  dnd: async (v) => { if (typeof v === 'boolean') { config.dnd = v; saveConfig(); broadcast('sys-changed', 'dnd'); } return !!config.dnd; },
+  night: async (o) => {
+    if (o && typeof o === 'object') { if (['off', 'on', 'auto'].includes(o.mode)) config.nightMode = o.mode; if (o.strength != null) config.nightStrength = clampInt(o.strength, 10, 100);
+      for (const k of ['from', 'to']) if (/^\d\d:\d\d$/.test(o[k] || '')) config['night' + k[0].toUpperCase() + k.slice(1)] = o[k]; saveConfig(); await nightApply(true); }
+    return { ...nightCfg(), active: nightActive() };
+  },
+  study: async (op, o) => {
+    if (op === 'start') { o = o || {}; clearInterval(studyTick); study = { phase: 'focus', round: 1, rounds: clampInt(o.rounds || 4, 1, 8), focusMin: clampInt(o.focus || 25, 1, 120), breakMin: clampInt(o.brk || 5, 1, 30), end: 0, started: Date.now() };
+      study.end = Date.now() + study.focusMin * 60000; studyNudged = false; studyTick = setInterval(studyStep, 5000); broadcast('sys-changed', 'study'); }
+    else if (op === 'stop') { study = null; clearInterval(studyTick); broadcast('sys-changed', 'study'); }
+    return studyInfo();
+  },
+  appsUpdate: async () => appsAutoUpdate(true),
+  upkeep: async () => ({ appsUpdatedAt: config.appsUpdatedAt || 0, appsUpdated: config.appsUpdatedCount || 0, busy: appsUpdating }),
+});
+// Upkeep on autopilot: App Store apps update themselves once a week (never during a game or study time)
+let appsUpdating = false;
+async function appsAutoUpdate(force) {
+  if (!OS_MODE || appsUpdating) return { busy: true }; if (!force && (Date.now() - (config.appsUpdatedAt || 0) < 7 * 24 * H || gameWins.size || study)) return { skipped: true };
+  if (!(await has('flatpak'))) return { skipped: true };
+  appsUpdating = true; broadcast('sys-changed', 'upkeep');
+  try {
+    const before = await run('flatpak', ['list', '--user', '--columns=application,version,active'], { timeout: 30000 }).catch(() => '');
+    await run('flatpak', ['update', '--user', '-y', '--noninteractive'], { timeout: 3600000 });
+    await run('flatpak', ['uninstall', '--user', '--unused', '-y', '--noninteractive'], { timeout: 600000 }).catch(() => {});
+    const after = await run('flatpak', ['list', '--user', '--columns=application,version,active'], { timeout: 30000 }).catch(() => '');
+    const b = new Set(before.split('\n')); const changed = after.split('\n').filter((l) => l && !b.has(l)).length;
+    config.appsUpdatedAt = Date.now(); config.appsUpdatedCount = changed; saveConfig();
+    if (changed && !force) toastSend('toast', { t: 'Apps updated', s: `${changed} app${changed > 1 ? 's' : ''} got the latest version.` });
+    return { changed };
+  } finally { appsUpdating = false; broadcast('sys-changed', 'upkeep'); }
+}
+setInterval(() => appsAutoUpdate(false).catch(() => {}), 3600000);
+// after a system update, the NVIDIA driver sometimes doesn't load: offer the one-click fix
+toastActs['fix-nvidia'] = async () => { toastSend('toast', { t: 'Fixing the graphics driver…', s: 'It asks for your password. This takes a few minutes.' }); try { await run('pkexec', ['/usr/lib/nexusos/nexus-system', 'fix-nvidia'], { timeout: 1800000 }); toastSend('toast', { t: 'Graphics driver fixed', s: 'Restart the computer to finish.' }); } catch (e) { toastSend('toast', { t: 'Couldn’t fix it automatically', s: 'Settings › Security & privacy has more options.' }); } return true; };
+function upkeepAtStart() {
+  if (!OS_MODE) return;
+  nightApply(true).catch(() => {});
+  setTimeout(() => appsAutoUpdate(false).catch(() => {}), 10 * MIN);
+  setTimeout(() => { if (fs.existsSync('/usr/bin/nvidia-smi') && !fs.existsSync('/proc/driver/nvidia/version')) toastSend('toast', { t: 'Your NVIDIA graphics driver isn’t running', s: 'This can happen after a system update. Games would run slowly.', act: { id: 'fix-nvidia', label: 'Fix it' } }); }, 2 * MIN);
+}
 /* ---------------------------------------------------------------- 2.0: Steam's menus
  * NexusOS starts Steam in the mode where its menus take clicks. If Steam comes back some other way (it restarts
  * itself after updates), offer to restart it properly. */
@@ -2728,7 +2808,7 @@ setInterval(() => {
   if (since < gap) return;
   // only while you're actually at the computer, and never during a game or a full-screen window
   let idle = 0; try { idle = require('electron').powerMonitor.getSystemIdleTime(); } catch (_) {}
-  if (idle > 90 || gameWins.size || lastWinList.some((w) => w.active && w.big)) return;
+  if (idle > 90 || gameWins.size || study || config.dnd || lastWinList.some((w) => w.active && w.big)) return;
   if ([...appWins.values()].some((a) => a.key === 'nexa')) return;
   m.ping = now; m.pending = m.pending || now; m.jit = Math.random(); m.count = (m.count || 0) + 1; saveConfig();
   buddySay(MISS_LINES[Math.floor(Math.random() * MISS_LINES.length)], 'miss');
@@ -2768,7 +2848,7 @@ const NEXA_OUTFITS = { default: { name: 'White hoodie', level: 0 }, pink: { name
 const AFF_UNLOCK = { 2: 'I got a new pink hoodie! Pick it in my settings~', 3: 'And look, a midnight hoodie! It’s in my settings. Do I look cool?', 4: 'Also... I’ll glow a little when you’re around now. And there’s a little kiss button... d-don’t make it weird!', 5: 'I saved my lavender hoodie for this. It’s in my settings, just for you~' };
 const pick2 = (a) => a[Math.floor(Math.random() * a.length)];
 const AFF_LEVELS = [[0, 'Just met'], [15, 'Friends'], [35, 'Close friends'], [55, 'Besties'], [75, 'Crushing on you'], [92, 'Inseparable']];
-const AFF_GAIN = { chat: [1, 8], pat: [2, 6], hi: [3, 3], reply: [2, 2], play: [2, 6], daily: [5, 5], kiss: [2, 2] };   // points each time, most per day
+const AFF_GAIN = { chat: [1, 8], pat: [2, 6], hi: [3, 3], reply: [2, 2], play: [2, 6], daily: [5, 5], kiss: [2, 2], study: [2, 6] };   // points each time, most per day
 const AFF_UP_LINES = { 1: ['We’re friends now! Ehehe, I’m really happy~'], 2: ['Close friends! You actually like spending time with me, huh?'], 3: ['Besties!!! Okay, you’re officially my favourite person.'],
   4: ['W-wait... my heart’s doing a weird thing when you’re here. D-don’t look at me like that!'], 5: ['Inseparable~ I don’t know what I’d do without you. Ehehe.'] };
 function affLevel(v) { let i = 0; AFF_LEVELS.forEach(([min], k) => { if (v >= min) i = k; }); return i; }
