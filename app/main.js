@@ -1067,7 +1067,7 @@ function showPopup(which, at) {
   const ax = Number(at) || 0;
   const x = which === 'quick' ? d.x + d.width - w - 12 : which === 'tray' ? Math.max(d.x + 8, Math.min(d.x + d.width - w - 8, d.x + Math.round(ax - w / 2))) : Math.round(d.x + (d.width - w) / 2);
   popupWin.setBounds({ x, y: d.y + d.height - PANEL_H - h - 8, width: w, height: h });
-  popupWhich = which; popupPrevActive = activeX; uiSound('pop');
+  peekHide(); popupWhich = which; popupPrevActive = activeX; uiSound('pop');
   sendTo(popupWin, 'popup', which);
   popupWin.show(); popupWin.focus();
   sendTo(panelWin, 'popup-state', which);
@@ -1076,6 +1076,79 @@ function hidePopup() {
   if (!popupWin || popupWin.isDestroyed() || !popupWin.isVisible()) return;
   popupWin.hide(); popupWhich = null; sendTo(panelWin, 'popup-state', null);
 }
+
+/* 2.2.1: hover a taskbar button to see its windows, like on Windows */
+let peekWin = null, peekMaking = null, peekIds = [], peekInfo = null, peekOnBar = false, peekOnWin = false, peekT = null, peekSeq = 0;
+const peekThumbs = new Map();   // last good picture of each window, so a minimized window still shows one
+function peekEnsure() {
+  if (peekWin && !peekWin.isDestroyed()) return Promise.resolve(peekWin);
+  if (!peekMaking) peekMaking = makeChild({ type: 'notification', frame: false, width: 240, height: 180, resizable: false, movable: false, skipTaskbar: true, alwaysOnTop: true, focusable: false, backgroundColor: '#0c1119' }, { view: 'peek' }).then((w) => {
+    w.on('closed', () => { if (peekWin === w) peekWin = null; });
+    return new Promise((r) => { const done = () => { peekWin = w; peekMaking = null; r(w); }; if (!w.webContents.isLoading() && w.webContents.getURL()) done(); else w.webContents.once('did-finish-load', done); });
+  }, (e) => { peekMaking = null; throw e; });
+  return peekMaking;
+}
+async function peekShots(ids, seq) {
+  const want = new Set(ids.map((i) => parseInt(i, 16))), mine = new Set();
+  // NexusOS's own windows: ask Chromium directly (quick)
+  for (const a of appWins.values()) {
+    if (a.win.isDestroyed()) continue; const x = xid(a.win); if (!want.has(x)) continue; mine.add(x);
+    if (a.win.isMinimized() || !a.win.isVisible()) continue;
+    try { const img = await a.win.capturePage(); if (!img.isEmpty()) peekThumbs.set(x, img.resize({ width: 400 }).toDataURL()); } catch (_) {}
+  }
+  if (seq === peekSeq && peekWin && !peekWin.isDestroyed()) sendTo(peekWin, 'peek', peekPayload());
+  // other programs' windows (Steam, Firefox, Discord…): the window capturer; a minimized window keeps its last picture
+  if (![...want].some((x) => !mine.has(x))) return;
+  try {
+    const { desktopCapturer } = require('electron');
+    const src = await Promise.race([desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 400, height: 240 }, fetchWindowIcons: false }), new Promise((r) => setTimeout(() => r([]), 4000))]);
+    for (const s of src) {
+      const m = /^window:(\d+):/.exec(s.id); if (!m || !want.has(+m[1]) || mine.has(+m[1]) || !s.thumbnail || s.thumbnail.isEmpty()) continue;
+      const sz = s.thumbnail.getSize(); if (sz.width < 8 || sz.height < 8) continue;
+      peekThumbs.set(+m[1], s.thumbnail.toDataURL());
+    }
+  } catch (_) {}
+  if (peekThumbs.size > 60) for (const k of [...peekThumbs.keys()].slice(0, peekThumbs.size - 60)) peekThumbs.delete(k);
+  if (seq === peekSeq && peekWin && !peekWin.isDestroyed()) sendTo(peekWin, 'peek', peekPayload());
+}
+function peekPayload() {
+  const wins = peekIds.map((id) => { const w = lastWinList.find((v) => v.id === id) || {}; return { id, title: w.title || (peekInfo && peekInfo.name) || 'Window', active: !!w.active, thumb: peekThumbs.get(parseInt(id, 16)) || null }; });
+  return { name: peekInfo ? peekInfo.name : '', app: peekInfo ? peekInfo.app : null, wins };
+}
+function peekPlace() {
+  if (!peekWin || peekWin.isDestroyed()) return;
+  const d = screen.getPrimaryDisplay().bounds, n = peekIds.length, CW = 220, G = 8, P = 10, H = 176;
+  const W = Math.min(d.width - 16, n * CW + (n - 1) * G + P * 2);
+  const cx = peekInfo ? peekInfo.x : d.x + d.width / 2;
+  peekWin.setBounds({ x: Math.round(Math.max(d.x + 8, Math.min(d.x + d.width - W - 8, cx - W / 2))), y: d.y + d.height - PANEL_H - H - 6, width: W, height: H });
+}
+async function peekShow(o) {
+  if (!OS_MODE || !o || !Array.isArray(o.ids)) return false;
+  const ids = o.ids.filter((i) => /^0x[0-9a-f]+$/i.test(String(i))).slice(0, 12); if (!ids.length) return false;
+  if (popupWin && !popupWin.isDestroyed() && popupWin.isVisible()) return false;
+  const seq = ++peekSeq; peekOnBar = true; clearTimeout(peekT);
+  const app = o.app && typeof o.app === 'object' ? { type: String(o.app.type || ''), key: String(o.app.key || ''), id: String(o.app.id || ''), name: String(o.app.name || '') } : null;
+  peekIds = ids; peekInfo = { x: Math.round(+o.x || 0), name: String(o.name || '').slice(0, 80), app };
+  const w = await peekEnsure(); if (seq !== peekSeq) return false;
+  peekPlace(); sendTo(w, 'peek', peekPayload()); if (!w.isVisible()) w.showInactive();
+  peekShots(ids, seq).catch(() => {});
+  return true;
+}
+function peekSync(list) {
+  const left = peekIds.filter((id) => list.some((w) => w.id === id));
+  if (!left.length) return peekHide();
+  if (left.length !== peekIds.length) { peekIds = left; peekPlace(); }
+  if (peekWin && !peekWin.isDestroyed()) sendTo(peekWin, 'peek', peekPayload());
+}
+function peekLater() { clearTimeout(peekT); peekT = setTimeout(() => { if (!peekOnBar && !peekOnWin) peekHide(); }, 350); }
+function peekHide() {
+  clearTimeout(peekT); peekSeq++; peekIds = []; peekOnBar = peekOnWin = false;
+  if (peekWin && !peekWin.isDestroyed() && peekWin.isVisible()) peekWin.hide();
+}
+handle('peek:show', (o) => peekShow(o));
+handle('peek:leave', () => { peekOnBar = false; peekLater(); return true; });
+handle('peek:hover', (on) => { peekOnWin = !!on; if (on) clearTimeout(peekT); else peekLater(); return true; });
+handle('peek:hide', () => { peekHide(); return true; });
 
 /* notifications */
 let toastH = 0;
@@ -1129,7 +1202,7 @@ async function listWindows() {
   const act = await run('xprop', ['-root', '_NET_ACTIVE_WINDOW'], { timeout: 3000 }).catch(() => '');
   const am = /window id # (0x[0-9a-f]+)/i.exec(act); activeX = am ? parseInt(am[1], 16) : 0;
   const own = new Map(); for (const a of appWins.values()) if (!a.win.isDestroyed()) own.set(xid(a.win), a);
-  const skip = new Set([desktopWin, panelWin, popupWin, toastWin].filter((w) => w && !w.isDestroyed()).map(xid));
+  const skip = new Set([desktopWin, panelWin, popupWin, toastWin, peekWin].filter((w) => w && !w.isDestroyed()).map(xid));
   const map = wmClassMap(); const res = [];
   for (const l of out.trim().split('\n').filter(Boolean)) {
     const g = /^(0x[0-9a-f]+)\s+(-?\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)\s+(\d+)\s+(\d+)\s+(\S+)\s+\S+\s?(.*)$/i.exec(l); if (!g) continue;
@@ -1177,6 +1250,7 @@ async function pushWindows(force) {
   const sig = JSON.stringify(list);
   lastWinList = list; watchGames(list);
   if (force || sig !== lastWinSig) { lastWinSig = sig; sendTo(panelWin, 'windows', list); sendTo(desktopWin, 'windows', list); }
+  if (peekIds.length) peekSync(list);
   // hide Start if the person clicked into another window
   // (only when a different window than before Start opened becomes active, so a slow focus change can't close it)
   if (!menuOpen && popupWin && popupWin.isVisible() && activeX && activeX !== xid(popupWin) && activeX !== popupPrevActive) hidePopup();

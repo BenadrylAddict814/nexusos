@@ -102,6 +102,14 @@ All in one block of `main.js` (search for `nightCfg`), just above the "Steam's m
 - Watch out: top-level code in `main.js` runs before constants defined further down (`H`, `MIN`). Using one of
   those at load time crashes the whole app (every IPC call then fails with "No handler registered").
 
+### Taskbar window previews (2.2.1)
+
+Hovering a running taskbar button calls `peek:show` with its window ids. The main process opens a small
+non-focusable `view=peek` window above the taskbar (`peekShow()` and friends, just before the notifications section).
+Pictures come from `capturePage()` for NexusOS's own windows, and from `desktopCapturer` (`window:<xid>:0`) for other
+programs. A minimized window can't be captured without a compositor, so it shows its last picture or the app icon.
+The preview hides 350 ms after the pointer leaves both the button and the preview.
+
 ## Lessons learned (don't relearn these)
 
 - **No compositor.** Openbox draws nothing on top, so Steam's menus only take clicks when Steam starts with

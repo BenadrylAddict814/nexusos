@@ -49,6 +49,8 @@ contextBridge.exposeInMainWorld('halcyon', {
   popupHide: call('win:popupHide'),
   windows: call('win:list'),
   winAct: call('win:act'),
+  peekShow: call('peek:show'), peekLeave: call('peek:leave'), peekHover: call('peek:hover'), peekHide: call('peek:hide'),
+  onPeek: (fn) => ipcRenderer.on('peek', (_e, d) => fn(d)),
   toast: call('toast'),
   confirm: call('dlg:confirm'),
   toastSize: call('toast:size'),

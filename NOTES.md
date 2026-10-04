@@ -1,4 +1,10 @@
-NexusOS 2.2.0
+NexusOS 2.2.1
+
+- Window previews on the taskbar, like on Windows: rest the mouse on an app that's open and a little preview of
+  each of its windows pops up above the taskbar. Click one to go to it, or click its X (or middle-click it) to close it.
+  Once one preview is showing, moving along the taskbar switches straight to the next app's.
+
+From 2.2.0:
 
 - Study with Nexa: press the book button in Nexa's window to start a study session (25 minutes of focus,
   5 minute breaks, 4 rounds; you can change the times). Notifications wait until the break, she cheers you on,
