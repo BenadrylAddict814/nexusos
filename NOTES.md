@@ -1,4 +1,18 @@
-NexusOS 2.2.1
+NexusOS 2.2.2
+
+Tune-up: NexusOS does less in the background, so there's more left for your games.
+- The desktop used to keep redrawing itself all the time (a hidden loading spinner, Nexa bobbing on the taskbar,
+  and the live wallpaper at 60 frames a second). Now the live wallpaper breathes at a gentler frame rate, and
+  the wallpaper and sakura petals rest while you're using a window. In testing, the desktop's idle processor
+  and graphics work dropped by about three quarters, and to almost nothing while an app is open.
+- The clock and the window list wake up less often and start fewer helper programs.
+- Nexa's brain goes to sleep after 10 quiet minutes, even with her window open, freeing about 3 GB of graphics
+  memory. Your next message wakes her in a few seconds. (Fixed: before, if she fell asleep during a game, she kept
+  saying "still waking up".)
+- Memory: compressed swap is used a little more eagerly and memory is freed more evenly, so loading a level is
+  less likely to stall. Games that trip Intel's "split lock" check no longer get slowed down (SteamOS does the same).
+
+From 2.2.1:
 
 - Window previews on the taskbar, like on Windows: rest the mouse on an app that's open and a little preview of
   each of its windows pops up above the taskbar. Click one to go to it, or click its X (or middle-click it) to close it.

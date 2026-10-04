@@ -17,8 +17,11 @@ CONF
 fi
 cat > /etc/sysctl.d/91-nexusos-zram.conf <<'CONF'
 # NexusOS: tuned for compressed swap in memory (zram)
-vm.swappiness = 100
+vm.swappiness = 150
 vm.page-cluster = 0
+# 2.2.2: free memory a little earlier and more evenly, so a game loading a level doesn't stall (same as SteamOS / Pop!_OS)
+vm.watermark_boost_factor = 0
+vm.watermark_scale_factor = 125
 CONF
 if [ -d /run/systemd/system ]; then
   systemctl enable zramswap.service >/dev/null 2>&1 || true

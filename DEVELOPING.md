@@ -110,6 +110,16 @@ Pictures come from `capturePage()` for NexusOS's own windows, and from `desktopC
 programs. A minimized window can't be captured without a compositor, so it shows its last picture or the app icon.
 The preview hides 350 ms after the pointer leaves both the button and the preview.
 
+### Staying light (2.2.2)
+
+- Anything that animates forever costs graphics work every frame, even when you can't see it (an opacity-0
+  spinner still animates). Use slow `setTimeout` loops instead of infinite CSS animations, and stop them when
+  `deskQuiet()` is true (a window is active or a game covers the desktop).
+- Only write to the page when a value changes (see `tick()`): even setting the same text makes Chromium redraw.
+- The window watcher gets the active window from its `xprop -spy` output; the slow check runs every 5 s.
+- Nexa's llama-server stops after 10 minutes without use (`nexaUsed`); the page wakes it with `wake()`.
+- To measure, compare `ps -o times=` of the Electron processes over 30 s with the desktop focused and with an app focused.
+
 ## Lessons learned (don't relearn these)
 
 - **No compositor.** Openbox draws nothing on top, so Steam's menus only take clicks when Steam starts with

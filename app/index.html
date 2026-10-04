@@ -187,7 +187,7 @@ body.dragging webview{pointer-events:none}
 .dlcard .row2{display:flex;gap:6px}
 /* boot */
 #boot{position:fixed;inset:0;background:#070d0f;z-index:99999;display:grid;place-items:center;transition:opacity .6s}
-#boot.done{opacity:0;pointer-events:none}
+#boot.done{opacity:0;pointer-events:none;visibility:hidden;transition:opacity .6s,visibility 0s linear .6s}#boot.done .ring,#boot.done .bnexa{animation:none}
 #boot .in{display:flex;flex-direction:column;align-items:center;gap:22px;color:#e8f1ef}
 #boot .mark{width:72px;height:72px}
 #boot h2{font:600 22px var(--display);margin:0;letter-spacing:.02em}
@@ -372,9 +372,9 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 #osdp{display:flex;align-items:center;gap:12px;height:56px;padding:0 18px;border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);box-sizing:border-box;color:#fff;font:600 15px var(--body);white-space:nowrap}
 #osdp svg{flex:none;color:var(--accent)}#osdp.pop{animation:bin .22s ease-out}
 /* ===== 1.7: Nexa buddy, speech bubble, live wallpaper, themes ===== */
-#buddy{position:relative;width:40px;height:40px;padding:0;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 40%,rgba(255,95,162,.35),rgba(0,229,255,.12) 70%);border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);flex:none;animation:bbob 3.6s ease-in-out infinite}
+#buddy{position:relative;width:40px;height:40px;padding:0;border-radius:50%;overflow:hidden;background:radial-gradient(circle at 50% 40%,rgba(255,95,162,.35),rgba(0,229,255,.12) 70%);border:1px solid color-mix(in srgb,var(--accent) 50%,transparent);flex:none}
 #buddy img{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}#buddy .bbl{opacity:0}#buddy.bl .bbl{opacity:1}
-#buddy.hop{animation:bhop .6s cubic-bezier(.3,1.7,.5,1),bbob 3.6s ease-in-out .6s infinite}
+#buddy.hop{animation:bhop .6s cubic-bezier(.3,1.7,.5,1)}
 @keyframes bbob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}@keyframes bhop{0%{transform:translateY(0) scale(1)}35%{transform:translateY(-7px) scale(1.08);box-shadow:0 0 14px var(--accent)}70%{transform:translateY(1px) scale(.97)}100%{transform:none;box-shadow:none}}
 .view-peek body{background:#0c1119;margin:0;overflow:hidden;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 35%,#1c2533)}
 #peekbox{position:fixed;inset:0;display:flex;gap:8px;padding:10px;box-sizing:border-box;overflow-x:auto;overflow-y:hidden}
@@ -393,7 +393,7 @@ dl.props{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:6px 0 1
 #bub img{width:40px;height:40px;border-radius:50%;flex:none;background:rgba(255,95,162,.25)}#bub b{display:block;font-size:12px;color:#ff8fc0;margin-bottom:1px}
 @keyframes bin{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
 #livewall{position:fixed;inset:0;overflow:hidden;background:#fafafa}#livewall .lbg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-#livewall .lfig{position:absolute;left:46.77%;bottom:0;width:34.53%;transform-origin:50% 100%;animation:lbreath 4.6s ease-in-out infinite}
+#livewall .lfig{position:absolute;left:46.77%;bottom:0;width:34.53%;transform-origin:50% 100%;will-change:transform}
 #livewall .lfig img{position:absolute;left:0;top:0;width:100%;height:auto}#livewall .lfig img:first-child{position:relative;display:block}
 #livewall .lov{opacity:0}#livewall .lov.on{opacity:1}
 @keyframes lbreath{0%,100%{transform:scale(1,1) translateY(0)}50%{transform:scale(1.004,1.008) translateY(-2px)}}
@@ -1081,8 +1081,8 @@ function renderCal(){const d=new Date(),y=d.getFullYear(),m=d.getMonth(),first=(
   let rows='',c=0,cells=[];for(let i=first;i>0;i--)cells.push(`<td class="x">${prev-i+1}</td>`);for(let i=1;i<=days;i++)cells.push(`<td${i===d.getDate()?' class="t"':''}>${i}</td>`);let n=1;while(cells.length%7)cells.push(`<td class="x">${n++}</td>`);
   for(let i=0;i<cells.length;i+=7)rows+='<tr>'+cells.slice(i,i+7).join('')+'</tr>';
   $('#cal').innerHTML=`<div class="ch"><b>${d.toLocaleDateString('en-GB',{month:'long',year:'numeric'})}</b><span style="color:var(--muted)">${d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric'})}</span></div><table><tr>${['Mo','Tu','We','Th','Fr','Sa','Su'].map(x=>`<th>${x}</th>`).join('')}</tr>${rows}</table>`}
-function tick(){const d=new Date();$('#clock b').textContent=d.toLocaleTimeString('en-GB',{hour:clock24?'2-digit':'numeric',minute:'2-digit',hour12:!clock24});$('#clock span').textContent=d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'})}
-setInterval(tick,1000);tick();
+function tick(){const d=new Date(),b=$('#clock b'),sp=$('#clock span');if(!b)return;const t=d.toLocaleTimeString('en-GB',{hour:clock24?'2-digit':'numeric',minute:'2-digit',hour12:!clock24}),ds=d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});if(b.textContent!==t)b.textContent=t;if(sp&&sp.textContent!==ds)sp.textContent=ds}
+if(VIEW==='panel'||VIEW==='main')setInterval(tick,5000);tick();
 function toast(t,s){if(MW&&VIEW!=='toasts'){HX.toast(t,s||'').catch(()=>{});return}if(VIEW==='toasts')return toastView(t,s);const e=h('div',{class:'toast'},h('b',{},t),s?h('span',{},s):null);const prev=[...document.querySelectorAll('.toast:not(.out)')];let top=16;prev.forEach(x=>top=Math.max(top,x.offsetTop+x.offsetHeight+8));e.style.top=top+'px';document.body.append(e);setTimeout(()=>e.classList.add('out'),2600);setTimeout(()=>e.remove(),3000)}
 
 /* ---------- file system ---------- */
@@ -1780,8 +1780,9 @@ const APPS={
       if(d.toolDone&&!/^(No |That failed|Unknown|The user said no|Not allowed|Which app)/.test(d.result||''))burst('spark',8)}
     if(kind==='setup')drawSetupProgress(d);
     if(kind==='state'&&!d.up&&ready){ready=false;setStat('Asleep','idle')}});
+  let wakeP=null;const wake=()=>wakeP||(wakeP=N.start().then(()=>{ready=true;setStat('Here with you','idle')}).finally(()=>{wakeP=null}));
   async function send(text){text=(text||'').trim();if(!text||busy)return;hush();
-    if(!ready){toast(cfg.name+' is still waking up','Give her a moment.');return}
+    if(!ready){if(wakeP)return toast(cfg.name+' is still waking up','Give her a moment.');setStat('Waking up…','think');try{await wake()}catch(e){setStat('Asleep','idle');toast('Couldn’t wake '+cfg.name,errMsg(e));return}}
     busy=true;msgs.push({role:'user',content:text});bubble('user',text);inp.value='';fit();
     reqId=Math.random().toString(36).slice(2);const my=reqId;cur=bubble('assistant','');cur.classList.add('typing');setStat('Thinking…','think');
     try{const r=await N.chat(msgs,my);if(my!==reqId&&!r.stopped)return;
@@ -2028,7 +2029,7 @@ const APPS={
     right.innerHTML='';right.append(log,bar);
     try{msgs=await N.history()}catch(e){msgs=[]}log.innerHTML='';for(const m of msgs.slice(-30))bubble(m.role,m.content);
     setStat('Waking up…','think');inp.focus();
-    try{await N.start();if(!alive)return;ready=true;setStat('Here with you','idle');
+    try{await wake();if(!alive)return;
       let g=null;try{g=await N.greet()}catch(e){}
       if(g&&g.aff){drawAff(g.aff);if(g.aff.up)setTimeout(()=>affUp(g.aff),3500)}
       if(!msgs.length&&(!g||!g.text))g={kind:'hi',text:`Hi! I'm ${cfg.name}, your NexusOS buddy. Ask me anything, or tell me to open a game, turn up the volume, or switch to performance mode!`};
@@ -2146,16 +2147,19 @@ function petals(on){if(!on){if(petalRun){petalRun.stop();petalRun=null}return}if
   const c=h('canvas',{id:'petals'});const wl=$('#desk');(wl?wl.parentNode:document.body).insertBefore(c,wl||null);const x=c.getContext('2d');let W=0,H=0,t0=0,raf=0,stopped=false;
   const P=Array.from({length:26},()=>({x:Math.random(),y:Math.random(),s:.6+Math.random()*.8,v:.02+Math.random()*.03,w:Math.random()*6.28,r:Math.random()*6.28}));
   const size=()=>{W=c.width=innerWidth;H=c.height=innerHeight};size();addEventListener('resize',size);
-  function draw(t){if(stopped)return;raf=setTimeout(()=>requestAnimationFrame(draw),33);if(document.documentElement.classList.contains('covered'))return;const dt=Math.min(.1,(t-(t0||t))/1000);t0=t;x.clearRect(0,0,W,H);
+  function draw(t){if(stopped)return;const q=deskQuiet();raf=setTimeout(()=>requestAnimationFrame(draw),q?500:40);if(q){t0=0;return}const dt=Math.min(.1,(t-(t0||t))/1000);t0=t;x.clearRect(0,0,W,H);
     for(const p of P){p.y+=p.v*dt*3;p.w+=dt*1.3;p.r+=dt*.8;p.x+=Math.sin(p.w)*.0006;if(p.y>1.05){p.y=-.05;p.x=Math.random()}
       x.save();x.translate(p.x*W,p.y*H);x.rotate(p.r);x.scale(p.s,p.s*(.6+.4*Math.abs(Math.sin(p.w))));x.fillStyle='rgba(255,170,205,.85)';x.beginPath();x.moveTo(0,-7);x.bezierCurveTo(7,-7,8,3,0,8);x.bezierCurveTo(-8,3,-7,-7,0,-7);x.fill();x.restore()}}
   requestAnimationFrame(draw);petalRun={stop(){stopped=true;clearTimeout(raf);c.remove();removeEventListener('resize',size)}}}
+// 2.2.2: the desktop's decorations rest while you're using a window (or a game covers it)
+function deskQuiet(){return document.documentElement.classList.contains('covered')||(typeof extWins!=='undefined'&&extWins.length>0)}
 // ---- 1.7: Nexa as a live wallpaper: she breathes, blinks and smiles now and then
 let liveRun=null;
 function liveWall(skin){if(liveRun&&liveRun.skin===skin)return;if(liveRun)liveRun.stop();if(!skin)return;
   const b='wallpapers/live/fig-'+(skin==='tan'?'tan':'light');const im=(src,cls)=>h('img',{src,class:cls||'',alt:'',draggable:false});
   const blink=im(b+'-blink.webp','lov'),smile=im(b+'-closed.webp','lov'),fig=h('div',{class:'lfig'},im(b+'.webp'),blink,smile);
-  const el=h('div',{id:'livewall'},im('wallpapers/live/bg.webp','lbg'),fig);document.body.prepend(el);let alive=true;const cov=()=>document.documentElement.classList.contains('covered');
+  const el=h('div',{id:'livewall'},im('wallpapers/live/bg.webp','lbg'),fig);document.body.prepend(el);let alive=true;const cov=deskQuiet,t0=performance.now();
+  (function br(){if(!alive)return;const q=cov();if(!q){const k=(1-Math.cos((performance.now()-t0)/4600*6.2832))/2;fig.style.transform=`translateY(${(-2*k).toFixed(2)}px) scale(${(1+.004*k).toFixed(4)},${(1+.008*k).toFixed(4)})`}setTimeout(br,q?500:66)})();
   (function bl(){if(!alive)return;if(!cov()){blink.classList.add('on');setTimeout(()=>blink.classList.remove('on'),140)}setTimeout(bl,2500+Math.random()*4000)})();
   (function sm(){if(!alive)return;if(!cov()&&Math.random()<.5){smile.classList.add('on');setTimeout(()=>smile.classList.remove('on'),2500)}setTimeout(sm,9000+Math.random()*9000)})();
   (function sp(){if(!alive)return;if(!cov()){const r=fig.getBoundingClientRect();const e=h('span',{class:'lsp'},Math.random()<.35?'♥':'✦');e.style.left=(r.left+r.width*(.2+Math.random()*.6))+'px';e.style.top=(r.top+r.height*(.05+Math.random()*.35))+'px';el.append(e);setTimeout(()=>e.remove(),3100)}setTimeout(sp,3500+Math.random()*3000)})();

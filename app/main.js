@@ -1199,8 +1199,10 @@ let lastWinSig = '', activeX = 0, watchTimer = null, lastWinList = [];
 async function listWindows() {
   const out = await run('wmctrl', ['-lpxG'], { timeout: 4000 }).catch(() => '');
   const sb = screen.getPrimaryDisplay().bounds, big = (w, h) => w * h >= sb.width * sb.height * 0.7;   // covers most of the screen (maximized, full screen)
-  const act = await run('xprop', ['-root', '_NET_ACTIVE_WINDOW'], { timeout: 3000 }).catch(() => '');
-  const am = /window id # (0x[0-9a-f]+)/i.exec(act); activeX = am ? parseInt(am[1], 16) : 0;
+  // 2.2.2: the watcher already tells us the active window, so only ask xprop when it isn't running
+  if (spyProc && spyActive !== null) activeX = spyActive;
+  else { const act = await run('xprop', ['-root', '_NET_ACTIVE_WINDOW'], { timeout: 3000 }).catch(() => '');
+    const am = /window id # (0x[0-9a-f]+)/i.exec(act); activeX = am ? parseInt(am[1], 16) : 0; }
   const own = new Map(); for (const a of appWins.values()) if (!a.win.isDestroyed()) own.set(xid(a.win), a);
   const skip = new Set([desktopWin, panelWin, popupWin, toastWin, peekWin].filter((w) => w && !w.isDestroyed()).map(xid));
   const map = wmClassMap(); const res = [];
@@ -1257,17 +1259,21 @@ async function pushWindows(force) {
 }
 // 1.5: react to window changes as they happen (xprop -spy) instead of asking twice a second, so NexusOS
 // wakes up far less while you play; a slow check still catches title changes
-let spyProc = null, spyT = null;
+let spyProc = null, spyT = null, spyActive = null, spyBuf = '';
 function startWindowWatch() {
   clearInterval(watchTimer);
   const poke = () => { clearTimeout(spyT); spyT = setTimeout(() => pushWindows(false).catch(() => {}), 120); };
   try {
     spyProc = cp.spawn('xprop', ['-root', '-spy', '_NET_ACTIVE_WINDOW', '_NET_CLIENT_LIST'], { stdio: ['ignore', 'pipe', 'ignore'] });
-    spyProc.stdout.on('data', poke);
+    spyProc.stdout.on('data', (d) => {
+      spyBuf = (spyBuf + String(d)).slice(-4000); const lines = spyBuf.split('\n'); spyBuf = lines.pop();
+      for (const l of lines) { const m = /^_NET_ACTIVE_WINDOW\(WINDOW\): window id # (0x[0-9a-f]+)/i.exec(l); if (m) spyActive = parseInt(m[1], 16); else if (/^_NET_ACTIVE_WINDOW/.test(l)) spyActive = 0; }
+      poke();
+    });
     spyProc.on('error', () => { spyProc = null; });
-    spyProc.on('exit', () => { spyProc = null; clearInterval(watchTimer); watchTimer = setInterval(() => pushWindows(false).catch(() => {}), 900); });
+    spyProc.on('exit', () => { spyProc = null; spyActive = null; clearInterval(watchTimer); watchTimer = setInterval(() => pushWindows(false).catch(() => {}), 900); });
   } catch (_) { spyProc = null; }
-  watchTimer = setInterval(() => pushWindows(false).catch(() => {}), spyProc ? 3000 : 900);
+  watchTimer = setInterval(() => pushWindows(false).catch(() => {}), spyProc ? 5000 : 900);   // (the slow check only catches title changes)
 }
 app.on('will-quit', () => { if (spyProc) try { spyProc.kill(); } catch (_) {} });
 async function windowAction(id, action) {
@@ -2326,6 +2332,7 @@ const nexaKids = new Set(); let nexaAbort = null;
 let nexaSrv = null, nexaPort = 0, nexaKey = '', nexaReady = null, nexaErr = '', nexaDevice = '';
 const freePort = () => new Promise((resolve, reject) => { const srv = require('net').createServer(); srv.listen(0, '127.0.0.1', () => { const p = srv.address().port; srv.close(() => resolve(p)); }); srv.on('error', reject); });
 function nexaStart() {
+  nexaUsed = Date.now();
   if (nexaReady) return nexaReady;
   nexaReady = (async () => {
     const eng = path.join(NEXA_DIR(), 'engine'), model = path.join(NEXA_DIR(), 'model.gguf');
@@ -2361,6 +2368,13 @@ function nexaStart() {
   nexaReady.catch(() => { nexaReady = null; });
   return nexaReady;
 }
+// 2.2.2: after 10 quiet minutes her brain sleeps (frees about 3 GB of graphics memory); the next message wakes her
+let nexaUsed = 0;
+setInterval(() => {
+  if (!nexaSrv || !nexaReady || nexaKids.size || Date.now() - nexaUsed < 10 * 60000) return;
+  nexaReady.then(() => { if (!nexaSrv || Date.now() - nexaUsed < 10 * 60000) return; const p = nexaSrv; nexaSrv = null; nexaReady = null;
+    try { p.kill('SIGTERM'); } catch (_) {} setTimeout(() => { try { p.kill('SIGKILL'); } catch (_) {} }, 5000); broadcast('nexa-state', { up: false }); }).catch(() => {});
+}, 60000);
 async function nexaStop() {
   for (const c of nexaKids) { try { c.kill('SIGKILL'); } catch (_) {} } nexaKids.clear();
   const p = nexaSrv; nexaSrv = null; nexaReady = null;
